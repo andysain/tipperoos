@@ -227,6 +227,99 @@ def inject_styles() -> None:
             text-align: center;
             padding-top: 0.85rem;
         }
+        .tr-rules-hero {
+            border: 1px solid #e5e7eb;
+            border-left: 6px solid #ff4b4b;
+            border-radius: 8px;
+            padding: 1.1rem 1.25rem;
+            margin: 0.75rem 0 1.25rem;
+            background: #fffafa;
+        }
+        .tr-rules-hero-title {
+            font-size: 1.2rem;
+            font-weight: 800;
+            margin-bottom: 0.35rem;
+        }
+        .tr-rules-hero-copy {
+            color: #4b5563;
+            line-height: 1.45;
+        }
+        .tr-rule-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.75rem;
+            margin: 0.8rem 0 1.25rem;
+        }
+        .tr-rule-tile {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 0.95rem;
+            background: #ffffff;
+        }
+        .tr-rule-tile strong {
+            display: block;
+            font-size: 0.95rem;
+            line-height: 1.25;
+            margin-bottom: 0.45rem;
+        }
+        .tr-points {
+            display: inline-flex;
+            align-items: baseline;
+            gap: 0.2rem;
+            color: #ff4b4b;
+            font-weight: 850;
+            font-size: 1.65rem;
+            line-height: 1;
+        }
+        .tr-points span {
+            color: #6b7280;
+            font-size: 0.8rem;
+            font-weight: 700;
+        }
+        .tr-rule-section-title {
+            font-size: 1.15rem;
+            font-weight: 850;
+            margin: 1.25rem 0 0.35rem;
+        }
+        .tr-example-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.8rem;
+            margin-top: 0.75rem;
+        }
+        .tr-example-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 1rem;
+            background: #ffffff;
+        }
+        .tr-example-card h4 {
+            margin: 0 0 0.65rem;
+            font-size: 1rem;
+        }
+        .tr-example-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 0.75rem;
+            padding: 0.5rem 0;
+            border-top: 1px solid #f3f4f6;
+        }
+        .tr-example-row:first-of-type {
+            border-top: 0;
+        }
+        .tr-example-points {
+            font-weight: 850;
+            color: #111827;
+        }
+        .tr-note {
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            background: #eff6ff;
+            color: #1e3a8a;
+            padding: 0.8rem 1rem;
+            margin: 1rem 0;
+            font-weight: 650;
+        }
         @media (max-width: 640px) {
             .block-container {
                 padding-left: 1rem;
@@ -246,6 +339,10 @@ def inject_styles() -> None:
             }
             .tr-team-label {
                 font-size: 1.12rem;
+            }
+            .tr-rule-grid,
+            .tr-example-grid {
+                grid-template-columns: 1fr;
             }
         }
         </style>
@@ -679,18 +776,16 @@ def score_prediction(match: dict, prediction: dict | None) -> int:
 
     actual_diff = actual_a - actual_b
     pred_diff = pred_a - pred_b
-    points = 0
 
-    if sign(actual_diff) == sign(pred_diff):
-        points += 3
-    if actual_diff == pred_diff:
-        points += 2
-    if pred_a == actual_a:
-        points += 1
-    if pred_b == actual_b:
-        points += 1
     if pred_a == actual_a and pred_b == actual_b:
-        points += 5
+        points = 6
+    elif actual_diff == pred_diff:
+        points = 4
+    elif sign(actual_diff) == sign(pred_diff):
+        points = 3
+    else:
+        points = 0
+
     if match.get("is_knockout") and prediction.get("pred_advance_team") == match.get("advance_team"):
         points += 2
     return points
@@ -1219,27 +1314,106 @@ def rules_page() -> None:
     st.title("Rules")
     st.markdown(
         """
-        Make a score prediction for each match before it locks. Matches lock 30 minutes before kickoff.
+        <div class="tr-rules-hero">
+            <div class="tr-rules-hero-title">Tip the score before kickoff</div>
+            <div class="tr-rules-hero-copy">
+                Matches lock 30 minutes before kickoff. The score is the score at the end of the match,
+                including extra time if extra time is played. Penalty shootout goals do not count.
+            </div>
+        </div>
 
-        The score is the score at the end of the match, including extra time if extra time is played.
-        Penalty shootout goals do not count in the score.
+        <div class="tr-rule-section-title">Match points</div>
+        <div class="tr-muted">For the match score, you get the highest one that applies.</div>
 
-        For knockout matches, if you predict a draw, choose who progresses.
+        <div class="tr-rule-grid">
+            <div class="tr-rule-tile">
+                <strong>Exact score</strong>
+                <div class="tr-points">6 <span>points</span></div>
+            </div>
+            <div class="tr-rule-tile">
+                <strong>Correct goal difference</strong>
+                <div class="tr-points">4 <span>points</span></div>
+            </div>
+            <div class="tr-rule-tile">
+                <strong>Correct result</strong>
+                <div class="tr-points">3 <span>points</span></div>
+            </div>
+            <div class="tr-rule-tile">
+                <strong>Wrong result</strong>
+                <div class="tr-points">0 <span>points</span></div>
+            </div>
+        </div>
 
-        Points:
+        <div class="tr-rule-section-title">Bonuses</div>
+        <div class="tr-note">
+            I'm still looking at how to do Knockout scoring. Will finalise before knockout rounds kickoff.
+        </div>
+        
+        <div class="tr-rule-grid">
+            <div class="tr-rule-tile">
+                <strong>Correct knockout advancement</strong>
+                <div class="tr-points">+2 <span>points</span></div>
+            </div>
+            <div class="tr-rule-tile">
+                <strong>Correct overall winner</strong>
+                <div class="tr-points">+10 <span>points</span></div>
+            </div>
+        </div>
 
-        | Prediction item | Points |
-        | --- | ---: |
-        | Correct result | 3 |
-        | Correct goal difference | 2 |
-        | Correct Team A score | 1 |
-        | Correct Team B score | 1 |
-        | Exact full score bonus | 5 |
-        | Correct knockout advancement | 2 |
-        | Correct overall winner | 10 |
 
-        Bots are computer players for fun and appear on the leaderboard.
-        """
+        <div class="tr-rule-section-title">Examples</div>
+        <div class="tr-example-grid">
+            <div class="tr-example-card">
+                <h4>Actual: Australia 2-1 Japan</h4>
+                <div class="tr-example-row">
+                    <div>Australia 2-1 Japan<br><span class="tr-muted">Exact score</span></div>
+                    <div class="tr-example-points">6</div>
+                </div>
+                <div class="tr-example-row">
+                    <div>Australia 1-0 Japan<br><span class="tr-muted">Correct goal difference</span></div>
+                    <div class="tr-example-points">4</div>
+                </div>
+                <div class="tr-example-row">
+                    <div>Australia 3-1 Japan<br><span class="tr-muted">Correct result</span></div>
+                    <div class="tr-example-points">3</div>
+                </div>
+                <div class="tr-example-row">
+                    <div>Australia 1-1 Japan<br><span class="tr-muted">Wrong result</span></div>
+                    <div class="tr-example-points">0</div>
+                </div>
+            </div>
+            <div class="tr-example-card">
+                <h4>Actual: England 1-1 USA</h4>
+                <div class="tr-example-row">
+                    <div>England 1-1 USA<br><span class="tr-muted">Exact score</span></div>
+                    <div class="tr-example-points">6</div>
+                </div>
+                <div class="tr-example-row">
+                    <div>England 0-0 USA<br><span class="tr-muted">Correct goal difference</span></div>
+                    <div class="tr-example-points">4</div>
+                </div>
+                <div class="tr-example-row">
+                    <div>England 2-2 USA<br><span class="tr-muted">Correct goal difference</span></div>
+                    <div class="tr-example-points">4</div>
+                </div>
+                <div class="tr-example-row">
+                    <div>England 2-1 USA<br><span class="tr-muted">Wrong result</span></div>
+                    <div class="tr-example-points">0</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tr-rule-section-title">Knockout matches</div>
+        <div class="tr-rules-hero">
+            <div class="tr-rules-hero-copy">
+                If you predict a draw in a knockout match, choose who progresses. Advancement points are
+                added separately from score points.
+            </div>
+        </div>
+
+        <div class="tr-muted">Bots are computer players for fun and appear on the leaderboard.</div>
+        """,
+        unsafe_allow_html=True,
     )
 
 
@@ -2249,6 +2423,7 @@ def admin_page() -> None:
 
 
 def main() -> None:
+    inject_styles()
     cleared_cookie = emit_pending_cookie_update()
     if not cleared_cookie:
         restore_session_from_cookie()
