@@ -7,400 +7,34 @@ import json
 import random
 import re
 from collections import Counter, defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from html import escape
-from pathlib import Path
 from statistics import median
-from zoneinfo import ZoneInfo
 
 import bcrypt
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
-from dateutil import parser
 from supabase import Client, create_client
 
-APP_TITLE = "Tipperoos"
-SESSION_COOKIE_NAME = "tipperoos_session"
-SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 60
-SYDNEY = ZoneInfo("Australia/Sydney")
-ARCHIVE_DIR = Path(__file__).parent / "archive"
-HOST_CITY_TIMEZONES = {
-    "Atlanta": "America/New_York",
-    "Boston": "America/New_York",
-    "Dallas": "America/Chicago",
-    "Houston": "America/Chicago",
-    "Kansas City": "America/Chicago",
-    "Los Angeles": "America/Los_Angeles",
-    "Miami": "America/New_York",
-    "New York/New Jersey": "America/New_York",
-    "Philadelphia": "America/New_York",
-    "San Francisco Bay Area": "America/Los_Angeles",
-    "Seattle": "America/Los_Angeles",
-    "Toronto": "America/Toronto",
-    "Vancouver": "America/Vancouver",
-    "Guadalajara": "America/Mexico_City",
-    "Mexico City": "America/Mexico_City",
-    "Monterrey": "America/Monterrey",
-}
-FIFA_FLAG_EMOJIS = {
-    "ALG": "🇩🇿",
-    "ARG": "🇦🇷",
-    "AUS": "🇦🇺",
-    "AUT": "🇦🇹",
-    "BEL": "🇧🇪",
-    "BIH": "🇧🇦",
-    "BRA": "🇧🇷",
-    "CAN": "🇨🇦",
-    "CIV": "🇨🇮",
-    "COD": "🇨🇩",
-    "COL": "🇨🇴",
-    "CPV": "🇨🇻",
-    "CRO": "🇭🇷",
-    "CUR": "🇨🇼",
-    "CZE": "🇨🇿",
-    "ECU": "🇪🇨",
-    "EGY": "🇪🇬",
-    "ENG": "🏴",
-    "ESP": "🇪🇸",
-    "FRA": "🇫🇷",
-    "GER": "🇩🇪",
-    "GHA": "🇬🇭",
-    "HAI": "🇭🇹",
-    "IRN": "🇮🇷",
-    "IRQ": "🇮🇶",
-    "JOR": "🇯🇴",
-    "JPN": "🇯🇵",
-    "KOR": "🇰🇷",
-    "KSA": "🇸🇦",
-    "MAR": "🇲🇦",
-    "MEX": "🇲🇽",
-    "NED": "🇳🇱",
-    "NOR": "🇳🇴",
-    "NZL": "🇳🇿",
-    "PAN": "🇵🇦",
-    "PAR": "🇵🇾",
-    "POR": "🇵🇹",
-    "QAT": "🇶🇦",
-    "RSA": "🇿🇦",
-    "SCO": "🏴",
-    "SEN": "🇸🇳",
-    "SUI": "🇨🇭",
-    "SWE": "🇸🇪",
-    "TUN": "🇹🇳",
-    "TUR": "🇹🇷",
-    "URU": "🇺🇾",
-    "USA": "🇺🇸",
-    "UZB": "🇺🇿",
-}
-BOT_SPECS = {
-    "random": {"username": "bot_random", "display_name": "Random Bot"},
-    "median": {"username": "bot_median", "display_name": "Median Bot"},
-    "one_one": {"username": "bot_one_one", "display_name": "1-1 Bot"},
-}
-SCORE_POOL = [0, 0, 1, 1, 1, 2, 2, 3]
-PLAYER_EMOJIS = [
-    "",
-    "😈",
-    "🏆",
-    "⚽",
-    "🔥",
-    "⭐",
-    "🎯",
-    "🦘",
-    "🇦🇺",
-    "🇳🇿",
-    "🇧🇷",
-    "🇦🇷",
-    "🇯🇵",
-    "🇫🇷",
-    "🇮🇹",
-    "🇪🇸",
-    "🇬🇧",
-    "Other",
-]
+from tipperoos.constants import (
+    APP_TITLE,
+    ARCHIVE_DIR,
+    BOT_SPECS,
+    FIFA_FLAG_EMOJIS,
+    PLAYER_EMOJIS,
+    SCORE_POOL,
+    SESSION_COOKIE_NAME,
+    SESSION_MAX_AGE_SECONDS,
+    SYDNEY,
+)
+from tipperoos.scoring import score_prediction, score_winner_pick
+from tipperoos.styles import inject_styles
+from tipperoos.time_utils import host_local_label, iso_dt, local_label, now_utc, parse_dt, parse_host_kickoff
+from tipperoos.ui import example_card, example_grid, muted, note, panel, points_grid, section_title
 
 
 st.set_page_config(page_title=APP_TITLE, page_icon="T", layout="wide")
-
-
-def inject_styles() -> None:
-    st.markdown(
-        """
-        <style>
-        .block-container {
-            max-width: 1180px;
-            padding-top: 2.4rem;
-            padding-bottom: 4rem;
-        }
-        h1, h2, h3 {
-            letter-spacing: 0;
-        }
-        div[data-testid="stForm"] {
-            border-radius: 8px;
-        }
-        div[data-testid="stMetricValue"] {
-            font-size: 1.75rem;
-        }
-        .tr-card-title {
-            font-size: 1.28rem;
-            font-weight: 750;
-            margin-bottom: 0.25rem;
-        }
-        .tr-card-meta {
-            color: #6b7280;
-            font-size: 0.95rem;
-            line-height: 1.35;
-            margin-bottom: 0;
-        }
-        .tr-card-pick {
-            color: #9ca3af;
-            font-size: 0.98rem;
-            font-weight: 650;
-            line-height: 1.35;
-            margin-bottom: 0.8rem;
-        }
-        .tr-team-label {
-            font-size: 1.35rem;
-            font-weight: 800;
-            color: #111827;
-            margin-bottom: 0.35rem;
-        }
-        .tr-card-top {
-            display: flex;
-            align-items: center;
-            justify-content: flex-start;
-            flex-wrap: wrap;
-            gap: 0.5rem 0.75rem;
-            margin-bottom: 0.35rem;
-        }
-        .tr-muted {
-            color: #6b7280;
-            font-size: 0.92rem;
-            line-height: 1.35;
-        }
-        .tr-badge {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-width: 84px;
-            padding: 0.25rem 0.65rem;
-            border-radius: 999px;
-            font-size: 0.82rem;
-            font-weight: 750;
-            border: 1px solid transparent;
-            white-space: nowrap;
-        }
-        .tr-badge-open {
-            background: #ecfdf5;
-            color: #047857;
-            border-color: #a7f3d0;
-        }
-        .tr-badge-saved {
-            background: #eff6ff;
-            color: #1d4ed8;
-            border-color: #bfdbfe;
-        }
-        .tr-badge-locked {
-            background: #f3f4f6;
-            color: #374151;
-            border-color: #d1d5db;
-        }
-        .tr-badge-missed {
-            background: #fef2f2;
-            color: #b91c1c;
-            border-color: #fecaca;
-        }
-        .tr-badge-completed {
-            background: #fff7ed;
-            color: #c2410c;
-            border-color: #fed7aa;
-        }
-        .tr-badge-tbc {
-            background: #f8fafc;
-            color: #475569;
-            border-color: #cbd5e1;
-        }
-        .tr-score-preview {
-            font-size: 1.75rem;
-            font-weight: 800;
-            text-align: center;
-            padding-top: 0.85rem;
-        }
-        .tr-rules-hero {
-            border: 1px solid #e5e7eb;
-            border-left: 6px solid #ff4b4b;
-            border-radius: 8px;
-            padding: 1.1rem 1.25rem;
-            margin: 0.75rem 0 1.25rem;
-            background: #fffafa;
-        }
-        .tr-rules-hero-title {
-            font-size: 1.2rem;
-            font-weight: 800;
-            margin-bottom: 0.35rem;
-        }
-        .tr-rules-hero-copy {
-            color: #4b5563;
-            line-height: 1.45;
-        }
-        .tr-rule-grid {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 0.75rem;
-            margin: 0.8rem 0 1.25rem;
-        }
-        .tr-rule-tile {
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            padding: 0.95rem;
-            background: #ffffff;
-        }
-        .tr-rule-tile strong {
-            display: block;
-            font-size: 0.95rem;
-            line-height: 1.25;
-            margin-bottom: 0.45rem;
-        }
-        .tr-points {
-            display: inline-flex;
-            align-items: baseline;
-            gap: 0.2rem;
-            color: #ff4b4b;
-            font-weight: 850;
-            font-size: 1.65rem;
-            line-height: 1;
-        }
-        .tr-points span {
-            color: #6b7280;
-            font-size: 0.8rem;
-            font-weight: 700;
-        }
-        .tr-rule-section-title {
-            font-size: 1.15rem;
-            font-weight: 850;
-            margin: 1.25rem 0 0.35rem;
-        }
-        .tr-example-grid {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 0.8rem;
-            margin-top: 0.75rem;
-        }
-        .tr-example-card {
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            padding: 1rem;
-            background: #ffffff;
-        }
-        .tr-example-card h4 {
-            margin: 0 0 0.65rem;
-            font-size: 1rem;
-        }
-        .tr-example-row {
-            display: grid;
-            grid-template-columns: 1fr auto;
-            gap: 0.75rem;
-            padding: 0.5rem 0;
-            border-top: 1px solid #f3f4f6;
-        }
-        .tr-example-row:first-of-type {
-            border-top: 0;
-        }
-        .tr-example-points {
-            font-weight: 850;
-            color: #111827;
-        }
-        .tr-note {
-            border: 1px solid #bfdbfe;
-            border-radius: 8px;
-            background: #eff6ff;
-            color: #1e3a8a;
-            padding: 0.8rem 1rem;
-            margin: 1rem 0;
-            font-weight: 650;
-        }
-        @media (max-width: 640px) {
-            .block-container {
-                padding-left: 1rem;
-                padding-right: 1rem;
-                padding-top: 1.2rem;
-            }
-            .tr-card-title {
-                font-size: 1rem;
-            }
-            .tr-score-preview {
-                font-size: 1.25rem;
-                padding-top: 0;
-            }
-            .tr-card-top {
-                align-items: center;
-                gap: 0.4rem 0.55rem;
-            }
-            .tr-team-label {
-                font-size: 1.12rem;
-            }
-            .tr-rule-grid,
-            .tr-example-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-def now_utc() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def parse_dt(value) -> datetime | None:
-    if value in (None, "") or pd.isna(value):
-        return None
-    dt = parser.parse(str(value))
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=SYDNEY)
-    return dt.astimezone(timezone.utc)
-
-
-def parse_host_kickoff(value, city_name: str) -> datetime | None:
-    if value in (None, "") or pd.isna(value):
-        return None
-    dt = parser.parse(str(value))
-    if dt.tzinfo is not None:
-        return dt.astimezone(timezone.utc)
-
-    host_tz_name = HOST_CITY_TIMEZONES.get(city_name)
-    if not host_tz_name:
-        return parse_dt(value)
-
-    # Older fixture exports used host-local wall-clock values without a reliable
-    # timezone. Attach the named host timezone for those naive timestamps.
-    return dt.replace(tzinfo=ZoneInfo(host_tz_name)).astimezone(timezone.utc)
-
-
-def iso_dt(dt: datetime | None) -> str | None:
-    if dt is None:
-        return None
-    return dt.astimezone(timezone.utc).isoformat()
-
-
-def local_label(value) -> str:
-    dt = parse_dt(value)
-    if not dt:
-        return "-"
-    return dt.astimezone(SYDNEY).strftime("%a %d %b, %I:%M %p")
-
-
-def host_local_label(value, city_name: str | None) -> str:
-    dt = parse_dt(value)
-    if not dt or not city_name:
-        return "-"
-    tz_name = HOST_CITY_TIMEZONES.get(city_name)
-    if not tz_name:
-        return "-"
-    return dt.astimezone(ZoneInfo(tz_name)).strftime("%a %d %b, %I:%M %p")
 
 
 def flag_for_code(code: str | None) -> str | None:
@@ -753,48 +387,6 @@ def can_edit_winner_pick(settings: dict) -> bool:
     if not deadline:
         return True
     return now_utc() < deadline
-
-
-def sign(value: int) -> int:
-    if value > 0:
-        return 1
-    if value < 0:
-        return -1
-    return 0
-
-
-def score_prediction(match: dict, prediction: dict | None) -> int:
-    if not prediction or match.get("status") != "completed":
-        return 0
-    if match.get("team_a_score") is None or match.get("team_b_score") is None:
-        return 0
-
-    actual_a = int(match["team_a_score"])
-    actual_b = int(match["team_b_score"])
-    pred_a = int(prediction["pred_team_a_score"])
-    pred_b = int(prediction["pred_team_b_score"])
-
-    actual_diff = actual_a - actual_b
-    pred_diff = pred_a - pred_b
-
-    if pred_a == actual_a and pred_b == actual_b:
-        points = 6
-    elif actual_diff == pred_diff:
-        points = 4
-    elif sign(actual_diff) == sign(pred_diff):
-        points = 3
-    else:
-        points = 0
-
-    if match.get("is_knockout") and prediction.get("pred_advance_team") == match.get("advance_team"):
-        points += 2
-    return points
-
-
-def score_winner_pick(settings: dict, pick: dict | None) -> int:
-    if not pick or not settings.get("final_winner"):
-        return 0
-    return 10 if pick.get("team") == settings.get("final_winner") else 0
 
 
 def create_player(username: str, display_name: str, pin: str, emoji: str = "", is_admin: bool = False) -> None:
@@ -1312,109 +904,63 @@ def match_centre_page() -> None:
 
 def rules_page() -> None:
     st.title("Rules")
-    st.markdown(
-        """
-        <div class="tr-rules-hero">
-            <div class="tr-rules-hero-title">Tip the score before kickoff</div>
-            <div class="tr-rules-hero-copy">
-                Matches lock 30 minutes before kickoff. The score is the score at the end of the match,
-                including extra time if extra time is played. Penalty shootout goals do not count.
-            </div>
-        </div>
-
-        <div class="tr-rule-section-title">Match points</div>
-        <div class="tr-muted">For the match score, you get the highest one that applies.</div>
-
-        <div class="tr-rule-grid">
-            <div class="tr-rule-tile">
-                <strong>Exact score</strong>
-                <div class="tr-points">6 <span>points</span></div>
-            </div>
-            <div class="tr-rule-tile">
-                <strong>Correct goal difference</strong>
-                <div class="tr-points">4 <span>points</span></div>
-            </div>
-            <div class="tr-rule-tile">
-                <strong>Correct result</strong>
-                <div class="tr-points">3 <span>points</span></div>
-            </div>
-            <div class="tr-rule-tile">
-                <strong>Wrong result</strong>
-                <div class="tr-points">0 <span>points</span></div>
-            </div>
-        </div>
-
-        <div class="tr-rule-section-title">Bonuses</div>
-        <div class="tr-note">
-            I'm still looking at how to do Knockout scoring. Will finalise before knockout rounds kickoff.
-        </div>
-        
-        <div class="tr-rule-grid">
-            <div class="tr-rule-tile">
-                <strong>Correct knockout advancement</strong>
-                <div class="tr-points">+2 <span>points</span></div>
-            </div>
-            <div class="tr-rule-tile">
-                <strong>Correct overall winner</strong>
-                <div class="tr-points">+10 <span>points</span></div>
-            </div>
-        </div>
-
-
-        <div class="tr-rule-section-title">Examples</div>
-        <div class="tr-example-grid">
-            <div class="tr-example-card">
-                <h4>Actual: Australia 2-1 Japan</h4>
-                <div class="tr-example-row">
-                    <div>Australia 2-1 Japan<br><span class="tr-muted">Exact score</span></div>
-                    <div class="tr-example-points">6</div>
-                </div>
-                <div class="tr-example-row">
-                    <div>Australia 1-0 Japan<br><span class="tr-muted">Correct goal difference</span></div>
-                    <div class="tr-example-points">4</div>
-                </div>
-                <div class="tr-example-row">
-                    <div>Australia 3-1 Japan<br><span class="tr-muted">Correct result</span></div>
-                    <div class="tr-example-points">3</div>
-                </div>
-                <div class="tr-example-row">
-                    <div>Australia 1-1 Japan<br><span class="tr-muted">Wrong result</span></div>
-                    <div class="tr-example-points">0</div>
-                </div>
-            </div>
-            <div class="tr-example-card">
-                <h4>Actual: England 1-1 USA</h4>
-                <div class="tr-example-row">
-                    <div>England 1-1 USA<br><span class="tr-muted">Exact score</span></div>
-                    <div class="tr-example-points">6</div>
-                </div>
-                <div class="tr-example-row">
-                    <div>England 0-0 USA<br><span class="tr-muted">Correct goal difference</span></div>
-                    <div class="tr-example-points">4</div>
-                </div>
-                <div class="tr-example-row">
-                    <div>England 2-2 USA<br><span class="tr-muted">Correct goal difference</span></div>
-                    <div class="tr-example-points">4</div>
-                </div>
-                <div class="tr-example-row">
-                    <div>England 2-1 USA<br><span class="tr-muted">Wrong result</span></div>
-                    <div class="tr-example-points">0</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="tr-rule-section-title">Knockout matches</div>
-        <div class="tr-rules-hero">
-            <div class="tr-rules-hero-copy">
-                If you predict a draw in a knockout match, choose who progresses. Advancement points are
-                added separately from score points.
-            </div>
-        </div>
-
-        <div class="tr-muted">Bots are computer players for fun and appear on the leaderboard.</div>
-        """,
-        unsafe_allow_html=True,
+    html = "\n".join(
+        [
+            panel(
+                "Tip the score before kickoff",
+                "Matches lock 30 minutes before kickoff. The score is the score at the end of the match, "
+                "including extra time if extra time is played. Penalty shootout goals do not count.",
+            ),
+            section_title("Match points", "For the match score, you get the highest one that applies."),
+            points_grid(
+                [
+                    ("Exact score", "6"),
+                    ("Correct goal difference", "4"),
+                    ("Correct result", "3"),
+                    ("Wrong result", "0"),
+                ]
+            ),
+            section_title("Bonuses"),
+            note("Knockout scoring is still under review and will be finalised before the knockout rounds kick off."),
+            points_grid(
+                [
+                    ("Correct knockout advancement", "+2"),
+                    ("Correct overall winner", "+10"),
+                ]
+            ),
+            section_title("Examples"),
+            example_grid(
+                [
+                    example_card(
+                        "Actual: Australia 2-1 Japan",
+                        [
+                            ("Australia 2-1 Japan", "Exact score", "6"),
+                            ("Australia 1-0 Japan", "Correct goal difference", "4"),
+                            ("Australia 3-1 Japan", "Correct result", "3"),
+                            ("Australia 1-1 Japan", "Wrong result", "0"),
+                        ],
+                    ),
+                    example_card(
+                        "Actual: England 1-1 USA",
+                        [
+                            ("England 1-1 USA", "Exact score", "6"),
+                            ("England 0-0 USA", "Correct goal difference", "4"),
+                            ("England 2-2 USA", "Correct goal difference", "4"),
+                            ("England 2-1 USA", "Wrong result", "0"),
+                        ],
+                    ),
+                ]
+            ),
+            section_title("Knockout matches"),
+            panel(
+                "Pick who progresses",
+                "If you predict a draw in a knockout match, choose who progresses. Advancement points are "
+                "added separately from score points.",
+            ),
+            muted("Bots are computer players for fun and appear on the leaderboard."),
+        ]
     )
+    st.markdown(html, unsafe_allow_html=True)
 
 
 def import_archive_fixture_csvs() -> tuple[int, int]:
