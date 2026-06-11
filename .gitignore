@@ -1,0 +1,12 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.streamlit/secrets.toml
+.env
+*.log
+*.db
+*.sqlite
+*.sqlite3
+codex_mvp_handoff.md
