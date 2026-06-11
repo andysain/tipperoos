@@ -481,7 +481,24 @@ def load_teams(active_only: bool = True) -> list[dict]:
 
 @st.cache_data(ttl=20)
 def load_matches() -> list[dict]:
-    return execute(db().table("matches").select("*").order("kickoff_time"))
+    matches = execute(db().table("matches").select("*").order("kickoff_time"))
+    results = result_lookup(load_match_results())
+    for match in matches:
+        result = results.get(match["id"])
+        if result:
+            match["status"] = result.get("status") or "scheduled"
+            match["team_a_score"] = result.get("team_a_score")
+            match["team_b_score"] = result.get("team_b_score")
+            match["advance_team"] = result.get("advance_team")
+            match["result_updated_at"] = result.get("updated_at") or result.get("confirmed_at")
+        else:
+            match["status"] = match.get("status") or "scheduled"
+    return matches
+
+
+@st.cache_data(ttl=20)
+def load_match_results() -> list[dict]:
+    return execute(db().table("match_results").select("*"))
 
 
 @st.cache_data(ttl=20)
@@ -548,8 +565,7 @@ def get_player(player_id: str) -> dict | None:
 
 
 def get_match(match_id: str) -> dict | None:
-    rows = execute(db().table("matches").select("*").eq("id", match_id).limit(1))
-    return rows[0] if rows else None
+    return next((match for match in load_matches() if match["id"] == match_id), None)
 
 
 def prediction_lookup(predictions: list[dict]) -> dict[tuple[str, str], dict]:
@@ -558,6 +574,10 @@ def prediction_lookup(predictions: list[dict]) -> dict[tuple[str, str], dict]:
 
 def winner_lookup(winner_picks: list[dict]) -> dict[str, dict]:
     return {p["player_id"]: p for p in winner_picks}
+
+
+def result_lookup(results: list[dict]) -> dict[str, dict]:
+    return {r["match_id"]: r for r in results}
 
 
 def team_lookup(teams: list[dict]) -> dict[str, dict]:
@@ -1530,22 +1550,382 @@ def save_result(match: dict, score_a: int, score_b: int, advance_team: str | Non
         advance_team = None
         result_updated_at = None
 
-    db().table("matches").update(
+    db().table("match_results").upsert(
         {
+            "match_id": match["id"],
             "status": status,
             "team_a_score": score_a if status == "completed" else None,
             "team_b_score": score_b if status == "completed" else None,
             "advance_team": advance_team,
-            "result_updated_at": result_updated_at,
+            "source": "manual",
+            "confirmed_at": result_updated_at or iso_dt(now_utc()),
             "updated_at": iso_dt(now_utc()),
-        }
-    ).eq("id", match["id"]).execute()
+        },
+        on_conflict="match_id",
+    ).execute()
     clear_data_cache()
 
     if status == "completed":
         generate_bot_predictions(only_match_id=match["id"])
         generate_bot_winner_picks()
         propagate_knockout_matchups()
+
+
+RESULT_SCORE_A_COLUMNS = ("team_a_score", "score_a")
+RESULT_SCORE_B_COLUMNS = ("team_b_score", "score_b")
+RESULT_TEAM_A_COLUMNS = ("team_a_code", "a_code")
+RESULT_TEAM_B_COLUMNS = ("team_b_code", "b_code")
+RESULT_ADVANCE_COLUMNS = ("advance_team_code", "advance_team", "advanced_team_code", "winner_code", "winner")
+RESULT_STATUS_COLUMNS = ("status", "result_status")
+RESULT_STATUSES = ("scheduled", "completed", "cancelled", "postponed")
+
+
+def csv_column(row: dict, aliases: tuple[str, ...]):
+    lower = {str(key).strip().lower(): key for key in row}
+    for alias in aliases:
+        key = lower.get(alias)
+        if key is not None:
+            return row.get(key)
+    return None
+
+
+def blank(value) -> bool:
+    return value in (None, "") or pd.isna(value)
+
+
+def parse_score_value(value, label: str) -> int:
+    if blank(value):
+        raise ValueError(f"{label} is blank.")
+    try:
+        score = int(float(str(value).strip()))
+    except ValueError as exc:
+        raise ValueError(f"{label} must be a whole number.") from exc
+    if score < 0:
+        raise ValueError(f"{label} must be 0 or more.")
+    return score
+
+
+def resolve_advance_value(value, match: dict, score_a: int, score_b: int) -> str | None:
+    if not match.get("is_knockout"):
+        return None
+    options = [match.get("team_a"), match.get("team_b")]
+    if score_a > score_b:
+        return match.get("team_a")
+    if score_b > score_a:
+        return match.get("team_b")
+    if blank(value):
+        raise ValueError("advance_team is required for tied knockout results.")
+
+    raw = str(value).strip()
+    normalized = raw.casefold()
+    if normalized in ("team_a", "a", "home"):
+        return match.get("team_a")
+    if normalized in ("team_b", "b", "away"):
+        return match.get("team_b")
+    for team in options:
+        if team and normalized == team.casefold():
+            return team
+    if match.get("team_a_code") and normalized == str(match["team_a_code"]).casefold():
+        return match.get("team_a")
+    if match.get("team_b_code") and normalized == str(match["team_b_code"]).casefold():
+        return match.get("team_b")
+    raise ValueError("advance_team must be team_a, team_b, a team name, or a team code.")
+
+
+def result_snapshot(match: dict) -> str:
+    if match.get("team_a_score") is None or match.get("team_b_score") is None:
+        return "-"
+    return f"{match['team_a_score']}-{match['team_b_score']}"
+
+
+def advance_code_for_match(match: dict) -> str:
+    advanced = match.get("advance_team")
+    if advanced == match.get("team_a"):
+        return match.get("team_a_code") or ""
+    if advanced == match.get("team_b"):
+        return match.get("team_b_code") or ""
+    return ""
+
+
+def result_update_from_values(
+    match: dict,
+    score_a_raw,
+    score_b_raw,
+    status_raw,
+    advance_raw,
+    source_label: str,
+) -> tuple[dict | None, str | None, bool]:
+    row_has_scores = not blank(score_a_raw) or not blank(score_b_raw)
+    row_has_status = not blank(status_raw)
+    if not row_has_scores and not row_has_status:
+        return None, None, False
+
+    status = str(status_raw).strip().lower() if row_has_status else "completed"
+    if row_has_scores and status == "scheduled":
+        status = "completed"
+    if status not in RESULT_STATUSES:
+        return None, f"status must be one of {', '.join(RESULT_STATUSES)}.", False
+
+    try:
+        score_a = score_b = None
+        advance_team = None
+        if status == "completed":
+            score_a = parse_score_value(score_a_raw, "team_a_score")
+            score_b = parse_score_value(score_b_raw, "team_b_score")
+            advance_team = resolve_advance_value(advance_raw, match, score_a, score_b)
+        elif row_has_scores:
+            return None, "Rows with scores should use status completed, or leave status as scheduled.", False
+    except ValueError as exc:
+        return None, str(exc), False
+
+    current_status = match.get("status") or "scheduled"
+    current_advance = match.get("advance_team")
+    current_result = result_snapshot(match)
+    new_result = f"{score_a}-{score_b}" if status == "completed" else "-"
+    changed = (
+        current_status != status
+        or current_result != new_result
+        or (current_advance or "") != (advance_team or "")
+    )
+    if not changed:
+        return None, None, True
+
+    action = "Add result" if current_result == "-" and status == "completed" else "Change result"
+    if status != "completed":
+        action = "Clear result/status" if current_result != "-" else "Change status"
+
+    return (
+        {
+            "match_id": match["id"],
+            "match_number": int(match["match_number"]),
+            "score_a": score_a,
+            "score_b": score_b,
+            "advance_team": advance_team,
+            "status": status,
+            "source": source_label,
+            "preview": {
+                "Action": action,
+                "Match": int(match["match_number"]),
+                "Codes": f"{match.get('team_a_code')} vs {match.get('team_b_code')}",
+                "Fixture": matchup_label(match),
+                "Current": f"{current_status} {current_result}".strip(),
+                "New": f"{status} {new_result}".strip(),
+                "Current advanced": current_advance or "-",
+                "New advanced": advance_team or "-",
+            },
+        },
+        None,
+        False,
+    )
+
+
+def build_result_updates_from_csv(uploaded_file) -> tuple[list[dict], list[dict], int]:
+    df = pd.read_csv(uploaded_file)
+    matches = load_matches()
+    matches_by_number = {int(m["match_number"]): m for m in matches if m.get("match_number") is not None}
+    updates: list[dict] = []
+    errors: list[dict] = []
+    unchanged = 0
+
+    columns = {str(column).strip().lower() for column in df.columns}
+    has_score_columns = bool(columns.intersection(RESULT_SCORE_A_COLUMNS)) and bool(columns.intersection(RESULT_SCORE_B_COLUMNS))
+    has_status_column = bool(columns.intersection(RESULT_STATUS_COLUMNS))
+    if "match_number" not in columns:
+        return [], [{"Row": "-", "Match": "-", "Problem": "CSV needs a match_number column."}], 0
+    if not columns.intersection(RESULT_TEAM_A_COLUMNS) or not columns.intersection(RESULT_TEAM_B_COLUMNS):
+        return [], [
+            {
+                "Row": "-",
+                "Match": "-",
+                "Problem": "CSV needs team_a_code and team_b_code columns so scores can be validated against fixtures.",
+            }
+        ], 0
+    if not has_score_columns and not has_status_column:
+        return [], [
+            {
+                "Row": "-",
+                "Match": "-",
+                "Problem": "Add team_a_score and team_b_score columns, or a status column, before uploading.",
+            }
+        ], 0
+
+    for index, row in enumerate(df.to_dict("records"), start=2):
+        match_number_raw = csv_column(row, ("match_number",))
+        if blank(match_number_raw):
+            continue
+        try:
+            match_number = int(float(str(match_number_raw).strip()))
+        except ValueError:
+            errors.append({"Row": index, "Match": "-", "Problem": "match_number must be a number."})
+            continue
+
+        match = matches_by_number.get(match_number)
+        if not match:
+            errors.append({"Row": index, "Match": match_number, "Problem": "No matching fixture in Supabase."})
+            continue
+        if not has_teams(match):
+            errors.append({"Row": index, "Match": match_number, "Problem": "Fixture teams are not set yet."})
+            continue
+
+        team_a_code_raw = csv_column(row, RESULT_TEAM_A_COLUMNS)
+        team_b_code_raw = csv_column(row, RESULT_TEAM_B_COLUMNS)
+        team_a_code = "" if blank(team_a_code_raw) else str(team_a_code_raw).strip().casefold()
+        team_b_code = "" if blank(team_b_code_raw) else str(team_b_code_raw).strip().casefold()
+        expected_a_code = str(match.get("team_a_code") or "").strip().casefold()
+        expected_b_code = str(match.get("team_b_code") or "").strip().casefold()
+        if not team_a_code or not team_b_code:
+            errors.append({"Row": index, "Match": match_number, "Problem": "team_a_code and team_b_code are required."})
+            continue
+        if team_a_code != expected_a_code or team_b_code != expected_b_code:
+            expected = f"{match.get('team_a_code') or '-'} vs {match.get('team_b_code') or '-'}"
+            supplied = f"{team_a_code_raw or '-'} vs {team_b_code_raw or '-'}"
+            errors.append(
+                {
+                    "Row": index,
+                    "Match": match_number,
+                    "Problem": f"Team codes do not match fixture. Expected {expected}; uploaded {supplied}.",
+                }
+            )
+            continue
+
+        status_raw = csv_column(row, RESULT_STATUS_COLUMNS)
+        score_a_raw = csv_column(row, RESULT_SCORE_A_COLUMNS)
+        score_b_raw = csv_column(row, RESULT_SCORE_B_COLUMNS)
+        advance_raw = csv_column(row, RESULT_ADVANCE_COLUMNS)
+
+        update, problem, unchanged_row = result_update_from_values(
+            match,
+            score_a_raw,
+            score_b_raw,
+            status_raw,
+            advance_raw,
+            "csv_upload",
+        )
+        if problem:
+            errors.append({"Row": index, "Match": match_number, "Problem": problem})
+            continue
+        if unchanged_row:
+            unchanged += 1
+            continue
+        if update:
+            updates.append(update)
+
+    return updates, errors, unchanged
+
+
+def result_editor_rows(matches: list[dict]) -> list[dict]:
+    rows = []
+    for match in matches:
+        if not has_teams(match):
+            continue
+        rows.append(
+            {
+                "match_number": int(match["match_number"]),
+                "kickoff": local_label(match.get("kickoff_time")),
+                "stage": match.get("group_name") or match.get("stage"),
+                "team_a": match.get("team_a"),
+                "team_a_code": match.get("team_a_code") or "",
+                "team_a_score": None if match.get("team_a_score") is None else int(match["team_a_score"]),
+                "team_b_score": None if match.get("team_b_score") is None else int(match["team_b_score"]),
+                "team_b_code": match.get("team_b_code") or "",
+                "team_b": match.get("team_b"),
+                "status": match.get("status") or "scheduled",
+                "advance_team_code": advance_code_for_match(match),
+            }
+        )
+    return rows
+
+
+def build_result_updates_from_table(rows) -> tuple[list[dict], list[dict], int]:
+    data = rows.to_dict("records") if hasattr(rows, "to_dict") else list(rows)
+    matches = load_matches()
+    matches_by_number = {int(m["match_number"]): m for m in matches if m.get("match_number") is not None}
+    updates: list[dict] = []
+    errors: list[dict] = []
+    unchanged = 0
+
+    for index, row in enumerate(data, start=1):
+        match_number_raw = row.get("match_number")
+        if blank(match_number_raw):
+            continue
+        try:
+            match_number = int(float(str(match_number_raw).strip()))
+        except ValueError:
+            errors.append({"Row": index, "Match": "-", "Problem": "match_number must be a number."})
+            continue
+
+        match = matches_by_number.get(match_number)
+        if not match:
+            errors.append({"Row": index, "Match": match_number, "Problem": "No matching fixture in Supabase."})
+            continue
+
+        supplied_a = "" if blank(row.get("team_a_code")) else str(row.get("team_a_code")).strip().casefold()
+        supplied_b = "" if blank(row.get("team_b_code")) else str(row.get("team_b_code")).strip().casefold()
+        expected_a = str(match.get("team_a_code") or "").strip().casefold()
+        expected_b = str(match.get("team_b_code") or "").strip().casefold()
+        if supplied_a != expected_a or supplied_b != expected_b:
+            errors.append({"Row": index, "Match": match_number, "Problem": "Team codes changed unexpectedly. Refresh and try again."})
+            continue
+
+        update, problem, unchanged_row = result_update_from_values(
+            match,
+            row.get("team_a_score"),
+            row.get("team_b_score"),
+            row.get("status"),
+            row.get("advance_team_code"),
+            "table_editor",
+        )
+        if problem:
+            errors.append({"Row": index, "Match": match_number, "Problem": problem})
+            continue
+        if unchanged_row:
+            unchanged += 1
+            continue
+        if update:
+            updates.append(update)
+
+    return updates, errors, unchanged
+
+
+def apply_result_updates(updates: list[dict]) -> int:
+    completed_match_ids = []
+    timestamp = iso_dt(now_utc())
+    for update in updates:
+        status = update["status"]
+        db().table("match_results").upsert(
+            {
+                "match_id": update["match_id"],
+                "status": status,
+                "team_a_score": update["score_a"] if status == "completed" else None,
+                "team_b_score": update["score_b"] if status == "completed" else None,
+                "advance_team": update["advance_team"] if status == "completed" else None,
+                "source": update.get("source") or "admin",
+                "confirmed_at": timestamp,
+                "updated_at": timestamp,
+            },
+            on_conflict="match_id",
+        ).execute()
+        if status == "completed":
+            completed_match_ids.append(update["match_id"])
+
+    clear_data_cache()
+    for match_id in completed_match_ids:
+        generate_bot_predictions(only_match_id=match_id)
+    if completed_match_ids:
+        generate_bot_winner_picks()
+    propagate_knockout_matchups()
+    try:
+        db().table("result_imports").insert(
+            {
+                "row_count": len(updates),
+                "changed_count": len(updates),
+                "error_count": 0,
+                "imported_by": st.session_state.get("player_id"),
+            }
+        ).execute()
+    except Exception:
+        pass
+    return len(updates)
 
 
 def settings_admin() -> None:
@@ -1644,41 +2024,159 @@ def round_of_32_admin() -> None:
 def result_admin() -> None:
     st.subheader("Results")
     matches = load_matches()
-    labels = [
-        f"{m.get('match_number')}: {matchup_label(m)} (Sydney {local_label(m.get('kickoff_time'))})"
-        for m in matches
-    ]
-    if not labels:
+    if not matches:
         st.info("No matches yet.")
         return
-    selected_label = st.selectbox("Match", labels)
-    match = matches[labels.index(selected_label)]
-    if not has_teams(match):
-        st.warning("Set both teams before entering a result.")
-        return
-    with st.form("result_form"):
-        c1, c2, c3 = st.columns([2, 1, 2])
-        score_a = c1.number_input(match["team_a"], min_value=0, max_value=30, value=int(match.get("team_a_score") or 0))
-        c2.markdown("### -")
-        score_b = c3.number_input(match["team_b"], min_value=0, max_value=30, value=int(match.get("team_b_score") or 0))
-        status = st.selectbox(
-            "Status",
-            ["scheduled", "completed", "cancelled", "postponed"],
-            index=["scheduled", "completed", "cancelled", "postponed"].index(match.get("status") or "scheduled"),
+
+    tab_edit, tab_upload, tab_single = st.tabs(["Edit Table", "Upload CSV", "Single match"])
+
+    with tab_edit:
+        rows = result_editor_rows(matches)
+        if not rows:
+            st.info("No fixtures with teams are ready for results yet.")
+        else:
+            st.caption("Edit scores directly, preview the changes, then confirm the save.")
+            edited = st.data_editor(
+                pd.DataFrame(rows),
+                key="results_table_editor",
+                use_container_width=True,
+                hide_index=True,
+                num_rows="fixed",
+                disabled=[
+                    "match_number",
+                    "kickoff",
+                    "stage",
+                    "team_a",
+                    "team_a_code",
+                    "team_b_code",
+                    "team_b",
+                ],
+                column_order=[
+                    "match_number",
+                    "kickoff",
+                    "stage",
+                    "team_a",
+                    "team_a_code",
+                    "team_a_score",
+                    "team_b_score",
+                    "team_b_code",
+                    "team_b",
+                    "status",
+                    "advance_team_code",
+                ],
+                column_config={
+                    "match_number": st.column_config.NumberColumn("Match", width="small"),
+                    "kickoff": st.column_config.TextColumn("Kickoff", width="medium"),
+                    "stage": st.column_config.TextColumn("Stage", width="small"),
+                    "team_a": st.column_config.TextColumn("Team A", width="medium"),
+                    "team_a_code": st.column_config.TextColumn("A code", width="small"),
+                    "team_a_score": st.column_config.NumberColumn("A score", min_value=0, max_value=30, step=1),
+                    "team_b_score": st.column_config.NumberColumn("B score", min_value=0, max_value=30, step=1),
+                    "team_b_code": st.column_config.TextColumn("B code", width="small"),
+                    "team_b": st.column_config.TextColumn("Team B", width="medium"),
+                    "status": st.column_config.SelectboxColumn("Status", options=list(RESULT_STATUSES)),
+                    "advance_team_code": st.column_config.TextColumn("Advances", width="small"),
+                },
+            )
+
+            updates, errors, _unchanged = build_result_updates_from_table(edited)
+            if errors:
+                st.error("Fix these rows before saving.")
+                st.dataframe(pd.DataFrame(errors), use_container_width=True, hide_index=True)
+
+            if updates:
+                st.write(f"{len(updates)} result change(s) ready to apply.")
+                st.dataframe(
+                    pd.DataFrame([update["preview"] for update in updates]),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+            else:
+                st.info("No result changes found in the table.")
+
+            if st.button("Confirm and save table results", type="primary", disabled=bool(errors) or not updates):
+                try:
+                    saved = apply_result_updates(updates)
+                    st.success(f"Saved {saved} result change(s).")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(str(exc))
+
+    with tab_upload:
+        st.caption(
+            "Upload `archive/results.csv`. Required columns: `match_number`, `team_a_code`, "
+            "`team_b_code`, `team_a_score`, `team_b_score`. For tied knockout matches, "
+            "also set `advance_team_code`."
         )
-        advance_team = None
-        if match.get("is_knockout"):
-            options = [match["team_a"], match["team_b"]]
-            existing = match.get("advance_team")
-            advance_team = st.selectbox("Team advanced", options, index=options.index(existing) if existing in options else 0)
-        submitted = st.form_submit_button("Save result")
-    if submitted:
-        try:
-            save_result(match, int(score_a), int(score_b), advance_team, status)
-            st.success("Result saved.")
-            st.rerun()
-        except Exception as exc:
-            st.error(str(exc))
+        uploaded = st.file_uploader("Results CSV", type="csv")
+        if uploaded:
+            try:
+                updates, errors, unchanged = build_result_updates_from_csv(uploaded)
+            except Exception as exc:
+                st.error("Could not read that CSV.")
+                with st.expander("Technical detail"):
+                    st.code(str(exc))
+                return
+
+            if errors:
+                st.error("Fix these CSV rows before saving.")
+                st.dataframe(pd.DataFrame(errors), use_container_width=True, hide_index=True)
+
+            if updates:
+                st.write(f"{len(updates)} result change(s) ready to apply.")
+                st.dataframe(
+                    pd.DataFrame([update["preview"] for update in updates]),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+            else:
+                st.info("No result changes found in that CSV.")
+
+            if unchanged:
+                st.caption(f"{unchanged} row(s) already matched the current saved result.")
+
+            confirm_disabled = bool(errors) or not updates
+            if st.button("Confirm and save CSV results", type="primary", disabled=confirm_disabled):
+                try:
+                    saved = apply_result_updates(updates)
+                    st.success(f"Saved {saved} result change(s).")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(str(exc))
+
+    with tab_single:
+        labels = [
+            f"{m.get('match_number')}: {matchup_label(m)} (Sydney {local_label(m.get('kickoff_time'))})"
+            for m in matches
+        ]
+        selected_label = st.selectbox("Match", labels)
+        match = matches[labels.index(selected_label)]
+        if not has_teams(match):
+            st.warning("Set both teams before entering a result.")
+            return
+        with st.form("result_form"):
+            c1, c2, c3 = st.columns([2, 1, 2])
+            score_a = c1.number_input(match["team_a"], min_value=0, max_value=30, value=int(match.get("team_a_score") or 0))
+            c2.markdown("### -")
+            score_b = c3.number_input(match["team_b"], min_value=0, max_value=30, value=int(match.get("team_b_score") or 0))
+            status = st.selectbox(
+                "Status",
+                ["scheduled", "completed", "cancelled", "postponed"],
+                index=["scheduled", "completed", "cancelled", "postponed"].index(match.get("status") or "scheduled"),
+            )
+            advance_team = None
+            if match.get("is_knockout"):
+                options = [match["team_a"], match["team_b"]]
+                existing = match.get("advance_team")
+                advance_team = st.selectbox("Team advanced", options, index=options.index(existing) if existing in options else 0)
+            submitted = st.form_submit_button("Save result")
+        if submitted:
+            try:
+                save_result(match, int(score_a), int(score_b), advance_team, status)
+                st.success("Result saved.")
+                st.rerun()
+            except Exception as exc:
+                st.error(str(exc))
 
 
 def bot_admin() -> None:

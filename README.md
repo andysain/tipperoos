@@ -68,6 +68,25 @@ The import creates:
 Round of 32 team assignment is manual in the admin UI. Later knockout rounds can be
 propagated from completed knockout results where the fixture labels are clear.
 
+## Result Updates
+
+Results are stored separately from fixture data in `match_results`. Admin > Results
+has an editable table for entering scores, previewing the changes, and confirming
+before saving.
+
+The CSV upload is a fallback for bulk updates. It uses `archive/results.csv`.
+
+Use this CSV shape:
+
+```csv
+match_number,team_a_code,team_b_code,team_a_score,team_b_score,status,advance_team_code
+```
+
+`team_a_code` and `team_b_code` are validated against the saved fixture before a
+score can be imported. `status` is optional and defaults to `completed` when scores
+are present. For tied knockout matches, set `advance_team_code` to the code of the
+team that advanced.
+
 ## Notes
 
 - Do not commit `.streamlit/secrets.toml`.

@@ -64,6 +64,42 @@ create table if not exists matches (
   )
 );
 
+create table if not exists match_results (
+  id uuid primary key default gen_random_uuid(),
+  match_id uuid not null references matches(id) on delete cascade,
+  status text not null default 'scheduled',
+  team_a_score integer,
+  team_b_score integer,
+  advance_team text,
+  source text,
+  source_updated_at timestamptz,
+  confirmed_at timestamptz default now(),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique(match_id),
+  constraint valid_match_result_status check (
+    status in ('scheduled', 'completed', 'cancelled', 'postponed')
+  ),
+  constraint valid_match_result_scores check (
+    (team_a_score is null or team_a_score >= 0) and
+    (team_b_score is null or team_b_score >= 0)
+  ),
+  constraint completed_match_result_has_scores check (
+    status != 'completed' or
+    (team_a_score is not null and team_b_score is not null)
+  )
+);
+
+create table if not exists result_imports (
+  id uuid primary key default gen_random_uuid(),
+  file_name text,
+  row_count integer default 0,
+  changed_count integer default 0,
+  error_count integer default 0,
+  imported_by uuid references players(id),
+  created_at timestamptz default now()
+);
+
 create table if not exists predictions (
   id uuid primary key default gen_random_uuid(),
   player_id uuid references players(id) on delete cascade,
@@ -110,5 +146,38 @@ create index if not exists idx_players_active on players(active);
 create index if not exists idx_players_bot on players(is_bot);
 create index if not exists idx_matches_kickoff on matches(kickoff_time);
 create index if not exists idx_matches_stage on matches(stage);
+create index if not exists idx_match_results_match on match_results(match_id);
+create index if not exists idx_match_results_status on match_results(status);
 create index if not exists idx_predictions_player on predictions(player_id);
 create index if not exists idx_predictions_match on predictions(match_id);
+
+insert into match_results (
+  match_id,
+  status,
+  team_a_score,
+  team_b_score,
+  advance_team,
+  source,
+  confirmed_at,
+  updated_at
+)
+select
+  id,
+  status,
+  team_a_score,
+  team_b_score,
+  advance_team,
+  'matches_migration',
+  coalesce(result_updated_at, now()),
+  now()
+from matches
+where status != 'scheduled'
+   or team_a_score is not null
+   or team_b_score is not null
+   or advance_team is not null
+on conflict (match_id) do update set
+  status = excluded.status,
+  team_a_score = excluded.team_a_score,
+  team_b_score = excluded.team_b_score,
+  advance_team = excluded.advance_team,
+  updated_at = now();
