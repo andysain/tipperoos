@@ -10,10 +10,20 @@ def sign(value: int) -> int:
 
 
 def score_prediction(match: dict, prediction: dict | None) -> int:
+    return score_prediction_details(match, prediction)["total_points"]
+
+
+def score_prediction_details(match: dict, prediction: dict | None) -> dict:
+    empty = {
+        "score_points": 0,
+        "advancement_points": 0,
+        "total_points": 0,
+        "tier": "No score",
+    }
     if not prediction or match.get("status") != "completed":
-        return 0
+        return empty
     if match.get("team_a_score") is None or match.get("team_b_score") is None:
-        return 0
+        return empty
 
     actual_a = int(match["team_a_score"])
     actual_b = int(match["team_b_score"])
@@ -24,17 +34,27 @@ def score_prediction(match: dict, prediction: dict | None) -> int:
     pred_diff = pred_a - pred_b
 
     if pred_a == actual_a and pred_b == actual_b:
-        points = 6
+        score_points = 6
+        tier = "Exact"
     elif actual_diff == pred_diff:
-        points = 4
+        score_points = 4
+        tier = "Goal diff"
     elif sign(actual_diff) == sign(pred_diff):
-        points = 3
+        score_points = 3
+        tier = "Result"
     else:
-        points = 0
+        score_points = 0
+        tier = "Wrong"
 
+    advancement_points = 0
     if match.get("is_knockout") and prediction.get("pred_advance_team") == match.get("advance_team"):
-        points += 2
-    return points
+        advancement_points = 2
+    return {
+        "score_points": score_points,
+        "advancement_points": advancement_points,
+        "total_points": score_points + advancement_points,
+        "tier": tier,
+    }
 
 
 def score_winner_pick(settings: dict, pick: dict | None) -> int:

@@ -28,11 +28,29 @@ from tipperoos.constants import (
     SESSION_MAX_AGE_SECONDS,
     SYDNEY,
 )
-from tipperoos.scoring import score_prediction, score_winner_pick
+from tipperoos.scoring import (
+    score_prediction,
+    score_prediction_details,
+    score_winner_pick,
+)
 from tipperoos.styles import inject_styles
-from tipperoos.time_utils import host_local_label, iso_dt, local_label, now_utc, parse_dt, parse_host_kickoff
-from tipperoos.ui import example_card, example_grid, muted, note, panel, points_grid, section_title
-
+from tipperoos.time_utils import (
+    host_local_label,
+    iso_dt,
+    local_label,
+    now_utc,
+    parse_dt,
+    parse_host_kickoff,
+)
+from tipperoos.ui import (
+    example_card,
+    example_grid,
+    muted,
+    note,
+    panel,
+    points_grid,
+    section_title,
+)
 
 st.set_page_config(page_title=APP_TITLE, page_icon="T", layout="wide")
 
@@ -411,7 +429,7 @@ def create_bot(bot_type: str) -> None:
             "username": spec["username"],
             "display_name": spec["display_name"],
             "pin_hash": hash_pin(str(random.randint(100000, 999999))),
-            "emoji": "Bot",
+            "emoji": None,
             "is_admin": False,
             "is_bot": True,
             "bot_type": bot_type,
@@ -594,7 +612,7 @@ def sidebar() -> str:
             st.session_state.pop(key, None)
         st.rerun()
 
-    pages = ["My Predictions", "Rules"]
+    pages = ["My Predictions", "Rules", "Leaderboard", "Match Centre"]
     if st.session_state.get("is_admin"):
         pages.append("Admin")
     return st.sidebar.radio("Page", pages)
@@ -830,25 +848,67 @@ def calculate_leaderboard() -> pd.DataFrame:
 
     rows = []
     for player in players:
-        match_points = sum(score_prediction(m, predictions.get((player["id"], m["id"]))) for m in matches)
+        score_points = 0
+        advancement_points = 0
+        exact_count = 0
+        goal_diff_count = 0
+        result_count = 0
+        for match in matches:
+            details = score_prediction_details(match, predictions.get((player["id"], match["id"])))
+            score_points += details["score_points"]
+            advancement_points += details["advancement_points"]
+            if details["tier"] == "Exact":
+                exact_count += 1
+            elif details["tier"] == "Goal diff":
+                goal_diff_count += 1
+            elif details["tier"] == "Result":
+                result_count += 1
         winner_bonus = score_winner_pick(settings, winners.get(player["id"]))
-        name = player["display_name"]
-        if player.get("is_bot"):
-            name = f"{name} (Bot)"
         rows.append(
             {
-                "Player": name,
-                "Match points": match_points,
+                "Player ID": player["id"],
+                "Player": player["display_name"],
+                "Emoji": player.get("emoji") or "",
+                "Bot": bool(player.get("is_bot")),
+                "Bot sort": 1 if player.get("is_bot") else 0,
+                "Score points": score_points,
+                "Advancement": advancement_points,
                 "Winner bonus": winner_bonus,
-                "Total points": match_points + winner_bonus,
+                "Total points": score_points + advancement_points + winner_bonus,
+                "Exact": exact_count,
+                "Goal diff": goal_diff_count,
+                "Result": result_count,
             }
         )
     df = pd.DataFrame(rows)
     if df.empty:
         return df
-    df = df.sort_values(["Total points", "Player"], ascending=[False, True]).reset_index(drop=True)
-    df.insert(0, "Rank", range(1, len(df) + 1))
+    df = df.sort_values(
+        ["Total points", "Score points", "Bot sort", "Player"],
+        ascending=[False, False, True, True],
+    ).reset_index(drop=True)
+    df["Rank"] = df["Total points"].rank(method="min", ascending=False).astype(int)
     return df
+
+
+def ordinal(value: int) -> str:
+    if 10 <= value % 100 <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(value % 10, "th")
+    return f"{value}{suffix}"
+
+
+def leaderboard_rank_label(rank: int, tied: bool) -> str:
+    return f"={rank}" if tied else ordinal(rank)
+
+
+def leaderboard_player_name(row: dict) -> str:
+    if row.get("Bot"):
+        return str(row.get("Player") or "")
+    emoji = str(row.get("Emoji") or "").strip()
+    player = str(row.get("Player") or "").strip()
+    return f"{emoji} {player}".strip()
 
 
 def leaderboard_page() -> None:
@@ -856,8 +916,61 @@ def leaderboard_page() -> None:
     df = calculate_leaderboard()
     if df.empty:
         st.info("No players yet.")
+        return
+
+    matches = load_matches()
+    completed_count = len([match for match in matches if match.get("status") == "completed"])
+    player_count = len(df)
+    current_player_id = st.session_state.get("player_id")
+    current_rows = df[df["Player ID"] == current_player_id]
+    top_score = int(df.iloc[0]["Total points"])
+    if current_rows.empty:
+        current_rank = "-"
     else:
-        st.dataframe(df, hide_index=True, use_container_width=True)
+        current_rank_value = int(current_rows.iloc[0]["Rank"])
+        current_score = int(current_rows.iloc[0]["Total points"])
+        current_tied = len(df[df["Total points"] == current_score]) > 1
+        current_rank = leaderboard_rank_label(current_rank_value, current_tied)
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Completed", completed_count)
+    m2.metric("Entrants", player_count)
+    m3.metric("Top score", top_score)
+    m4.metric("Your rank", current_rank)
+
+    if completed_count == 0:
+        st.info("The leaderboard will start moving once the first result is entered. Everyone is tied for now.")
+    st.caption("Match points come from exact scores, correct goal differences, and correct results. Winner bonuses are shown separately.")
+
+    for row in df.to_dict("records"):
+        is_current = row["Player ID"] == current_player_id
+        classes = ["tr-leader-row"]
+        if row["Bot"]:
+            classes.append("tr-leader-row-bot")
+        if is_current:
+            classes.append("tr-leader-row-current")
+        if int(row["Total points"]) == 0:
+            classes.append("tr-leader-row-zero")
+        rank = int(row["Rank"])
+        tied = len(df[df["Total points"] == row["Total points"]]) > 1
+        rank_display = leaderboard_rank_label(rank, tied)
+        name = escape(leaderboard_player_name(row))
+        bot_badge = '<span class="tr-leader-bot">Bot</span>' if row["Bot"] else ""
+        you_badge = '<span class="tr-leader-you">You</span>' if is_current else ""
+        html = (
+            f'<div class="{" ".join(classes)}">'
+            f'<div class="tr-leader-rank">{rank_display}</div>'
+            '<div class="tr-leader-player">'
+            f'<div class="tr-leader-name">{name} {bot_badge} {you_badge}</div>'
+            f'<div class="tr-leader-breakdown">Exact {int(row["Exact"])} · '
+            f'Goal diff {int(row["Goal diff"])} · Result {int(row["Result"])}</div>'
+            "</div>"
+            f'<div class="tr-leader-stat"><strong>{int(row["Score points"])}</strong><span>Match</span></div>'
+            f'<div class="tr-leader-stat"><strong>{int(row["Winner bonus"])}</strong><span>Winner</span></div>'
+            f'<div class="tr-leader-total"><strong>{int(row["Total points"])}</strong><span>Total</span></div>'
+            "</div>"
+        )
+        st.markdown(html, unsafe_allow_html=True)
 
 
 def match_centre_page() -> None:

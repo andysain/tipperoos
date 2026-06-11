@@ -199,6 +199,94 @@ def inject_styles() -> None:
             margin: 1rem 0;
             font-weight: 650;
         }
+        .tr-leader-row {
+            display: grid;
+            grid-template-columns: 4rem minmax(0, 1fr) 5.5rem 5.5rem 6rem;
+            align-items: center;
+            gap: 0.65rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 0.8rem 0.95rem;
+            margin: 0.5rem 0;
+            background: #ffffff;
+            box-shadow: 0 1px 2px rgba(17, 24, 39, 0.04);
+        }
+        .tr-leader-row-current {
+            border-color: #ff9f9f;
+            background: #fff7f7;
+        }
+        .tr-leader-row-bot {
+            background: #f8fafc;
+            border-style: dashed;
+            color: #475569;
+        }
+        .tr-leader-row-zero .tr-leader-total strong {
+            color: #6b7280;
+        }
+        .tr-leader-rank {
+            font-weight: 850;
+            font-size: 1rem;
+            color: #111827;
+        }
+        .tr-leader-name {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            flex-wrap: wrap;
+            font-weight: 850;
+            font-size: 1.05rem;
+            color: #111827;
+        }
+        .tr-leader-breakdown {
+            margin-top: 0.2rem;
+            color: #6b7280;
+            font-size: 0.86rem;
+            line-height: 1.3;
+        }
+        .tr-leader-bot,
+        .tr-leader-you {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            padding: 0.15rem 0.45rem;
+            font-size: 0.72rem;
+            font-weight: 850;
+            line-height: 1.2;
+        }
+        .tr-leader-bot {
+            background: #e0f2fe;
+            color: #0369a1;
+            border: 1px solid #bae6fd;
+        }
+        .tr-leader-you {
+            background: #fee2e2;
+            color: #b91c1c;
+            border: 1px solid #fecaca;
+        }
+        .tr-leader-stat,
+        .tr-leader-total {
+            text-align: right;
+        }
+        .tr-leader-stat strong,
+        .tr-leader-total strong {
+            display: block;
+            color: #111827;
+            font-size: 1.15rem;
+            line-height: 1.1;
+        }
+        .tr-leader-stat span,
+        .tr-leader-total span {
+            color: #6b7280;
+            font-size: 0.76rem;
+            font-weight: 750;
+            text-transform: uppercase;
+            letter-spacing: 0;
+        }
+        .tr-leader-total strong {
+            color: #ff4b4b;
+            font-size: 1.45rem;
+        }
         @media (max-width: 640px) {
             .block-container {
                 padding-left: 1rem;
@@ -222,6 +310,17 @@ def inject_styles() -> None:
             .tr-rule-grid,
             .tr-example-grid {
                 grid-template-columns: 1fr;
+            }
+            .tr-leader-row {
+                grid-template-columns: 3.2rem minmax(0, 1fr) 4.6rem;
+                gap: 0.5rem;
+                padding: 0.8rem;
+            }
+            .tr-leader-stat {
+                display: none;
+            }
+            .tr-leader-total {
+                text-align: right;
             }
         }
         </style>
