@@ -270,14 +270,17 @@ def parse_dt(value) -> datetime | None:
 def parse_host_kickoff(value, city_name: str) -> datetime | None:
     if value in (None, "") or pd.isna(value):
         return None
+    dt = parser.parse(str(value))
+    if dt.tzinfo is not None:
+        return dt.astimezone(timezone.utc)
+
     host_tz_name = HOST_CITY_TIMEZONES.get(city_name)
     if not host_tz_name:
         return parse_dt(value)
-    # The archive stores host-local wall-clock kickoff times with numeric offsets.
-    # Re-attach the named host timezone so daylight saving rules come from the city,
-    # not from a potentially stale CSV offset.
-    naive = parser.parse(str(value)).replace(tzinfo=None)
-    return naive.replace(tzinfo=ZoneInfo(host_tz_name)).astimezone(timezone.utc)
+
+    # Older fixture exports used host-local wall-clock values without a reliable
+    # timezone. Attach the named host timezone for those naive timestamps.
+    return dt.replace(tzinfo=ZoneInfo(host_tz_name)).astimezone(timezone.utc)
 
 
 def iso_dt(dt: datetime | None) -> str | None:
