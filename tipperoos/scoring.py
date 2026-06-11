@@ -34,7 +34,7 @@ def score_prediction_details(match: dict, prediction: dict | None) -> dict:
     pred_diff = pred_a - pred_b
 
     if pred_a == actual_a and pred_b == actual_b:
-        score_points = 6
+        score_points = 5
         tier = "Exact"
     elif actual_diff == pred_diff:
         score_points = 4

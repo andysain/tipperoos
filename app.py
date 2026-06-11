@@ -1027,7 +1027,7 @@ def rules_page() -> None:
             section_title("Match points", "For the match score, you get the highest one that applies."),
             points_grid(
                 [
-                    ("Exact score", "6"),
+                    ("Exact score", "5"),
                     ("Correct goal difference", "4"),
                     ("Correct result", "3"),
                     ("Wrong result", "0"),
@@ -1047,7 +1047,7 @@ def rules_page() -> None:
                     example_card(
                         "Actual: Australia 2-1 Japan",
                         [
-                            ("Australia 2-1 Japan", "Exact score", "6"),
+                            ("Australia 2-1 Japan", "Exact score", "5"),
                             ("Australia 1-0 Japan", "Correct goal difference", "4"),
                             ("Australia 3-1 Japan", "Correct result", "3"),
                             ("Australia 1-1 Japan", "Wrong result", "0"),
@@ -1056,7 +1056,7 @@ def rules_page() -> None:
                     example_card(
                         "Actual: England 1-1 USA",
                         [
-                            ("England 1-1 USA", "Exact score", "6"),
+                            ("England 1-1 USA", "Exact score", "5"),
                             ("England 0-0 USA", "Correct goal difference", "4"),
                             ("England 2-2 USA", "Correct goal difference", "4"),
                             ("England 2-1 USA", "Wrong result", "0"),
