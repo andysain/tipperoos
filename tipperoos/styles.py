@@ -34,10 +34,10 @@ def inject_styles() -> None:
         }
         .tr-card-pick {
             color: #9ca3af;
-            font-size: 0.98rem;
-            font-weight: 650;
+            font-size: 0.92rem;
+            font-weight: 600;
             line-height: 1.35;
-            margin-bottom: 0.8rem;
+            margin-bottom: 0;
         }
         .tr-team-label {
             font-size: 1.35rem;
@@ -287,6 +287,102 @@ def inject_styles() -> None:
             color: #ff4b4b;
             font-size: 1.45rem;
         }
+        .tr-centre-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 0.78rem 0.95rem;
+            margin: 0.5rem 0;
+            background: #ffffff;
+            box-shadow: 0 1px 2px rgba(17, 24, 39, 0.04);
+        }
+        .tr-centre-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+        .tr-centre-meta {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.45rem 0.65rem;
+            color: #6b7280;
+            font-size: 0.88rem;
+            line-height: 1.35;
+            margin-bottom: 0.3rem;
+        }
+        .tr-centre-title {
+            color: #111827;
+            font-size: 1.1rem;
+            font-weight: 850;
+            line-height: 1.25;
+            margin-bottom: 0.15rem;
+        }
+        .tr-centre-body {
+            margin-top: 0.65rem;
+            border-top: 1px solid #f3f4f6;
+            padding-top: 0.25rem;
+        }
+        .tr-centre-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 8rem;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.65rem 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .tr-centre-row:last-child {
+            border-bottom: 0;
+        }
+        .tr-centre-player {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            color: #111827;
+            font-size: 1rem;
+            font-weight: 800;
+            line-height: 1.25;
+        }
+        .tr-centre-tip {
+            margin-top: 0.15rem;
+            color: #4b5563;
+            font-size: 0.95rem;
+            font-weight: 650;
+            line-height: 1.3;
+        }
+        .tr-centre-advance {
+            display: inline;
+            margin-left: 0.45rem;
+            color: #6b7280;
+            font-weight: 600;
+        }
+        .tr-centre-points {
+            text-align: right;
+        }
+        .tr-centre-points strong {
+            display: block;
+            color: #ff4b4b;
+            font-size: 1.25rem;
+            line-height: 1.1;
+            font-weight: 900;
+        }
+        .tr-centre-points span {
+            display: block;
+            color: #6b7280;
+            font-size: 0.78rem;
+            font-weight: 750;
+            line-height: 1.2;
+        }
+        .tr-centre-points-pending strong {
+            color: #6b7280;
+        }
+        .tr-centre-empty {
+            color: #6b7280;
+            font-size: 0.92rem;
+            font-weight: 650;
+            padding: 0.35rem 0 0.15rem;
+        }
         @media (max-width: 640px) {
             .block-container {
                 padding-left: 1rem;
@@ -321,6 +417,26 @@ def inject_styles() -> None:
             }
             .tr-leader-total {
                 text-align: right;
+            }
+            .tr-centre-card {
+                padding: 0.85rem;
+            }
+            .tr-centre-title {
+                font-size: 1.05rem;
+            }
+            .tr-centre-row {
+                grid-template-columns: minmax(0, 1fr);
+                gap: 0.35rem;
+            }
+            .tr-centre-points {
+                text-align: left;
+            }
+            .tr-centre-points strong,
+            .tr-centre-points span {
+                display: inline;
+            }
+            .tr-centre-points span {
+                margin-left: 0.35rem;
             }
         }
         </style>

@@ -29,13 +29,11 @@ from tipperoos.constants import (
     SYDNEY,
 )
 from tipperoos.scoring import (
-    score_prediction,
     score_prediction_details,
     score_winner_pick,
 )
 from tipperoos.styles import inject_styles
 from tipperoos.time_utils import (
-    host_local_label,
     iso_dt,
     local_label,
     now_utc,
@@ -361,7 +359,7 @@ def team_display(name: str | None, icon: str | None = None) -> str:
     return f"{icon} {name}".strip() if icon else name
 
 
-def status_badge(status: str) -> str:
+def status_badge(status: str, compact: bool = False) -> str:
     colors = {
         "Open": ("#ecfdf5", "#047857", "#a7f3d0"),
         "Saved": ("#eff6ff", "#1d4ed8", "#bfdbfe"),
@@ -371,10 +369,13 @@ def status_badge(status: str) -> str:
         "To be confirmed": ("#f8fafc", "#475569", "#cbd5e1"),
     }
     background, color, border = colors.get(status, colors["Locked"])
+    min_width = "auto" if compact else "84px"
+    padding = "0.18rem 0.55rem" if compact else "0.25rem 0.65rem"
+    font_size = "0.78rem" if compact else "0.82rem"
     return (
         f'<span style="display:inline-flex;align-items:center;justify-content:center;'
-        f'min-width:84px;padding:0.25rem 0.65rem;border-radius:999px;'
-        f'font-size:0.82rem;font-weight:750;white-space:nowrap;'
+        f'min-width:{min_width};padding:{padding};border-radius:999px;'
+        f'font-size:{font_size};font-weight:750;white-space:nowrap;'
         f'background:{background};color:{color};border:1px solid {border};">{status}</span>'
     )
 
@@ -390,6 +391,12 @@ def prediction_summary(prediction: dict | None) -> str:
     if not prediction:
         return ""
     return f"Your pick: {prediction['pred_team_a_score']}-{prediction['pred_team_b_score']}"
+
+
+def prediction_scoreline(prediction: dict | None) -> str:
+    if not prediction:
+        return "-"
+    return f"{prediction['pred_team_a_score']}-{prediction['pred_team_b_score']}"
 
 
 def is_match_locked(match: dict, settings: dict) -> bool:
@@ -725,6 +732,14 @@ def match_status(match: dict, prediction: dict | None, settings: dict) -> str:
     return "Saved" if prediction else "Open"
 
 
+def match_centre_status(match: dict, settings: dict) -> str:
+    if match.get("status") == "completed":
+        return "Completed"
+    if not has_teams(match):
+        return "To be confirmed"
+    return "Locked" if is_match_locked(match, settings) else "Open"
+
+
 def prediction_form(match: dict, prediction: dict | None, disabled: bool) -> None:
     player_id = st.session_state.player_id
     key = match["id"]
@@ -973,46 +988,136 @@ def leaderboard_page() -> None:
         st.markdown(html, unsafe_allow_html=True)
 
 
+def score_reason(details: dict) -> str:
+    tier = details.get("tier")
+    if tier == "Exact":
+        reason = "Exact score"
+    elif tier == "Goal diff":
+        reason = "Correct goal difference"
+    elif tier == "Result":
+        reason = "Correct result"
+    else:
+        reason = "Wrong result"
+    if details.get("advancement_points"):
+        return f"{reason} + advancement" if details.get("score_points") else "Correct advancement"
+    return reason
+
+
+def match_result_line(match: dict) -> str:
+    if (
+        match.get("status") != "completed"
+        or match.get("team_a_score") is None
+        or match.get("team_b_score") is None
+    ):
+        return matchup_label(match)
+    team_a = team_display(match.get("team_a"), match.get("team_a_icon") or flag_for_code(match.get("team_a_code")))
+    team_b = team_display(match.get("team_b"), match.get("team_b_icon") or flag_for_code(match.get("team_b_code")))
+    return f"{team_a} {match.get('team_a_score')} - {match.get('team_b_score')} {team_b}"
+
+
+def player_display_for_centre(player: dict) -> str:
+    name = str(player.get("display_name") or "")
+    if player.get("is_bot"):
+        return escape(name)
+    emoji = str(player.get("emoji") or "").strip()
+    return escape(f"{emoji} {name}".strip())
+
+
+def match_centre_prediction_rows(match: dict, predictions: list[dict], players: dict[str, dict], completed: bool) -> str:
+    if not predictions:
+        return '<div class="tr-centre-empty">No predictions for this match.</div>'
+
+    rows = []
+    predictions = sorted(
+        predictions,
+        key=lambda pred: (
+            bool(players.get(pred["player_id"], {}).get("is_bot")),
+            str(players.get(pred["player_id"], {}).get("display_name") or "").lower(),
+        ),
+    )
+    for pred in predictions:
+        player = players.get(pred["player_id"])
+        if not player:
+            continue
+        details = score_prediction_details(match, pred)
+        bot_badge = '<span class="tr-leader-bot">Bot</span>' if player.get("is_bot") else ""
+        if completed:
+            points = int(details["total_points"])
+            reason = score_reason(details)
+            result_html = f'<div class="tr-centre-points"><strong>{points}</strong><span>{escape(reason)}</span></div>'
+        else:
+            result_html = '<div class="tr-centre-points tr-centre-points-pending"><strong>-</strong><span>Pending</span></div>'
+        advance = ""
+        if match.get("is_knockout") and pred.get("pred_advance_team"):
+            advance = f'<div class="tr-centre-advance">Advances: {escape(str(pred["pred_advance_team"]))}</div>'
+        rows.append(
+            '<div class="tr-centre-row">'
+            '<div>'
+            f'<div class="tr-centre-player">{player_display_for_centre(player)} {bot_badge}</div>'
+            f'<div class="tr-centre-tip">{prediction_scoreline(pred)}{advance}</div>'
+            '</div>'
+            f'{result_html}'
+            '</div>'
+        )
+    return "".join(rows) if rows else '<div class="tr-centre-empty">No predictions for this match.</div>'
+
+
 def match_centre_page() -> None:
     st.title("Match Centre")
     settings = load_settings()
     players = {p["id"]: p for p in load_players()}
-    predictions = load_predictions()
+    player_id = st.session_state.player_id
+    all_predictions = load_predictions()
+    prediction_by_player_match = prediction_lookup(all_predictions)
     predictions_by_match = defaultdict(list)
-    for pred in predictions:
+    for pred in all_predictions:
         predictions_by_match[pred["match_id"]].append(pred)
 
-    for match in load_matches():
-        with st.expander(f"Sydney {local_label(match.get('kickoff_time'))} | {matchup_label(match)}"):
-            st.caption(f"{match.get('stage')} | {match.get('match_label') or ''}")
-            st.write(f"Host kickoff: {host_local_label(match.get('kickoff_time'), match.get('city'))} ({match.get('city') or 'host city'})")
-            if match.get("status") == "completed":
-                st.write(f"Result: {match.get('team_a_score')} - {match.get('team_b_score')}")
-                if match.get("advance_team"):
-                    st.write(f"Advanced: {match['advance_team']}")
+    filter_choice = st.segmented_control(
+        "Filter",
+        ["Open", "Locked", "Completed", "All"],
+        default="Open",
+    )
 
-            locked = is_match_locked(match, settings)
-            rows = []
-            for pred in predictions_by_match.get(match["id"], []):
-                player = players.get(pred["player_id"])
-                if not player:
-                    continue
-                if not locked and pred["player_id"] != st.session_state.player_id:
-                    continue
-                rows.append(
-                    {
-                        "Player": f"{player['display_name']}{' (Bot)' if player.get('is_bot') else ''}",
-                        "Prediction": f"{pred['pred_team_a_score']}-{pred['pred_team_b_score']}",
-                        "Advance": pred.get("pred_advance_team") or "",
-                        "Points": score_prediction(match, pred),
-                    }
-                )
-            if rows:
-                st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
-            elif not locked:
-                st.info("Other predictions hidden until this match locks.")
-            else:
-                st.info("No predictions for this match.")
+    rendered = 0
+    for match in load_matches():
+        status = match_centre_status(match, settings)
+        if filter_choice == "Open" and status != "Open":
+            continue
+        if filter_choice == "Locked" and status != "Locked":
+            continue
+        if filter_choice == "Completed" and status != "Completed":
+            continue
+
+        rendered += 1
+        current_prediction = prediction_by_player_match.get((player_id, match["id"]))
+        completed = status == "Completed"
+        reveal = status in ("Locked", "Completed")
+        pick_text = prediction_summary(current_prediction) or "Your pick: -"
+        predictions = predictions_by_match.get(match["id"], [])
+        row_html = ""
+        if reveal:
+            row_html = match_centre_prediction_rows(match, predictions, players, completed)
+        elif status != "Open":
+            row_html = '<div class="tr-centre-empty">Teams are not set for this fixture yet.</div>'
+        body_html = f'<div class="tr-centre-body">{row_html}</div>' if row_html else ""
+
+        st.markdown(
+            '<div class="tr-centre-card">'
+            '<div class="tr-centre-head">'
+            '<div>'
+            f'<div class="tr-centre-meta">{status_badge(status, compact=True)} <span>{escape(match_time_summary(match))}</span></div>'
+            f'<div class="tr-centre-title">{escape(match_result_line(match))}</div>'
+            f'<div class="tr-card-pick">{escape(pick_text)}</div>'
+            '</div>'
+            '</div>'
+            f'{body_html}'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+    if rendered == 0:
+        st.info("No matches in this view.")
 
 
 def rules_page() -> None:
