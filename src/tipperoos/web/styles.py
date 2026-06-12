@@ -88,26 +88,6 @@ def inject_styles() -> None:
             font-weight: 850;
             line-height: 1;
         }
-        .tr-pin-label {
-            color: #374151;
-            font-size: 0.88rem;
-            font-weight: 750;
-            margin: 0.7rem 0 0.25rem;
-        }
-        .tr-pin-display {
-            min-height: 2.55rem;
-            border: 1px solid #d1d5db;
-            border-radius: 8px;
-            background: #ffffff;
-            color: #111827;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.18rem;
-            font-weight: 850;
-            letter-spacing: 0;
-            margin-bottom: 0.45rem;
-        }
         .tr-badge {
             display: inline-flex;
             align-items: center;
