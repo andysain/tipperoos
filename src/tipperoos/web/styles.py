@@ -7,6 +7,12 @@ def inject_styles() -> None:
     st.markdown(
         """
         <style>
+        :root {
+            --tr-border: rgba(128, 128, 128, 0.28);
+            --tr-muted: #6b7280;
+            --tr-subtle-bg: rgba(128, 128, 128, 0.08);
+            --tr-soft-bg: rgba(128, 128, 128, 0.05);
+        }
         .block-container {
             max-width: 1180px;
             padding-top: 2.4rem;
@@ -20,6 +26,9 @@ def inject_styles() -> None:
         }
         div[data-testid="stMetricValue"] {
             font-size: 1.75rem;
+        }
+        div[data-testid="stSegmentedControl"] button {
+            min-height: 2.55rem;
         }
         .tr-card-title {
             font-size: 1.28rem;
@@ -42,7 +51,7 @@ def inject_styles() -> None:
         .tr-team-label {
             font-size: 1.35rem;
             font-weight: 800;
-            color: #111827;
+            color: inherit;
             margin-bottom: 0.35rem;
         }
         .tr-card-top {
@@ -54,7 +63,7 @@ def inject_styles() -> None:
             margin-bottom: 0.35rem;
         }
         .tr-muted {
-            color: #6b7280;
+            color: var(--tr-muted);
             font-size: 0.92rem;
             line-height: 1.35;
         }
@@ -71,22 +80,90 @@ def inject_styles() -> None:
             justify-content: space-between;
             gap: 0.65rem;
             min-width: 7rem;
-            border: 1px solid #e5e7eb;
+            border: 1px solid var(--tr-border);
             border-radius: 8px;
-            background: #ffffff;
+            background: var(--tr-soft-bg);
             padding: 0.48rem 0.7rem;
         }
         .tr-summary-stat span {
-            color: #6b7280;
+            color: var(--tr-muted);
             font-size: 0.82rem;
             font-weight: 750;
             line-height: 1.2;
         }
         .tr-summary-stat strong {
-            color: #111827;
+            color: inherit;
             font-size: 1.05rem;
             font-weight: 850;
             line-height: 1;
+        }
+        .tr-winner-summary {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-bottom: 0.8rem;
+        }
+        .tr-winner-summary span {
+            color: var(--tr-muted);
+            font-size: 0.88rem;
+            font-weight: 750;
+        }
+        .tr-winner-summary strong {
+            font-size: 1.1rem;
+            font-weight: 850;
+        }
+        .tr-tip-risk {
+            border-radius: 8px;
+            padding: 0.55rem 0.75rem;
+            margin-bottom: 0.7rem;
+            font-size: 0.9rem;
+            font-weight: 850;
+            line-height: 1.25;
+        }
+        .tr-tip-risk-soon {
+            background: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid #bfdbfe;
+        }
+        .tr-tip-risk-urgent {
+            background: #fffbeb;
+            color: #92400e;
+            border: 1px solid #fcd34d;
+        }
+        .tr-tip-risk-critical {
+            background: #fef2f2;
+            color: #b91c1c;
+            border: 1px solid #fecaca;
+        }
+        .tr-scoreline-preview {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+            align-items: center;
+            gap: 0.75rem;
+            border: 1px solid var(--tr-border);
+            border-radius: 8px;
+            background: var(--tr-soft-bg);
+            padding: 0.6rem 0.75rem;
+            margin: 0.75rem 0;
+        }
+        .tr-scoreline-preview span {
+            min-width: 0;
+            color: var(--tr-muted);
+            font-size: 0.86rem;
+            font-weight: 750;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .tr-scoreline-preview span:last-child {
+            text-align: right;
+        }
+        .tr-scoreline-preview strong {
+            font-size: 1.2rem;
+            font-weight: 900;
+            white-space: nowrap;
         }
         .tr-badge {
             display: inline-flex;
@@ -468,7 +545,7 @@ def inject_styles() -> None:
                 justify-content: center;
                 gap: 0.15rem;
                 padding: 0.42rem 0.25rem;
-                background: #f9fafb;
+                background: var(--tr-soft-bg);
                 box-shadow: none;
             }
             .tr-summary-stat span {
@@ -481,6 +558,24 @@ def inject_styles() -> None:
             }
             .tr-summary-stat strong {
                 font-size: 0.95rem;
+            }
+            .tr-winner-summary {
+                margin-bottom: 0.6rem;
+            }
+            .tr-scoreline-preview {
+                grid-template-columns: minmax(0, 1fr);
+                gap: 0.25rem;
+                text-align: center;
+                padding: 0.55rem;
+                margin: 0.65rem 0;
+            }
+            .tr-scoreline-preview span,
+            .tr-scoreline-preview span:last-child {
+                text-align: center;
+            }
+            .tr-scoreline-preview strong {
+                font-size: 1.1rem;
+                order: -1;
             }
             .tr-rule-grid,
             .tr-example-grid {

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from html import escape
 from pathlib import Path
 
@@ -432,8 +432,25 @@ def winner_pick_card(player_id: str, winner_pick: WinnerPickView, require_first:
     current_team = current_pick.get("team") if current_pick else None
     index = [t["name"] for t in teams].index(current_team) if current_team in [t["name"] for t in teams] else 0
     disabled = not unlocked
+    edit_key = "winner_pick_editing"
     if require_first and not current_pick and unlocked:
         st.info("Choose your overall winner first, then match predictions will unlock.")
+
+    if current_pick and not st.session_state.get(edit_key):
+        team = teams_by_name.get(current_pick["team"])
+        pick_label = team_display(current_pick["team"], team.get("icon") if team else None)
+        with st.container(border=True):
+            st.markdown(
+                f'<div class="tr-winner-summary"><span>Winner pick</span><strong>{escape(pick_label)}</strong></div>',
+                unsafe_allow_html=True,
+            )
+            if unlocked:
+                if st.button("Change winner pick", use_container_width=True):
+                    st.session_state[edit_key] = True
+                    st.rerun()
+            else:
+                st.caption("Winner pick is locked.")
+        return True
 
     with st.container(border=True):
         if current_pick:
@@ -455,12 +472,74 @@ def winner_pick_card(player_id: str, winner_pick: WinnerPickView, require_first:
     if submitted:
         try:
             upsert_winner_pick(player_id, selected)
+            st.session_state[edit_key] = False
             st.success("Winner pick saved.")
             st.rerun()
         except Exception as exc:
             st.error(str(exc))
 
     return bool(current_pick) or not unlocked
+
+
+def score_picker(label: str, current_score: int, key: str, disabled: bool) -> int:
+    common_scores: list[int | str] = [0, 1, 2, 3, 4, "5+"]
+    default_score: int | str = current_score if current_score < 5 else "5+"
+    selected = st.segmented_control(
+        label,
+        common_scores,
+        default=default_score,
+        key=f"score_{key}",
+        disabled=disabled,
+        width="stretch",
+    )
+    if selected == "5+":
+        more_scores = list(range(5, 11))
+        if current_score not in more_scores and current_score >= 5:
+            more_scores.append(current_score)
+            more_scores.sort()
+        return int(
+            st.selectbox(
+                "Score",
+                more_scores,
+                index=more_scores.index(current_score) if current_score in more_scores else 0,
+                key=f"score_more_{key}",
+                disabled=disabled,
+                label_visibility="collapsed",
+            )
+        )
+    return int(selected if selected is not None else current_score)
+
+
+def time_remaining_label(delta: timedelta) -> str:
+    total_minutes = max(0, int(delta.total_seconds() // 60))
+    days, remainder = divmod(total_minutes, 60 * 24)
+    hours, minutes = divmod(remainder, 60)
+    if days:
+        return f"{days}d {hours}h"
+    if hours:
+        return f"{hours}h {minutes}m"
+    return f"{minutes}m"
+
+
+def tip_deadline_notice(match: dict, settings: dict, status: str) -> tuple[str, str] | None:
+    if status != "Open":
+        return None
+    kickoff = parse_dt(match.get("kickoff_time"))
+    if not kickoff:
+        return None
+    lock_minutes = int(settings.get("lock_minutes_before_kickoff") or 30)
+    lock_at = kickoff - timedelta(minutes=lock_minutes)
+    remaining = lock_at - now_utc()
+    if remaining <= timedelta(0):
+        return ("critical", "Tip needed now - locking")
+    label = time_remaining_label(remaining)
+    if remaining <= timedelta(hours=6):
+        return ("critical", f"High risk - locks in {label}")
+    if remaining <= timedelta(hours=24):
+        return ("urgent", f"Tip needed today - locks in {label}")
+    if remaining <= timedelta(days=3):
+        return ("soon", f"Upcoming tip - locks in {label}")
+    return None
 
 
 def prediction_form(match: dict, prediction: dict | None, disabled: bool) -> None:
@@ -470,41 +549,27 @@ def prediction_form(match: dict, prediction: dict | None, disabled: bool) -> Non
     existing_b = int(prediction["pred_team_b_score"]) if prediction else 0
     team_a_label = team_display(match["team_a"], match.get("team_a_icon") or flag_for_code(match.get("team_a_code")))
     team_b_label = team_display(match["team_b"], match.get("team_b_icon") or flag_for_code(match.get("team_b_code")))
-    score_options = list(range(0, 11))
-    if existing_a not in score_options:
-        score_options.append(existing_a)
-    if existing_b not in score_options:
-        score_options.append(existing_b)
-    score_options = sorted(score_options)
 
-    with st.form(f"prediction_{key}", border=False):
-        c1, c2, c3 = st.columns([2, 0.35, 2], vertical_alignment="bottom")
-        c1.markdown(f'<div class="tr-team-label">{team_a_label}</div>', unsafe_allow_html=True)
-        pred_a = c1.selectbox(
-            "Score",
-            score_options,
-            index=score_options.index(existing_a),
-            key=f"a_{key}",
-            disabled=disabled,
-            label_visibility="collapsed",
-        )
-        c2.markdown('<div class="tr-score-preview">-</div>', unsafe_allow_html=True)
-        c3.markdown(f'<div class="tr-team-label">{team_b_label}</div>', unsafe_allow_html=True)
-        pred_b = c3.selectbox(
-            "Score",
-            score_options,
-            index=score_options.index(existing_b),
-            key=f"b_{key}",
-            disabled=disabled,
-            label_visibility="collapsed",
-        )
+    c1, c2 = st.columns(2)
+    with c1:
+        pred_a = score_picker(team_a_label, existing_a, f"a_{key}", disabled)
+    with c2:
+        pred_b = score_picker(team_b_label, existing_b, f"b_{key}", disabled)
+    st.markdown(
+        '<div class="tr-scoreline-preview">'
+        f'<span>{escape(team_a_label)}</span><strong>{pred_a} - {pred_b}</strong><span>{escape(team_b_label)}</span>'
+        "</div>",
+        unsafe_allow_html=True,
+    )
 
-        advance_team = prediction.get("pred_advance_team") if prediction else None
-        if match.get("is_knockout"):
-            options = [match["team_a"], match["team_b"]]
-            index = options.index(advance_team) if advance_team in options else 0
-            advance_team = st.selectbox("If level, who advances?", options, index=index, key=f"adv_{key}", disabled=disabled)
-        submitted = st.form_submit_button("Save prediction", disabled=disabled, type="primary", use_container_width=True)
+    advance_team = prediction.get("pred_advance_team") if prediction else None
+    if match.get("is_knockout"):
+        options = [match["team_a"], match["team_b"]]
+        index = options.index(advance_team) if advance_team in options else 0
+        advance_team = st.selectbox("If level, who advances?", options, index=index, key=f"adv_{key}", disabled=disabled)
+    button_label = "Update prediction" if prediction else "Save prediction"
+    button_type = "secondary" if prediction else "primary"
+    submitted = st.button(button_label, disabled=disabled, type=button_type, use_container_width=True, key=f"save_{key}")
 
     if submitted:
         try:
@@ -549,8 +614,8 @@ def my_predictions_page() -> None:
 
         filter_choice = st.segmented_control(
             "Filter",
-            ["Open", "Missing", "All", "Completed"],
-            default="Open",
+            ["To tip", "Saved", "All", "Completed"],
+            default="To tip",
         )
         filter_state_key = "my_predictions_filter"
         if st.session_state.get(filter_state_key) != filter_choice:
@@ -564,9 +629,9 @@ def my_predictions_page() -> None:
             match = match_view.match
             prediction = match_view.prediction
             status = match_view.status
-            if filter_choice == "Open" and status not in ("Open", "Saved"):
+            if filter_choice == "To tip" and status != "Open":
                 continue
-            if filter_choice == "Missing" and (prediction or not has_teams(match) or match.get("status") == "completed"):
+            if filter_choice == "Saved" and status != "Saved":
                 continue
             if filter_choice == "Completed" and match.get("status") != "completed":
                 continue
@@ -579,6 +644,13 @@ def my_predictions_page() -> None:
             status = match_view.status
             rendered += 1
             with st.container(border=True):
+                deadline_notice = tip_deadline_notice(match, view.settings, status)
+                if deadline_notice:
+                    urgency, message = deadline_notice
+                    st.markdown(
+                        f'<div class="tr-tip-risk tr-tip-risk-{urgency}">{escape(message)}</div>',
+                        unsafe_allow_html=True,
+                    )
                 st.markdown(
                     f'<div class="tr-card-top"><div>{status_badge(status)}</div>'
                     f'<div class="tr-card-meta">{match_time_summary(match)}</div></div>',
