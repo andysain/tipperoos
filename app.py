@@ -926,6 +926,52 @@ def leaderboard_player_name(row: dict) -> str:
     return f"{emoji} {player}".strip()
 
 
+def unique_chart_name(player: dict, used_names: set[str]) -> str:
+    emoji = str(player.get("emoji") or "").strip()
+    base = f"{emoji} {player.get('display_name') or 'Player'}".strip()
+    name = base
+    suffix = 2
+    while name in used_names:
+        name = f"{base} {suffix}"
+        suffix += 1
+    used_names.add(name)
+    return name
+
+
+def cumulative_human_scores() -> pd.DataFrame:
+    humans = [player for player in load_players() if not player.get("is_bot")]
+    completed_matches = [
+        match
+        for match in load_matches()
+        if match.get("status") == "completed"
+        and match.get("team_a_score") is not None
+        and match.get("team_b_score") is not None
+    ]
+    if not humans or not completed_matches:
+        return pd.DataFrame()
+
+    predictions = prediction_lookup(load_predictions())
+    used_names: set[str] = set()
+    player_names = {player["id"]: unique_chart_name(player, used_names) for player in humans}
+    totals = {player["id"]: 0 for player in humans}
+    rows = []
+
+    for index, match in enumerate(completed_matches, start=1):
+        try:
+            match_number = int(match.get("match_number") or index)
+        except (TypeError, ValueError):
+            match_number = index
+        for player in humans:
+            details = score_prediction_details(match, predictions.get((player["id"], match["id"])))
+            totals[player["id"]] += int(details["total_points"])
+        row = {"Match": match_number}
+        for player in humans:
+            row[player_names[player["id"]]] = totals[player["id"]]
+        rows.append(row)
+
+    return pd.DataFrame(rows)
+
+
 def leaderboard_page() -> None:
     st.title("Leaderboard")
     df = calculate_leaderboard()
@@ -957,6 +1003,7 @@ def leaderboard_page() -> None:
         st.info("The leaderboard will start moving once the first result is entered. Everyone is tied for now.")
     st.caption("Match points come from exact scores, correct goal differences, and correct results. Winner bonuses are shown separately.")
 
+
     for row in df.to_dict("records"):
         is_current = row["Player ID"] == current_player_id
         classes = ["tr-leader-row"]
@@ -986,6 +1033,12 @@ def leaderboard_page() -> None:
             "</div>"
         )
         st.markdown(html, unsafe_allow_html=True)
+
+
+    progress_df = cumulative_human_scores()
+    if not progress_df.empty:
+        st.subheader("Score progression")
+        st.line_chart(progress_df.set_index("Match"), height=280)
 
 
 def score_reason(details: dict) -> str:
