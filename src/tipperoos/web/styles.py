@@ -99,20 +99,51 @@ def inject_styles() -> None:
         }
         .tr-winner-summary {
             display: flex;
-            align-items: baseline;
+            align-items: center;
             justify-content: space-between;
             gap: 0.75rem;
-            flex-wrap: wrap;
             margin-bottom: 0;
         }
-        .tr-winner-summary span {
+        .tr-winner-picked {
+            display: inline-flex;
+            align-items: baseline;
+            gap: 0.75rem;
+            min-width: 0;
+        }
+        .tr-winner-picked span {
             color: var(--tr-muted);
             font-size: 0.88rem;
             font-weight: 750;
+            white-space: nowrap;
         }
-        .tr-winner-summary strong {
+        .tr-winner-picked strong {
             font-size: 1.1rem;
             font-weight: 850;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .tr-winner-edit,
+        .tr-winner-locked {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            border: 1px solid var(--tr-border);
+            padding: 0.34rem 0.65rem;
+            font-size: 0.86rem;
+            font-weight: 750;
+            line-height: 1.1;
+            white-space: nowrap;
+            text-decoration: none;
+        }
+        .tr-winner-edit {
+            color: inherit;
+            background: var(--tr-soft-bg);
+        }
+        .tr-winner-locked {
+            color: var(--tr-muted);
         }
         .tr-tip-risk {
             border-radius: 8px;
@@ -151,17 +182,20 @@ def inject_styles() -> None:
         .tr-scoreline-preview span {
             min-width: 0;
             color: var(--tr-muted);
-            font-size: 0.86rem;
-            font-weight: 750;
+            font-size: 1.25rem;
+            font-weight: 850;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
         }
         .tr-scoreline-preview span:last-child {
+            text-align: left;
+        }
+        .tr-scoreline-preview span:first-child {
             text-align: right;
         }
         .tr-scoreline-preview strong {
-            font-size: 1.2rem;
+            font-size: 1.55rem;
             font-weight: 900;
             white-space: nowrap;
         }
@@ -566,7 +600,23 @@ def inject_styles() -> None:
                 font-size: 0.95rem;
             }
             .tr-winner-summary {
-                margin-bottom: 0.6rem;
+                gap: 0.45rem;
+                margin-bottom: 0;
+            }
+            .tr-winner-picked {
+                gap: 0.45rem;
+            }
+            .tr-winner-picked span,
+            .tr-winner-edit,
+            .tr-winner-locked {
+                font-size: 0.78rem;
+            }
+            .tr-winner-picked strong {
+                font-size: 0.95rem;
+            }
+            .tr-winner-edit,
+            .tr-winner-locked {
+                padding: 0.28rem 0.5rem;
             }
             .tr-scoreline-preview {
                 grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
@@ -575,17 +625,17 @@ def inject_styles() -> None:
                 margin: 0.5rem 0;
             }
             .tr-scoreline-preview span {
-                font-size: 0.78rem;
+                font-size: 1.05rem;
                 white-space: nowrap;
             }
             .tr-scoreline-preview span:first-child {
-                text-align: left;
-            }
-            .tr-scoreline-preview span:last-child {
                 text-align: right;
             }
+            .tr-scoreline-preview span:last-child {
+                text-align: left;
+            }
             .tr-scoreline-preview strong {
-                font-size: 1.1rem;
+                font-size: 1.45rem;
             }
             .tr-rule-grid,
             .tr-example-grid {

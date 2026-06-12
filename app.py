@@ -4,6 +4,7 @@ import sys
 from datetime import datetime, timedelta
 from html import escape
 from pathlib import Path
+from urllib.parse import urlencode
 
 SRC_DIR = Path(__file__).resolve().parent / "src"
 if str(SRC_DIR) not in sys.path:
@@ -164,6 +165,19 @@ def set_session_query_param(token: str) -> None:
 def clear_session_query_param() -> None:
     if SESSION_QUERY_PARAM in st.query_params:
         del st.query_params[SESSION_QUERY_PARAM]
+
+
+def query_href_with(**updates: str | None) -> str:
+    params = {}
+    for key, value in st.query_params.items():
+        params[key] = value[0] if isinstance(value, list) and value else value
+    for key, value in updates.items():
+        if value is None:
+            params.pop(key, None)
+        else:
+            params[key] = value
+    query = urlencode(params)
+    return f"?{query}" if query else "?"
 
 
 def hint_numeric_pin_keyboard() -> None:
@@ -433,6 +447,10 @@ def winner_pick_card(player_id: str, winner_pick: WinnerPickView, require_first:
     index = [t["name"] for t in teams].index(current_team) if current_team in [t["name"] for t in teams] else 0
     disabled = not unlocked
     edit_key = "winner_pick_editing"
+    if query_param_value("winner_pick_edit") == "1":
+        st.session_state[edit_key] = True
+        if "winner_pick_edit" in st.query_params:
+            del st.query_params["winner_pick_edit"]
     if require_first and not current_pick and unlocked:
         st.info("Choose your overall winner first, then match predictions will unlock.")
 
@@ -440,17 +458,18 @@ def winner_pick_card(player_id: str, winner_pick: WinnerPickView, require_first:
         team = teams_by_name.get(current_pick["team"])
         pick_label = team_display(current_pick["team"], team.get("icon") if team else None)
         with st.container(border=True):
-            summary_col, action_col = st.columns([1, 0.18], vertical_alignment="center")
-            summary_col.markdown(
-                f'<div class="tr-winner-summary"><span>Winner pick</span><strong>{escape(pick_label)}</strong></div>',
+            if unlocked:
+                action_html = f'<a class="tr-winner-edit" href="{escape(query_href_with(winner_pick_edit="1"), quote=True)}">Edit</a>'
+            else:
+                action_html = '<span class="tr-winner-locked">Locked</span>'
+            st.markdown(
+                '<div class="tr-winner-summary">'
+                '<div class="tr-winner-picked"><span>Winner pick</span>'
+                f'<strong>{escape(pick_label)}</strong></div>'
+                f"{action_html}"
+                "</div>",
                 unsafe_allow_html=True,
             )
-            if unlocked:
-                if action_col.button("Edit", key="edit_winner_pick", use_container_width=True):
-                    st.session_state[edit_key] = True
-                    st.rerun()
-            else:
-                action_col.caption("Locked")
         return True
 
     st.subheader("Tournament winner pick")
