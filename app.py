@@ -421,8 +421,8 @@ def winner_pick_card(player_id: str, winner_pick: WinnerPickView, require_first:
     teams_by_name = winner_pick.teams_by_name
     current_pick = winner_pick.current_pick
     unlocked = winner_pick.unlocked
-    st.subheader("Tournament winner pick")
     if not teams:
+        st.subheader("Tournament winner pick")
         if st.session_state.get("is_admin"):
             st.info("No teams have been imported yet. Go to Admin > Import to load the archive fixtures.")
         else:
@@ -440,18 +440,20 @@ def winner_pick_card(player_id: str, winner_pick: WinnerPickView, require_first:
         team = teams_by_name.get(current_pick["team"])
         pick_label = team_display(current_pick["team"], team.get("icon") if team else None)
         with st.container(border=True):
-            st.markdown(
+            summary_col, action_col = st.columns([1, 0.18], vertical_alignment="center")
+            summary_col.markdown(
                 f'<div class="tr-winner-summary"><span>Winner pick</span><strong>{escape(pick_label)}</strong></div>',
                 unsafe_allow_html=True,
             )
             if unlocked:
-                if st.button("Change winner pick", use_container_width=True):
+                if action_col.button("Edit", key="edit_winner_pick", use_container_width=True):
                     st.session_state[edit_key] = True
                     st.rerun()
             else:
-                st.caption("Winner pick is locked.")
+                action_col.caption("Locked")
         return True
 
+    st.subheader("Tournament winner pick")
     with st.container(border=True):
         if current_pick:
             team = teams_by_name.get(current_pick["team"])
@@ -607,7 +609,6 @@ def my_predictions_page() -> None:
         winner_ready = winner_pick_card(player_id, view.winner_pick, require_first=True)
 
     with timed("page.my_predictions.filter"):
-        st.divider()
         st.subheader("Match predictions")
         if not winner_ready:
             return
@@ -651,8 +652,9 @@ def my_predictions_page() -> None:
                         f'<div class="tr-tip-risk tr-tip-risk-{urgency}">{escape(message)}</div>',
                         unsafe_allow_html=True,
                     )
+                badge_label = "Needs tip" if status == "Open" else status
                 st.markdown(
-                    f'<div class="tr-card-top"><div>{status_badge(status)}</div>'
+                    f'<div class="tr-card-top"><div>{status_badge(status, label=badge_label)}</div>'
                     f'<div class="tr-card-meta">{match_time_summary(match)}</div></div>',
                     unsafe_allow_html=True,
                 )

@@ -28,7 +28,7 @@ def inject_styles() -> None:
             font-size: 1.75rem;
         }
         div[data-testid="stSegmentedControl"] button {
-            min-height: 2.55rem;
+            min-height: 2.35rem;
         }
         .tr-card-title {
             font-size: 1.28rem;
@@ -43,7 +43,7 @@ def inject_styles() -> None:
         }
         .tr-card-pick {
             color: #9ca3af;
-            font-size: 0.92rem;
+            font-size: 0.86rem;
             font-weight: 600;
             line-height: 1.35;
             margin-bottom: 0;
@@ -60,7 +60,7 @@ def inject_styles() -> None:
             justify-content: flex-start;
             flex-wrap: wrap;
             gap: 0.5rem 0.75rem;
-            margin-bottom: 0.35rem;
+            margin-bottom: 0.15rem;
         }
         .tr-muted {
             color: var(--tr-muted);
@@ -103,7 +103,7 @@ def inject_styles() -> None:
             justify-content: space-between;
             gap: 0.75rem;
             flex-wrap: wrap;
-            margin-bottom: 0.8rem;
+            margin-bottom: 0;
         }
         .tr-winner-summary span {
             color: var(--tr-muted);
@@ -116,9 +116,9 @@ def inject_styles() -> None:
         }
         .tr-tip-risk {
             border-radius: 8px;
-            padding: 0.55rem 0.75rem;
-            margin-bottom: 0.7rem;
-            font-size: 0.9rem;
+            padding: 0.45rem 0.65rem;
+            margin-bottom: 0.45rem;
+            font-size: 0.86rem;
             font-weight: 850;
             line-height: 1.25;
         }
@@ -145,8 +145,8 @@ def inject_styles() -> None:
             border: 1px solid var(--tr-border);
             border-radius: 8px;
             background: var(--tr-soft-bg);
-            padding: 0.6rem 0.75rem;
-            margin: 0.75rem 0;
+            padding: 0.5rem 0.65rem;
+            margin: 0.55rem 0;
         }
         .tr-scoreline-preview span {
             min-width: 0;
@@ -521,6 +521,11 @@ def inject_styles() -> None:
             .tr-card-title {
                 font-size: 1rem;
             }
+            .tr-tip-risk {
+                padding: 0.45rem 0.55rem;
+                margin-bottom: 0.45rem;
+                font-size: 0.82rem;
+            }
             .tr-score-preview {
                 font-size: 1.25rem;
                 padding-top: 0;
@@ -528,6 +533,7 @@ def inject_styles() -> None:
             .tr-card-top {
                 align-items: center;
                 gap: 0.4rem 0.55rem;
+                margin-bottom: 0.05rem;
             }
             .tr-team-label {
                 font-size: 1.12rem;
@@ -563,19 +569,23 @@ def inject_styles() -> None:
                 margin-bottom: 0.6rem;
             }
             .tr-scoreline-preview {
-                grid-template-columns: minmax(0, 1fr);
-                gap: 0.25rem;
-                text-align: center;
-                padding: 0.55rem;
-                margin: 0.65rem 0;
+                grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+                gap: 0.45rem;
+                padding: 0.48rem 0.55rem;
+                margin: 0.5rem 0;
             }
-            .tr-scoreline-preview span,
+            .tr-scoreline-preview span {
+                font-size: 0.78rem;
+                white-space: nowrap;
+            }
+            .tr-scoreline-preview span:first-child {
+                text-align: left;
+            }
             .tr-scoreline-preview span:last-child {
-                text-align: center;
+                text-align: right;
             }
             .tr-scoreline-preview strong {
                 font-size: 1.1rem;
-                order: -1;
             }
             .tr-rule-grid,
             .tr-example-grid {
