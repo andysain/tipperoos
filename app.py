@@ -1,46 +1,90 @@
 from __future__ import annotations
 
-import base64
-import hashlib
-import hmac
-import json
-import random
-import re
-from collections import Counter, defaultdict
-from datetime import datetime, timedelta
+import sys
+from datetime import datetime
 from html import escape
-from statistics import median
+from pathlib import Path
 
-import bcrypt
+SRC_DIR = Path(__file__).resolve().parent / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
-from supabase import Client, create_client
 
-from tipperoos.constants import (
+from tipperoos.services.actions import (
+    save_prediction,
+    upsert_winner_pick,
+)
+from tipperoos.services.admin_ops import (
+    RESULT_STATUSES,
+    apply_result_updates,
+    assign_round_of_32_match,
+    build_result_updates_from_csv,
+    build_result_updates_from_table,
+    generate_bot_predictions,
+    generate_bot_winner_picks,
+    import_archive_fixture_csvs,
+    result_editor_rows,
+    save_result,
+)
+from tipperoos.services.analytics import calculate_leaderboard, cumulative_human_scores, group_standings
+from tipperoos.core.constants import (
     APP_TITLE,
-    ARCHIVE_DIR,
     BOT_SPECS,
-    FIFA_FLAG_EMOJIS,
     PLAYER_EMOJIS,
-    SCORE_POOL,
     SESSION_COOKIE_NAME,
     SESSION_MAX_AGE_SECONDS,
     SYDNEY,
 )
-from tipperoos.scoring import (
-    score_prediction_details,
-    score_winner_pick,
+from tipperoos.core.domain import (
+    flag_for_code,
+    has_teams,
+    leaderboard_player_name,
+    leaderboard_rank_label,
+    match_result_line,
+    match_time_summary,
+    matchup_label,
+    player_display_for_centre,
+    prediction_scoreline,
+    score_reason,
+    status_badge,
+    team_display,
+    team_format_from_lookup,
 )
-from tipperoos.styles import inject_styles
-from tipperoos.time_utils import (
+from tipperoos.services.players import check_pin, create_player, ensure_default_bots, unique_username
+from tipperoos.core.scoring import (
+    score_prediction_details,
+)
+from tipperoos.services.session_tokens import (
+    make_session_token as make_signed_session_token,
+    validate_session_token as validate_signed_session_token,
+)
+from tipperoos.web.styles import inject_styles
+from tipperoos.core.time_utils import (
     iso_dt,
     local_label,
     now_utc,
     parse_dt,
-    parse_host_kickoff,
 )
-from tipperoos.ui import (
+from tipperoos.core.timing import get_timings, reset_timings, timed
+from tipperoos.data.store import (
+    app_setup_state,
+    clear_data_cache,
+    db,
+    execute,
+    get_player,
+    load_matches,
+    load_players,
+    load_predictions,
+    load_settings,
+    load_teams,
+    load_winner_picks,
+)
+from tipperoos.services.views.predictions_view import WinnerPickView, get_predictions_page
+from tipperoos.services.views.match_centre_view import get_match_centre_page
+from tipperoos.web.ui import (
     example_card,
     example_grid,
     muted,
@@ -53,40 +97,6 @@ from tipperoos.ui import (
 st.set_page_config(page_title=APP_TITLE, page_icon="T", layout="wide")
 
 
-def flag_for_code(code: str | None) -> str | None:
-    if not code:
-        return None
-    return FIFA_FLAG_EMOJIS.get(str(code).strip().upper())
-
-
-def clean_username(value: str) -> str:
-    username = re.sub(r"[^a-z0-9_]+", "_", value.strip().lower())
-    return username.strip("_") or "player"
-
-
-def unique_username(display_name: str) -> str:
-    base = clean_username(display_name)
-    existing = {p["username"] for p in load_players(include_inactive=True)}
-    if base not in existing:
-        return base
-    for index in range(2, 1000):
-        candidate = f"{base}_{index}"
-        if candidate not in existing:
-            return candidate
-    return f"{base}_{random.randint(1000, 9999)}"
-
-
-def hash_pin(pin: str) -> str:
-    return bcrypt.hashpw(pin.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-
-
-def check_pin(pin: str, hashed: str) -> bool:
-    try:
-        return bcrypt.checkpw(pin.encode("utf-8"), hashed.encode("utf-8"))
-    except ValueError:
-        return False
-
-
 def session_secret() -> bytes:
     secret = st.secrets.get("SESSION_SECRET")
     if not secret:
@@ -96,33 +106,11 @@ def session_secret() -> bytes:
 
 
 def make_session_token(player_id: str) -> str:
-    payload = {
-        "player_id": player_id,
-        "exp": int((now_utc() + timedelta(seconds=SESSION_MAX_AGE_SECONDS)).timestamp()),
-    }
-    payload_raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
-    payload_b64 = base64.urlsafe_b64encode(payload_raw).decode("ascii").rstrip("=")
-    signature = hmac.new(session_secret(), payload_b64.encode("ascii"), hashlib.sha256).digest()
-    signature_b64 = base64.urlsafe_b64encode(signature).decode("ascii").rstrip("=")
-    return f"{payload_b64}.{signature_b64}"
+    return make_signed_session_token(player_id, session_secret())
 
 
 def validate_session_token(token: str | None) -> str | None:
-    if not token or "." not in token:
-        return None
-    try:
-        payload_b64, signature_b64 = token.split(".", 1)
-        expected = hmac.new(session_secret(), payload_b64.encode("ascii"), hashlib.sha256).digest()
-        actual = base64.urlsafe_b64decode(signature_b64 + "=" * (-len(signature_b64) % 4))
-        if not hmac.compare_digest(expected, actual):
-            return None
-        payload_raw = base64.urlsafe_b64decode(payload_b64 + "=" * (-len(payload_b64) % 4))
-        payload = json.loads(payload_raw.decode("utf-8"))
-        if int(payload.get("exp", 0)) < int(now_utc().timestamp()):
-            return None
-        return payload.get("player_id")
-    except Exception:
-        return None
+    return validate_signed_session_token(token, session_secret())
 
 
 def set_session_cookie(token: str) -> None:
@@ -186,273 +174,6 @@ def restore_session_from_cookie() -> bool:
         return False
     apply_player_session(player, persist=False)
     return True
-
-
-@st.cache_resource
-def get_supabase_client() -> Client:
-    url = st.secrets.get("SUPABASE_URL")
-    key = st.secrets.get("SUPABASE_KEY")
-    if not url or not key:
-        st.error("Missing Supabase secrets. Add SUPABASE_URL and SUPABASE_KEY.")
-        st.stop()
-    return create_client(url, key)
-
-
-def db() -> Client:
-    return get_supabase_client()
-
-
-def execute(builder):
-    return builder.execute().data or []
-
-
-def clear_data_cache() -> None:
-    st.cache_data.clear()
-
-
-@st.cache_data(ttl=20)
-def load_players(include_inactive: bool = False) -> list[dict]:
-    query = db().table("players").select("*").order("display_name")
-    if not include_inactive:
-        query = query.eq("active", True)
-    return execute(query)
-
-
-@st.cache_data(ttl=20)
-def load_teams(active_only: bool = True) -> list[dict]:
-    query = db().table("teams").select("*").order("name")
-    if active_only:
-        query = query.eq("active", True)
-    return execute(query)
-
-
-@st.cache_data(ttl=20)
-def load_matches() -> list[dict]:
-    matches = execute(db().table("matches").select("*").order("kickoff_time"))
-    results = result_lookup(load_match_results())
-    for match in matches:
-        result = results.get(match["id"])
-        if result:
-            match["status"] = result.get("status") or "scheduled"
-            match["team_a_score"] = result.get("team_a_score")
-            match["team_b_score"] = result.get("team_b_score")
-            match["advance_team"] = result.get("advance_team")
-            match["result_updated_at"] = result.get("updated_at") or result.get("confirmed_at")
-        else:
-            match["status"] = match.get("status") or "scheduled"
-    return matches
-
-
-@st.cache_data(ttl=20)
-def load_match_results() -> list[dict]:
-    return execute(db().table("match_results").select("*"))
-
-
-@st.cache_data(ttl=20)
-def load_predictions() -> list[dict]:
-    return execute(db().table("predictions").select("*"))
-
-
-@st.cache_data(ttl=20)
-def load_winner_picks() -> list[dict]:
-    return execute(db().table("winner_picks").select("*"))
-
-
-@st.cache_data(ttl=20)
-def load_settings() -> dict:
-    rows = execute(db().table("settings").select("*").eq("id", 1).limit(1))
-    if rows:
-        settings = rows[0]
-        settings.setdefault("allow_player_signup", True)
-        return settings
-    data = {
-        "id": 1,
-        "lock_minutes_before_kickoff": 30,
-        "allow_player_signup": True,
-        "timezone": "Australia/Sydney",
-    }
-    db().table("settings").insert(data).execute()
-    clear_data_cache()
-    return data
-
-
-def app_setup_state() -> dict:
-    state = {
-        "schema_ok": False,
-        "admin_count": 0,
-        "team_count": 0,
-        "match_count": 0,
-        "winner_deadline_set": False,
-        "bots_count": 0,
-        "settings": {},
-        "error": None,
-    }
-    try:
-        players = load_players(include_inactive=True)
-        teams = load_teams(active_only=False)
-        matches = load_matches()
-        settings = load_settings()
-    except Exception as exc:
-        state["error"] = exc
-        return state
-
-    state["schema_ok"] = True
-    state["admin_count"] = len([p for p in players if p.get("is_admin")])
-    state["bots_count"] = len([p for p in players if p.get("is_bot")])
-    state["team_count"] = len(teams)
-    state["match_count"] = len(matches)
-    state["winner_deadline_set"] = bool(settings.get("winner_pick_deadline"))
-    state["settings"] = settings
-    return state
-
-
-def get_player(player_id: str) -> dict | None:
-    rows = execute(db().table("players").select("*").eq("id", player_id).limit(1))
-    return rows[0] if rows else None
-
-
-def get_match(match_id: str) -> dict | None:
-    return next((match for match in load_matches() if match["id"] == match_id), None)
-
-
-def prediction_lookup(predictions: list[dict]) -> dict[tuple[str, str], dict]:
-    return {(p["player_id"], p["match_id"]): p for p in predictions}
-
-
-def winner_lookup(winner_picks: list[dict]) -> dict[str, dict]:
-    return {p["player_id"]: p for p in winner_picks}
-
-
-def result_lookup(results: list[dict]) -> dict[str, dict]:
-    return {r["match_id"]: r for r in results}
-
-
-def team_lookup(teams: list[dict]) -> dict[str, dict]:
-    return {t["name"]: t for t in teams}
-
-
-def team_format_from_lookup(teams_by_name: dict[str, dict]):
-    def _format(name: str) -> str:
-        team = teams_by_name.get(name)
-        if not team:
-            return name
-        return team_display(name, team.get("icon") or flag_for_code(team.get("fifa_code")))
-
-    return _format
-
-
-def has_teams(match: dict) -> bool:
-    return bool(match.get("team_a") and match.get("team_b"))
-
-
-def matchup_label(match: dict) -> str:
-    if has_teams(match):
-        left = team_display(match["team_a"], match.get("team_a_icon") or flag_for_code(match.get("team_a_code")))
-        right = team_display(match["team_b"], match.get("team_b_icon") or flag_for_code(match.get("team_b_code")))
-        return f"{left} vs {right}"
-    return match.get("match_label") or "Fixture to be confirmed"
-
-
-def team_display(name: str | None, icon: str | None = None) -> str:
-    if not name:
-        return "TBC"
-    return f"{icon} {name}".strip() if icon else name
-
-
-def status_badge(status: str, compact: bool = False) -> str:
-    colors = {
-        "Open": ("#ecfdf5", "#047857", "#a7f3d0"),
-        "Saved": ("#eff6ff", "#1d4ed8", "#bfdbfe"),
-        "Locked": ("#f3f4f6", "#374151", "#d1d5db"),
-        "Missed": ("#fef2f2", "#b91c1c", "#fecaca"),
-        "Completed": ("#fff7ed", "#c2410c", "#fed7aa"),
-        "To be confirmed": ("#f8fafc", "#475569", "#cbd5e1"),
-    }
-    background, color, border = colors.get(status, colors["Locked"])
-    min_width = "auto" if compact else "84px"
-    padding = "0.18rem 0.55rem" if compact else "0.25rem 0.65rem"
-    font_size = "0.78rem" if compact else "0.82rem"
-    return (
-        f'<span style="display:inline-flex;align-items:center;justify-content:center;'
-        f'min-width:{min_width};padding:{padding};border-radius:999px;'
-        f'font-size:{font_size};font-weight:750;white-space:nowrap;'
-        f'background:{background};color:{color};border:1px solid {border};">{status}</span>'
-    )
-
-
-def match_time_summary(match: dict) -> str:
-    sydney = local_label(match.get("kickoff_time"))
-    stage = match.get("group_name") or match.get("stage") or "Match"
-    city = match.get("city") or "Host city"
-    return f"{stage} · {sydney} · {city}"
-
-
-def prediction_summary(prediction: dict | None) -> str:
-    if not prediction:
-        return ""
-    return f"Your pick: {prediction['pred_team_a_score']}-{prediction['pred_team_b_score']}"
-
-
-def prediction_scoreline(prediction: dict | None) -> str:
-    if not prediction:
-        return "-"
-    return f"{prediction['pred_team_a_score']}-{prediction['pred_team_b_score']}"
-
-
-def is_match_locked(match: dict, settings: dict) -> bool:
-    kickoff = parse_dt(match.get("kickoff_time"))
-    if not kickoff:
-        return True
-    minutes = int(settings.get("lock_minutes_before_kickoff") or 30)
-    return now_utc() >= kickoff - timedelta(minutes=minutes)
-
-
-def can_edit_winner_pick(settings: dict) -> bool:
-    deadline = parse_dt(settings.get("winner_pick_deadline"))
-    if not deadline:
-        return True
-    return now_utc() < deadline
-
-
-def create_player(username: str, display_name: str, pin: str, emoji: str = "", is_admin: bool = False) -> None:
-    db().table("players").insert(
-        {
-            "username": clean_username(username),
-            "display_name": display_name.strip(),
-            "pin_hash": hash_pin(pin),
-            "emoji": emoji.strip() or None,
-            "is_admin": is_admin,
-            "is_bot": False,
-            "active": True,
-        }
-    ).execute()
-    clear_data_cache()
-
-
-def create_bot(bot_type: str) -> None:
-    spec = BOT_SPECS[bot_type]
-    db().table("players").upsert(
-        {
-            "username": spec["username"],
-            "display_name": spec["display_name"],
-            "pin_hash": hash_pin(str(random.randint(100000, 999999))),
-            "emoji": None,
-            "is_admin": False,
-            "is_bot": True,
-            "bot_type": bot_type,
-            "active": True,
-        },
-        on_conflict="username",
-    ).execute()
-
-
-def ensure_default_bots() -> None:
-    players = load_players(include_inactive=True)
-    existing = {p.get("bot_type") for p in players if p.get("is_bot")}
-    for bot_type in BOT_SPECS:
-        if bot_type not in existing:
-            create_bot(bot_type)
-    clear_data_cache()
 
 
 def bootstrap_admin_if_needed() -> None:
@@ -575,7 +296,8 @@ def login_page() -> None:
                             username = unique_username(display_name)
                             create_player(username, display_name, pin, emoji)
                             player = execute(
-                                db().table("players").select("*").eq("username", username).limit(1)
+                                db().table("players").select("*").eq("username", username).limit(1),
+                                "login.created_player_lookup",
                             )[0]
                             apply_player_session(player, persist=True)
                             st.rerun()
@@ -610,8 +332,7 @@ def setup_status_page(setup: dict) -> None:
 
 
 def sidebar() -> str:
-    player = get_player(st.session_state.player_id)
-    label = player["display_name"] if player else st.session_state.get("display_name", "Player")
+    label = st.session_state.get("display_name", "Player")
     st.sidebar.subheader(f"Playing as: {label}")
     if st.sidebar.button("Switch player"):
         st.session_state.clear_session_cookie = True
@@ -625,61 +346,11 @@ def sidebar() -> str:
     return st.sidebar.radio("Page", pages)
 
 
-def upsert_winner_pick(player_id: str, team: str) -> None:
-    settings = load_settings()
-    if not can_edit_winner_pick(settings):
-        raise ValueError("Winner picks are locked.")
-    db().table("winner_picks").upsert(
-        {"player_id": player_id, "team": team, "updated_at": iso_dt(now_utc())},
-        on_conflict="player_id",
-    ).execute()
-    clear_data_cache()
-
-
-def save_prediction(player_id: str, match_id: str, pred_a: int, pred_b: int, advance_team: str | None) -> None:
-    settings = load_settings()
-    match = get_match(match_id)
-    if not match:
-        raise ValueError("Match not found.")
-    if not has_teams(match):
-        raise ValueError("This fixture is not ready yet.")
-    if is_match_locked(match, settings):
-        raise ValueError("This match is locked.")
-    if pred_a < 0 or pred_b < 0:
-        raise ValueError("Scores must be zero or higher.")
-
-    if match.get("is_knockout"):
-        if pred_a > pred_b:
-            advance_team = match["team_a"]
-        elif pred_b > pred_a:
-            advance_team = match["team_b"]
-        elif not advance_team:
-            raise ValueError("Choose who advances for a drawn knockout score.")
-    else:
-        advance_team = None
-
-    db().table("predictions").upsert(
-        {
-            "player_id": player_id,
-            "match_id": match_id,
-            "pred_team_a_score": pred_a,
-            "pred_team_b_score": pred_b,
-            "pred_advance_team": advance_team,
-            "updated_at": iso_dt(now_utc()),
-        },
-        on_conflict="player_id,match_id",
-    ).execute()
-    clear_data_cache()
-
-
-def winner_pick_card(player_id: str, require_first: bool = False) -> bool:
-    settings = load_settings()
-    teams = load_teams()
-    teams_by_name = team_lookup(teams)
-    picks = winner_lookup(load_winner_picks())
-    current_pick = picks.get(player_id)
-    unlocked = can_edit_winner_pick(settings)
-
+def winner_pick_card(player_id: str, winner_pick: WinnerPickView, require_first: bool = False) -> bool:
+    teams = winner_pick.teams
+    teams_by_name = winner_pick.teams_by_name
+    current_pick = winner_pick.current_pick
+    unlocked = winner_pick.unlocked
     st.subheader("Tournament winner pick")
     if not teams:
         if st.session_state.get("is_admin"):
@@ -720,24 +391,6 @@ def winner_pick_card(player_id: str, require_first: bool = False) -> bool:
             st.error(str(exc))
 
     return bool(current_pick) or not unlocked
-
-
-def match_status(match: dict, prediction: dict | None, settings: dict) -> str:
-    if match.get("status") == "completed":
-        return "Completed"
-    if not has_teams(match):
-        return "To be confirmed"
-    if is_match_locked(match, settings):
-        return "Locked" if prediction else "Missed"
-    return "Saved" if prediction else "Open"
-
-
-def match_centre_status(match: dict, settings: dict) -> str:
-    if match.get("status") == "completed":
-        return "Completed"
-    if not has_teams(match):
-        return "To be confirmed"
-    return "Locked" if is_match_locked(match, settings) else "Open"
 
 
 def prediction_form(match: dict, prediction: dict | None, disabled: bool) -> None:
@@ -794,182 +447,79 @@ def prediction_form(match: dict, prediction: dict | None, disabled: bool) -> Non
 
 def my_predictions_page() -> None:
     player_id = st.session_state.player_id
-    settings = load_settings()
-    predictions = prediction_lookup(load_predictions())
-    matches = load_matches()
-    statuses = [match_status(match, predictions.get((player_id, match["id"])), settings) for match in matches]
-    status_counts = Counter(statuses)
-    saved_total = len([m for m in matches if predictions.get((player_id, m["id"]))])
+    with timed("page.my_predictions.view"):
+        view = get_predictions_page(player_id)
 
-    st.title("My Predictions")
-    metric_cols = st.columns(4)
-    metric_cols[0].metric("To tip", status_counts.get("Open", 0))
-    metric_cols[1].metric("Saved", saved_total)
-    metric_cols[2].metric("Locked", status_counts.get("Locked", 0))
-    metric_cols[3].metric("Missed", status_counts.get("Missed", 0))
+    with timed("page.my_predictions.header"):
+        st.title("My Predictions")
+        metric_cols = st.columns(4)
+        metric_cols[0].metric("To tip", view.metrics.get("Open", 0))
+        metric_cols[1].metric("Saved", view.metrics.get("Saved", 0))
+        metric_cols[2].metric("Locked", view.metrics.get("Locked", 0))
+        metric_cols[3].metric("Missed", view.metrics.get("Missed", 0))
 
-    winner_ready = winner_pick_card(player_id, require_first=True)
+    with timed("page.my_predictions.winner_pick"):
+        winner_ready = winner_pick_card(player_id, view.winner_pick, require_first=True)
 
-    st.divider()
-    st.subheader("Match predictions")
-    if not winner_ready:
-        st.stop()
+    with timed("page.my_predictions.filter"):
+        st.divider()
+        st.subheader("Match predictions")
+        if not winner_ready:
+            return
 
-    filter_choice = st.segmented_control(
-        "Filter",
-        ["Open", "Missing", "All", "Completed"],
-        default="Open",
-    )
-
-    rendered = 0
-    for match in matches:
-        prediction = predictions.get((player_id, match["id"]))
-        status = match_status(match, prediction, settings)
-        if filter_choice == "Open" and status not in ("Open", "Saved"):
-            continue
-        if filter_choice == "Missing" and (prediction or not has_teams(match) or match.get("status") == "completed"):
-            continue
-        if filter_choice == "Completed" and match.get("status") != "completed":
-            continue
-
-        rendered += 1
-        with st.container(border=True):
-            st.markdown(
-                f'<div class="tr-card-top"><div>{status_badge(status)}</div>'
-                f'<div class="tr-card-meta">{match_time_summary(match)}</div></div>',
-                unsafe_allow_html=True,
-            )
-            pick_text = prediction_summary(prediction)
-            if pick_text:
-                st.markdown(f'<div class="tr-card-pick">{pick_text}</div>', unsafe_allow_html=True)
-
-            if not has_teams(match):
-                st.info("Teams are not set for this fixture yet.")
-                continue
-
-            disabled = status in ("Locked", "Completed", "Missed") or not has_teams(match)
-            prediction_form(match, prediction, disabled)
-
-    if rendered == 0:
-        st.info("No matches in this view.")
-
-
-def calculate_leaderboard() -> pd.DataFrame:
-    players = load_players()
-    matches = load_matches()
-    settings = load_settings()
-    predictions = prediction_lookup(load_predictions())
-    winners = winner_lookup(load_winner_picks())
-
-    rows = []
-    for player in players:
-        score_points = 0
-        advancement_points = 0
-        exact_count = 0
-        goal_diff_count = 0
-        result_count = 0
-        for match in matches:
-            details = score_prediction_details(match, predictions.get((player["id"], match["id"])))
-            score_points += details["score_points"]
-            advancement_points += details["advancement_points"]
-            if details["tier"] == "Exact":
-                exact_count += 1
-            elif details["tier"] == "Goal diff":
-                goal_diff_count += 1
-            elif details["tier"] == "Result":
-                result_count += 1
-        winner_bonus = score_winner_pick(settings, winners.get(player["id"]))
-        rows.append(
-            {
-                "Player ID": player["id"],
-                "Player": player["display_name"],
-                "Emoji": player.get("emoji") or "",
-                "Bot": bool(player.get("is_bot")),
-                "Bot sort": 1 if player.get("is_bot") else 0,
-                "Score points": score_points,
-                "Advancement": advancement_points,
-                "Winner bonus": winner_bonus,
-                "Total points": score_points + advancement_points + winner_bonus,
-                "Exact": exact_count,
-                "Goal diff": goal_diff_count,
-                "Result": result_count,
-            }
+        filter_choice = st.segmented_control(
+            "Filter",
+            ["Open", "Missing", "All", "Completed"],
+            default="Open",
         )
-    df = pd.DataFrame(rows)
-    if df.empty:
-        return df
-    df = df.sort_values(
-        ["Total points", "Score points", "Bot sort", "Player"],
-        ascending=[False, False, True, True],
-    ).reset_index(drop=True)
-    df["Rank"] = df["Total points"].rank(method="min", ascending=False).astype(int)
-    return df
+        filter_state_key = "my_predictions_filter"
+        if st.session_state.get(filter_state_key) != filter_choice:
+            st.session_state[filter_state_key] = filter_choice
+            st.session_state.my_predictions_visible_count = 12
 
+    with timed("page.my_predictions.match_list"):
+        visible_count = int(st.session_state.get("my_predictions_visible_count", 12))
+        visible_matches = []
+        for match_view in view.matches:
+            match = match_view.match
+            prediction = match_view.prediction
+            status = match_view.status
+            if filter_choice == "Open" and status not in ("Open", "Saved"):
+                continue
+            if filter_choice == "Missing" and (prediction or not has_teams(match) or match.get("status") == "completed"):
+                continue
+            if filter_choice == "Completed" and match.get("status") != "completed":
+                continue
+            visible_matches.append(match_view)
 
-def ordinal(value: int) -> str:
-    if 10 <= value % 100 <= 20:
-        suffix = "th"
-    else:
-        suffix = {1: "st", 2: "nd", 3: "rd"}.get(value % 10, "th")
-    return f"{value}{suffix}"
+        rendered = 0
+        for match_view in visible_matches[:visible_count]:
+            match = match_view.match
+            prediction = match_view.prediction
+            status = match_view.status
+            rendered += 1
+            with st.container(border=True):
+                st.markdown(
+                    f'<div class="tr-card-top"><div>{status_badge(status)}</div>'
+                    f'<div class="tr-card-meta">{match_time_summary(match)}</div></div>',
+                    unsafe_allow_html=True,
+                )
+                if match_view.pick_text:
+                    st.markdown(f'<div class="tr-card-pick">{match_view.pick_text}</div>', unsafe_allow_html=True)
 
+                if not has_teams(match):
+                    st.info("Teams are not set for this fixture yet.")
+                    continue
 
-def leaderboard_rank_label(rank: int, tied: bool) -> str:
-    return f"={rank}" if tied else ordinal(rank)
+                prediction_form(match, prediction, match_view.disabled)
 
-
-def leaderboard_player_name(row: dict) -> str:
-    if row.get("Bot"):
-        return str(row.get("Player") or "")
-    emoji = str(row.get("Emoji") or "").strip()
-    player = str(row.get("Player") or "").strip()
-    return f"{emoji} {player}".strip()
-
-
-def unique_chart_name(player: dict, used_names: set[str]) -> str:
-    emoji = str(player.get("emoji") or "").strip()
-    base = f"{emoji} {player.get('display_name') or 'Player'}".strip()
-    name = base
-    suffix = 2
-    while name in used_names:
-        name = f"{base} {suffix}"
-        suffix += 1
-    used_names.add(name)
-    return name
-
-
-def cumulative_human_scores() -> pd.DataFrame:
-    humans = [player for player in load_players() if not player.get("is_bot")]
-    completed_matches = [
-        match
-        for match in load_matches()
-        if match.get("status") == "completed"
-        and match.get("team_a_score") is not None
-        and match.get("team_b_score") is not None
-    ]
-    if not humans or not completed_matches:
-        return pd.DataFrame()
-
-    predictions = prediction_lookup(load_predictions())
-    used_names: set[str] = set()
-    player_names = {player["id"]: unique_chart_name(player, used_names) for player in humans}
-    totals = {player["id"]: 0 for player in humans}
-    rows = []
-
-    for index, match in enumerate(completed_matches, start=1):
-        try:
-            match_number = int(match.get("match_number") or index)
-        except (TypeError, ValueError):
-            match_number = index
-        for player in humans:
-            details = score_prediction_details(match, predictions.get((player["id"], match["id"])))
-            totals[player["id"]] += int(details["total_points"])
-        row = {"Match": match_number}
-        for player in humans:
-            row[player_names[player["id"]]] = totals[player["id"]]
-        rows.append(row)
-
-    return pd.DataFrame(rows)
+        if rendered == 0:
+            st.info("No matches in this view.")
+        elif rendered < len(visible_matches):
+            remaining = len(visible_matches) - rendered
+            if st.button(f"Show 12 more ({remaining} remaining)", use_container_width=True):
+                st.session_state.my_predictions_visible_count = rendered + 12
+                st.rerun()
 
 
 def leaderboard_page() -> None:
@@ -1041,41 +591,6 @@ def leaderboard_page() -> None:
         st.line_chart(progress_df.set_index("Match"), height=280)
 
 
-def score_reason(details: dict) -> str:
-    tier = details.get("tier")
-    if tier == "Exact":
-        reason = "Exact score"
-    elif tier == "Goal diff":
-        reason = "Correct goal difference"
-    elif tier == "Result":
-        reason = "Correct result"
-    else:
-        reason = "Wrong result"
-    if details.get("advancement_points"):
-        return f"{reason} + advancement" if details.get("score_points") else "Correct advancement"
-    return reason
-
-
-def match_result_line(match: dict) -> str:
-    if (
-        match.get("status") != "completed"
-        or match.get("team_a_score") is None
-        or match.get("team_b_score") is None
-    ):
-        return matchup_label(match)
-    team_a = team_display(match.get("team_a"), match.get("team_a_icon") or flag_for_code(match.get("team_a_code")))
-    team_b = team_display(match.get("team_b"), match.get("team_b_icon") or flag_for_code(match.get("team_b_code")))
-    return f"{team_a} {match.get('team_a_score')} - {match.get('team_b_score')} {team_b}"
-
-
-def player_display_for_centre(player: dict) -> str:
-    name = str(player.get("display_name") or "")
-    if player.get("is_bot"):
-        return escape(name)
-    emoji = str(player.get("emoji") or "").strip()
-    return escape(f"{emoji} {name}".strip())
-
-
 def match_centre_prediction_rows(match: dict, predictions: list[dict], players: dict[str, dict], completed: bool) -> str:
     if not predictions:
         return '<div class="tr-centre-empty">No predictions for this match.</div>'
@@ -1116,61 +631,70 @@ def match_centre_prediction_rows(match: dict, predictions: list[dict], players: 
 
 
 def match_centre_page() -> None:
-    st.title("Match Centre")
-    settings = load_settings()
-    players = {p["id"]: p for p in load_players()}
     player_id = st.session_state.player_id
-    all_predictions = load_predictions()
-    prediction_by_player_match = prediction_lookup(all_predictions)
-    predictions_by_match = defaultdict(list)
-    for pred in all_predictions:
-        predictions_by_match[pred["match_id"]].append(pred)
-
-    filter_choice = st.segmented_control(
-        "Filter",
-        ["Open", "Locked", "Completed", "All"],
-        default="Open",
-    )
-
-    rendered = 0
-    for match in load_matches():
-        status = match_centre_status(match, settings)
-        if filter_choice == "Open" and status != "Open":
-            continue
-        if filter_choice == "Locked" and status != "Locked":
-            continue
-        if filter_choice == "Completed" and status != "Completed":
-            continue
-
-        rendered += 1
-        current_prediction = prediction_by_player_match.get((player_id, match["id"]))
-        completed = status == "Completed"
-        reveal = status in ("Locked", "Completed")
-        pick_text = prediction_summary(current_prediction) or "Your pick: -"
-        predictions = predictions_by_match.get(match["id"], [])
-        row_html = ""
-        if reveal:
-            row_html = match_centre_prediction_rows(match, predictions, players, completed)
-        elif status != "Open":
-            row_html = '<div class="tr-centre-empty">Teams are not set for this fixture yet.</div>'
-        body_html = f'<div class="tr-centre-body">{row_html}</div>' if row_html else ""
-
-        st.markdown(
-            '<div class="tr-centre-card">'
-            '<div class="tr-centre-head">'
-            '<div>'
-            f'<div class="tr-centre-meta">{status_badge(status, compact=True)} <span>{escape(match_time_summary(match))}</span></div>'
-            f'<div class="tr-centre-title">{escape(match_result_line(match))}</div>'
-            f'<div class="tr-card-pick">{escape(pick_text)}</div>'
-            '</div>'
-            '</div>'
-            f'{body_html}'
-            '</div>',
-            unsafe_allow_html=True,
+    with timed("page.match_centre.header"):
+        st.title("Match Centre")
+        filter_choice = st.segmented_control(
+            "Filter",
+            ["Open", "Locked", "Completed", "All"],
+            default="Open",
         )
+        filter_state_key = "match_centre_filter"
+        if st.session_state.get(filter_state_key) != filter_choice:
+            st.session_state[filter_state_key] = filter_choice
+            st.session_state.match_centre_visible_count = 12
 
-    if rendered == 0:
-        st.info("No matches in this view.")
+    with timed("page.match_centre.view"):
+        view = get_match_centre_page(player_id, filter_choice)
+
+    with timed("page.match_centre.match_list"):
+        visible_count = int(st.session_state.get("match_centre_visible_count", 12))
+        visible_matches = []
+        for match_view in view.matches:
+            status = match_view.status
+            if filter_choice == "Open" and status != "Open":
+                continue
+            if filter_choice == "Locked" and status != "Locked":
+                continue
+            if filter_choice == "Completed" and status != "Completed":
+                continue
+            visible_matches.append(match_view)
+
+        rendered = 0
+        for match_view in visible_matches[:visible_count]:
+            match = match_view.match
+            row_html = match_view.row_html
+            if match_view.reveal:
+                row_html = match_centre_prediction_rows(
+                    match,
+                    match_view.predictions,
+                    view.players,
+                    match_view.completed,
+                )
+            body_html = f'<div class="tr-centre-body">{row_html}</div>' if row_html else ""
+
+            rendered += 1
+            st.markdown(
+                '<div class="tr-centre-card">'
+                '<div class="tr-centre-head">'
+                '<div>'
+                f'<div class="tr-centre-meta">{status_badge(match_view.status, compact=True)} <span>{escape(match_time_summary(match))}</span></div>'
+                f'<div class="tr-centre-title">{escape(match_result_line(match))}</div>'
+                f'<div class="tr-card-pick">{escape(match_view.pick_text)}</div>'
+                '</div>'
+                '</div>'
+                f'{body_html}'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+
+        if rendered == 0:
+            st.info("No matches in this view.")
+        elif rendered < len(visible_matches):
+            remaining = len(visible_matches) - rendered
+            if st.button(f"Show 12 more ({remaining} remaining)", key="match_centre_show_more", use_container_width=True):
+                st.session_state.match_centre_visible_count = rendered + 12
+                st.rerun()
 
 
 def rules_page() -> None:
@@ -1232,691 +756,6 @@ def rules_page() -> None:
         ]
     )
     st.markdown(html, unsafe_allow_html=True)
-
-
-def import_archive_fixture_csvs() -> tuple[int, int]:
-    teams_path = ARCHIVE_DIR / "teams.csv"
-    matches_path = ARCHIVE_DIR / "matches.csv"
-    stages_path = ARCHIVE_DIR / "tournament_stages.csv"
-    cities_path = ARCHIVE_DIR / "host_cities.csv"
-    if not all(p.exists() for p in (teams_path, matches_path, stages_path, cities_path)):
-        raise FileNotFoundError("Missing one or more archive CSV files.")
-
-    teams_df = pd.read_csv(teams_path)
-    stages_df = pd.read_csv(stages_path)
-    cities_df = pd.read_csv(cities_path)
-    matches_df = pd.read_csv(matches_path)
-
-    team_rows = []
-    team_by_id = {}
-    for row in teams_df.to_dict("records"):
-        name = str(row["team_name"]).strip()
-        team = {
-            "external_id": int(row["id"]),
-            "name": name,
-            "fifa_code": str(row.get("fifa_code") or "").strip() or None,
-            "group_letter": str(row.get("group_letter") or "").strip() or None,
-            "icon": flag_for_code(row.get("fifa_code")),
-            "active": True,
-            "updated_at": iso_dt(now_utc()),
-        }
-        team_rows.append(team)
-        team_by_id[int(row["id"])] = team
-    db().table("teams").upsert(team_rows, on_conflict="external_id").execute()
-
-    stages = {
-        int(row["id"]): {"stage": row["stage_name"], "stage_order": int(row["stage_order"])}
-        for row in stages_df.to_dict("records")
-    }
-    cities = {
-        int(row["id"]): {"city": row["city_name"], "venue": row["venue_name"]}
-        for row in cities_df.to_dict("records")
-    }
-
-    match_rows = []
-    for row in matches_df.to_dict("records"):
-        stage = stages[int(row["stage_id"])]
-        city = cities.get(int(row["city_id"]), {})
-
-        team_a = team_by_id.get(int(row["home_team_id"])) if not pd.isna(row.get("home_team_id")) else None
-        team_b = team_by_id.get(int(row["away_team_id"])) if not pd.isna(row.get("away_team_id")) else None
-
-        match_rows.append(
-            {
-                "match_id": f"M{int(row['match_number']):03d}",
-                "match_number": int(row["match_number"]),
-                "stage": stage["stage"],
-                "stage_order": stage["stage_order"],
-                "group_name": row["match_label"] if stage["stage"] == "Group Stage" else None,
-                "match_label": row["match_label"],
-                "team_a": team_a["name"] if team_a else None,
-                "team_b": team_b["name"] if team_b else None,
-                "team_a_code": team_a.get("fifa_code") if team_a else None,
-                "team_b_code": team_b.get("fifa_code") if team_b else None,
-                "team_a_icon": team_a.get("icon") if team_a else None,
-                "team_b_icon": team_b.get("icon") if team_b else None,
-                "kickoff_time": iso_dt(parse_host_kickoff(row["kickoff_at"], city.get("city"))),
-                "is_knockout": stage["stage"] != "Group Stage",
-                "city": city.get("city"),
-                "venue": city.get("venue"),
-                "updated_at": iso_dt(now_utc()),
-            }
-        )
-    db().table("matches").upsert(match_rows, on_conflict="match_id").execute()
-    clear_data_cache()
-    return len(team_rows), len(match_rows)
-
-
-def group_standings() -> dict[str, list[dict]]:
-    teams = {t["name"]: t for t in load_teams()}
-    standings = defaultdict(dict)
-    for team in teams.values():
-        group = team.get("group_letter")
-        if group:
-            standings[group][team["name"]] = {
-                "Team": team["name"],
-                "P": 0,
-                "W": 0,
-                "D": 0,
-                "L": 0,
-                "GF": 0,
-                "GA": 0,
-                "GD": 0,
-                "Pts": 0,
-            }
-
-    for match in load_matches():
-        if match.get("stage") != "Group Stage" or match.get("status") != "completed":
-            continue
-        if match.get("team_a_score") is None or match.get("team_b_score") is None:
-            continue
-        group = (match.get("group_name") or "").replace("Group ", "")
-        a = standings[group].setdefault(match["team_a"], {"Team": match["team_a"], "P": 0, "W": 0, "D": 0, "L": 0, "GF": 0, "GA": 0, "GD": 0, "Pts": 0})
-        b = standings[group].setdefault(match["team_b"], {"Team": match["team_b"], "P": 0, "W": 0, "D": 0, "L": 0, "GF": 0, "GA": 0, "GD": 0, "Pts": 0})
-        sa, sb = int(match["team_a_score"]), int(match["team_b_score"])
-        for row, gf, ga in ((a, sa, sb), (b, sb, sa)):
-            row["P"] += 1
-            row["GF"] += gf
-            row["GA"] += ga
-            row["GD"] = row["GF"] - row["GA"]
-        if sa > sb:
-            a["W"] += 1
-            b["L"] += 1
-            a["Pts"] += 3
-        elif sb > sa:
-            b["W"] += 1
-            a["L"] += 1
-            b["Pts"] += 3
-        else:
-            a["D"] += 1
-            b["D"] += 1
-            a["Pts"] += 1
-            b["Pts"] += 1
-
-    return {
-        group: sorted(rows.values(), key=lambda r: (-r["Pts"], -r["GD"], -r["GF"], r["Team"]))
-        for group, rows in sorted(standings.items())
-    }
-
-
-def prediction_count_for_match(match_id: str) -> int:
-    return len(execute(db().table("predictions").select("id").eq("match_id", match_id)))
-
-
-def team_fields(name: str | None, teams_by_name: dict[str, dict], side: str) -> dict:
-    team = teams_by_name.get(name or "")
-    return {
-        side: name,
-        f"{side}_code": team.get("fifa_code") if team else None,
-        f"{side}_icon": team.get("icon") if team else None,
-    }
-
-
-def assign_round_of_32_match(match: dict, team_a: str, team_b: str) -> None:
-    if prediction_count_for_match(match["id"]) and (match.get("team_a") != team_a or match.get("team_b") != team_b):
-        raise ValueError("This match already has predictions. Do not change teams without a reset.")
-    teams_by_name = team_lookup(load_teams())
-    update = {"updated_at": iso_dt(now_utc())}
-    update.update(team_fields(team_a, teams_by_name, "team_a"))
-    update.update(team_fields(team_b, teams_by_name, "team_b"))
-    db().table("matches").update(update).eq("id", match["id"]).execute()
-    clear_data_cache()
-
-
-def loser_for_match(match: dict) -> str | None:
-    advanced = match.get("advance_team")
-    if not advanced:
-        return None
-    if advanced == match.get("team_a"):
-        return match.get("team_b")
-    if advanced == match.get("team_b"):
-        return match.get("team_a")
-    return None
-
-
-def resolve_source_token(token: str, matches_by_number: dict[int, dict]) -> str | None:
-    token = token.strip()
-    if token.startswith("W") and token[1:].isdigit():
-        source = matches_by_number.get(int(token[1:]))
-        return source.get("advance_team") if source and source.get("status") == "completed" else None
-    if token.startswith("RU") and token[2:].isdigit():
-        source = matches_by_number.get(int(token[2:]))
-        return loser_for_match(source) if source and source.get("status") == "completed" else None
-    return None
-
-
-def propagate_knockout_matchups() -> int:
-    matches = load_matches()
-    teams_by_name = team_lookup(load_teams())
-    matches_by_number = {int(m["match_number"]): m for m in matches if m.get("match_number") is not None}
-    changed = 0
-
-    for match in matches:
-        if not match.get("is_knockout") or not match.get("match_label") or match.get("stage") == "Round of 32":
-            continue
-        if not any(token in match["match_label"] for token in ("W", "RU")):
-            continue
-        parts = [p.strip() for p in match["match_label"].split(" vs ")]
-        if len(parts) != 2:
-            continue
-        resolved = [resolve_source_token(part, matches_by_number) for part in parts]
-        if not any(resolved):
-            continue
-        if prediction_count_for_match(match["id"]):
-            continue
-        update = {"updated_at": iso_dt(now_utc())}
-        if resolved[0] and resolved[0] != match.get("team_a"):
-            update.update(team_fields(resolved[0], teams_by_name, "team_a"))
-        if resolved[1] and resolved[1] != match.get("team_b"):
-            update.update(team_fields(resolved[1], teams_by_name, "team_b"))
-        if len(update) > 1:
-            db().table("matches").update(update).eq("id", match["id"]).execute()
-            changed += 1
-    if changed:
-        clear_data_cache()
-    return changed
-
-
-def choose_advance(match: dict, pred_a: int, pred_b: int) -> str | None:
-    if not match.get("is_knockout"):
-        return None
-    if pred_a > pred_b:
-        return match.get("team_a")
-    if pred_b > pred_a:
-        return match.get("team_b")
-    return random.choice([match["team_a"], match["team_b"]])
-
-
-def bot_prediction_for_match(bot_type: str, match: dict, human_predictions: list[dict]) -> tuple[int, int, str | None]:
-    if bot_type == "random":
-        pred_a = random.choice(SCORE_POOL)
-        pred_b = random.choice(SCORE_POOL)
-    elif bot_type == "one_one":
-        pred_a = pred_b = 1
-    else:
-        if human_predictions:
-            pred_a = int(round(median([int(p["pred_team_a_score"]) for p in human_predictions])))
-            pred_b = int(round(median([int(p["pred_team_b_score"]) for p in human_predictions])))
-        else:
-            pred_a = pred_b = 1
-
-    advance = choose_advance(match, pred_a, pred_b)
-    if bot_type == "median" and match.get("is_knockout") and pred_a == pred_b and human_predictions:
-        votes = [p.get("pred_advance_team") for p in human_predictions if p.get("pred_advance_team")]
-        if votes:
-            advance = Counter(votes).most_common(1)[0][0]
-    return pred_a, pred_b, advance
-
-
-def generate_bot_predictions(bot_type: str | None = None, only_match_id: str | None = None) -> int:
-    ensure_default_bots()
-    players = load_players()
-    bots = [p for p in players if p.get("is_bot") and (bot_type is None or p.get("bot_type") == bot_type)]
-    humans = [p["id"] for p in players if not p.get("is_bot")]
-    matches = [m for m in load_matches() if has_teams(m)]
-    if only_match_id:
-        matches = [m for m in matches if m["id"] == only_match_id]
-    settings = load_settings()
-    all_predictions = load_predictions()
-    existing = prediction_lookup(all_predictions)
-    generated = 0
-
-    for bot in bots:
-        for match in matches:
-            if (bot["id"], match["id"]) in existing:
-                continue
-            if bot.get("bot_type") == "median" and not is_match_locked(match, settings):
-                continue
-            human_predictions = [
-                p for p in all_predictions if p["match_id"] == match["id"] and p["player_id"] in humans
-            ]
-            pred_a, pred_b, advance = bot_prediction_for_match(bot["bot_type"], match, human_predictions)
-            db().table("predictions").insert(
-                {
-                    "player_id": bot["id"],
-                    "match_id": match["id"],
-                    "pred_team_a_score": pred_a,
-                    "pred_team_b_score": pred_b,
-                    "pred_advance_team": advance,
-                }
-            ).execute()
-            generated += 1
-    if generated:
-        clear_data_cache()
-    return generated
-
-
-def generate_bot_winner_picks() -> int:
-    ensure_default_bots()
-    teams = [t["name"] for t in load_teams()]
-    if not teams:
-        return 0
-    players = load_players()
-    bots = [p for p in players if p.get("is_bot")]
-    humans = [p["id"] for p in players if not p.get("is_bot")]
-    picks = winner_lookup(load_winner_picks())
-    generated = 0
-    human_picks = [picks[p]["team"] for p in humans if p in picks]
-
-    for bot in bots:
-        if bot["id"] in picks:
-            continue
-        if bot.get("bot_type") == "median" and human_picks:
-            team = Counter(human_picks).most_common(1)[0][0]
-        else:
-            team = random.choice(teams)
-        db().table("winner_picks").insert({"player_id": bot["id"], "team": team}).execute()
-        generated += 1
-    if generated:
-        clear_data_cache()
-    return generated
-
-
-def save_result(match: dict, score_a: int, score_b: int, advance_team: str | None, status: str) -> None:
-    if status == "completed":
-        if match.get("is_knockout") and not advance_team:
-            raise ValueError("Choose who advanced.")
-        result_updated_at = iso_dt(now_utc())
-    else:
-        advance_team = None
-        result_updated_at = None
-
-    db().table("match_results").upsert(
-        {
-            "match_id": match["id"],
-            "status": status,
-            "team_a_score": score_a if status == "completed" else None,
-            "team_b_score": score_b if status == "completed" else None,
-            "advance_team": advance_team,
-            "source": "manual",
-            "confirmed_at": result_updated_at or iso_dt(now_utc()),
-            "updated_at": iso_dt(now_utc()),
-        },
-        on_conflict="match_id",
-    ).execute()
-    clear_data_cache()
-
-    if status == "completed":
-        generate_bot_predictions(only_match_id=match["id"])
-        generate_bot_winner_picks()
-        propagate_knockout_matchups()
-
-
-RESULT_SCORE_A_COLUMNS = ("team_a_score", "score_a")
-RESULT_SCORE_B_COLUMNS = ("team_b_score", "score_b")
-RESULT_TEAM_A_COLUMNS = ("team_a_code", "a_code")
-RESULT_TEAM_B_COLUMNS = ("team_b_code", "b_code")
-RESULT_ADVANCE_COLUMNS = ("advance_team_code", "advance_team", "advanced_team_code", "winner_code", "winner")
-RESULT_STATUS_COLUMNS = ("status", "result_status")
-RESULT_STATUSES = ("scheduled", "completed", "cancelled", "postponed")
-
-
-def csv_column(row: dict, aliases: tuple[str, ...]):
-    lower = {str(key).strip().lower(): key for key in row}
-    for alias in aliases:
-        key = lower.get(alias)
-        if key is not None:
-            return row.get(key)
-    return None
-
-
-def blank(value) -> bool:
-    return value in (None, "") or pd.isna(value)
-
-
-def parse_score_value(value, label: str) -> int:
-    if blank(value):
-        raise ValueError(f"{label} is blank.")
-    try:
-        score = int(float(str(value).strip()))
-    except ValueError as exc:
-        raise ValueError(f"{label} must be a whole number.") from exc
-    if score < 0:
-        raise ValueError(f"{label} must be 0 or more.")
-    return score
-
-
-def resolve_advance_value(value, match: dict, score_a: int, score_b: int) -> str | None:
-    if not match.get("is_knockout"):
-        return None
-    options = [match.get("team_a"), match.get("team_b")]
-    if score_a > score_b:
-        return match.get("team_a")
-    if score_b > score_a:
-        return match.get("team_b")
-    if blank(value):
-        raise ValueError("advance_team is required for tied knockout results.")
-
-    raw = str(value).strip()
-    normalized = raw.casefold()
-    if normalized in ("team_a", "a", "home"):
-        return match.get("team_a")
-    if normalized in ("team_b", "b", "away"):
-        return match.get("team_b")
-    for team in options:
-        if team and normalized == team.casefold():
-            return team
-    if match.get("team_a_code") and normalized == str(match["team_a_code"]).casefold():
-        return match.get("team_a")
-    if match.get("team_b_code") and normalized == str(match["team_b_code"]).casefold():
-        return match.get("team_b")
-    raise ValueError("advance_team must be team_a, team_b, a team name, or a team code.")
-
-
-def result_snapshot(match: dict) -> str:
-    if match.get("team_a_score") is None or match.get("team_b_score") is None:
-        return "-"
-    return f"{match['team_a_score']}-{match['team_b_score']}"
-
-
-def advance_code_for_match(match: dict) -> str:
-    advanced = match.get("advance_team")
-    if advanced == match.get("team_a"):
-        return match.get("team_a_code") or ""
-    if advanced == match.get("team_b"):
-        return match.get("team_b_code") or ""
-    return ""
-
-
-def result_update_from_values(
-    match: dict,
-    score_a_raw,
-    score_b_raw,
-    status_raw,
-    advance_raw,
-    source_label: str,
-) -> tuple[dict | None, str | None, bool]:
-    row_has_scores = not blank(score_a_raw) or not blank(score_b_raw)
-    row_has_status = not blank(status_raw)
-    if not row_has_scores and not row_has_status:
-        return None, None, False
-
-    status = str(status_raw).strip().lower() if row_has_status else "completed"
-    if row_has_scores and status == "scheduled":
-        status = "completed"
-    if status not in RESULT_STATUSES:
-        return None, f"status must be one of {', '.join(RESULT_STATUSES)}.", False
-
-    try:
-        score_a = score_b = None
-        advance_team = None
-        if status == "completed":
-            score_a = parse_score_value(score_a_raw, "team_a_score")
-            score_b = parse_score_value(score_b_raw, "team_b_score")
-            advance_team = resolve_advance_value(advance_raw, match, score_a, score_b)
-        elif row_has_scores:
-            return None, "Rows with scores should use status completed, or leave status as scheduled.", False
-    except ValueError as exc:
-        return None, str(exc), False
-
-    current_status = match.get("status") or "scheduled"
-    current_advance = match.get("advance_team")
-    current_result = result_snapshot(match)
-    new_result = f"{score_a}-{score_b}" if status == "completed" else "-"
-    changed = (
-        current_status != status
-        or current_result != new_result
-        or (current_advance or "") != (advance_team or "")
-    )
-    if not changed:
-        return None, None, True
-
-    action = "Add result" if current_result == "-" and status == "completed" else "Change result"
-    if status != "completed":
-        action = "Clear result/status" if current_result != "-" else "Change status"
-
-    return (
-        {
-            "match_id": match["id"],
-            "match_number": int(match["match_number"]),
-            "score_a": score_a,
-            "score_b": score_b,
-            "advance_team": advance_team,
-            "status": status,
-            "source": source_label,
-            "preview": {
-                "Action": action,
-                "Match": int(match["match_number"]),
-                "Codes": f"{match.get('team_a_code')} vs {match.get('team_b_code')}",
-                "Fixture": matchup_label(match),
-                "Current": f"{current_status} {current_result}".strip(),
-                "New": f"{status} {new_result}".strip(),
-                "Current advanced": current_advance or "-",
-                "New advanced": advance_team or "-",
-            },
-        },
-        None,
-        False,
-    )
-
-
-def build_result_updates_from_csv(uploaded_file) -> tuple[list[dict], list[dict], int]:
-    df = pd.read_csv(uploaded_file)
-    matches = load_matches()
-    matches_by_number = {int(m["match_number"]): m for m in matches if m.get("match_number") is not None}
-    updates: list[dict] = []
-    errors: list[dict] = []
-    unchanged = 0
-
-    columns = {str(column).strip().lower() for column in df.columns}
-    has_score_columns = bool(columns.intersection(RESULT_SCORE_A_COLUMNS)) and bool(columns.intersection(RESULT_SCORE_B_COLUMNS))
-    has_status_column = bool(columns.intersection(RESULT_STATUS_COLUMNS))
-    if "match_number" not in columns:
-        return [], [{"Row": "-", "Match": "-", "Problem": "CSV needs a match_number column."}], 0
-    if not columns.intersection(RESULT_TEAM_A_COLUMNS) or not columns.intersection(RESULT_TEAM_B_COLUMNS):
-        return [], [
-            {
-                "Row": "-",
-                "Match": "-",
-                "Problem": "CSV needs team_a_code and team_b_code columns so scores can be validated against fixtures.",
-            }
-        ], 0
-    if not has_score_columns and not has_status_column:
-        return [], [
-            {
-                "Row": "-",
-                "Match": "-",
-                "Problem": "Add team_a_score and team_b_score columns, or a status column, before uploading.",
-            }
-        ], 0
-
-    for index, row in enumerate(df.to_dict("records"), start=2):
-        match_number_raw = csv_column(row, ("match_number",))
-        if blank(match_number_raw):
-            continue
-        try:
-            match_number = int(float(str(match_number_raw).strip()))
-        except ValueError:
-            errors.append({"Row": index, "Match": "-", "Problem": "match_number must be a number."})
-            continue
-
-        match = matches_by_number.get(match_number)
-        if not match:
-            errors.append({"Row": index, "Match": match_number, "Problem": "No matching fixture in Supabase."})
-            continue
-        if not has_teams(match):
-            errors.append({"Row": index, "Match": match_number, "Problem": "Fixture teams are not set yet."})
-            continue
-
-        team_a_code_raw = csv_column(row, RESULT_TEAM_A_COLUMNS)
-        team_b_code_raw = csv_column(row, RESULT_TEAM_B_COLUMNS)
-        team_a_code = "" if blank(team_a_code_raw) else str(team_a_code_raw).strip().casefold()
-        team_b_code = "" if blank(team_b_code_raw) else str(team_b_code_raw).strip().casefold()
-        expected_a_code = str(match.get("team_a_code") or "").strip().casefold()
-        expected_b_code = str(match.get("team_b_code") or "").strip().casefold()
-        if not team_a_code or not team_b_code:
-            errors.append({"Row": index, "Match": match_number, "Problem": "team_a_code and team_b_code are required."})
-            continue
-        if team_a_code != expected_a_code or team_b_code != expected_b_code:
-            expected = f"{match.get('team_a_code') or '-'} vs {match.get('team_b_code') or '-'}"
-            supplied = f"{team_a_code_raw or '-'} vs {team_b_code_raw or '-'}"
-            errors.append(
-                {
-                    "Row": index,
-                    "Match": match_number,
-                    "Problem": f"Team codes do not match fixture. Expected {expected}; uploaded {supplied}.",
-                }
-            )
-            continue
-
-        status_raw = csv_column(row, RESULT_STATUS_COLUMNS)
-        score_a_raw = csv_column(row, RESULT_SCORE_A_COLUMNS)
-        score_b_raw = csv_column(row, RESULT_SCORE_B_COLUMNS)
-        advance_raw = csv_column(row, RESULT_ADVANCE_COLUMNS)
-
-        update, problem, unchanged_row = result_update_from_values(
-            match,
-            score_a_raw,
-            score_b_raw,
-            status_raw,
-            advance_raw,
-            "csv_upload",
-        )
-        if problem:
-            errors.append({"Row": index, "Match": match_number, "Problem": problem})
-            continue
-        if unchanged_row:
-            unchanged += 1
-            continue
-        if update:
-            updates.append(update)
-
-    return updates, errors, unchanged
-
-
-def result_editor_rows(matches: list[dict]) -> list[dict]:
-    rows = []
-    for match in matches:
-        if not has_teams(match):
-            continue
-        rows.append(
-            {
-                "match_number": int(match["match_number"]),
-                "kickoff": local_label(match.get("kickoff_time")),
-                "stage": match.get("group_name") or match.get("stage"),
-                "team_a": match.get("team_a"),
-                "team_a_code": match.get("team_a_code") or "",
-                "team_a_score": None if match.get("team_a_score") is None else int(match["team_a_score"]),
-                "team_b_score": None if match.get("team_b_score") is None else int(match["team_b_score"]),
-                "team_b_code": match.get("team_b_code") or "",
-                "team_b": match.get("team_b"),
-                "status": match.get("status") or "scheduled",
-                "advance_team_code": advance_code_for_match(match),
-            }
-        )
-    return rows
-
-
-def build_result_updates_from_table(rows) -> tuple[list[dict], list[dict], int]:
-    data = rows.to_dict("records") if hasattr(rows, "to_dict") else list(rows)
-    matches = load_matches()
-    matches_by_number = {int(m["match_number"]): m for m in matches if m.get("match_number") is not None}
-    updates: list[dict] = []
-    errors: list[dict] = []
-    unchanged = 0
-
-    for index, row in enumerate(data, start=1):
-        match_number_raw = row.get("match_number")
-        if blank(match_number_raw):
-            continue
-        try:
-            match_number = int(float(str(match_number_raw).strip()))
-        except ValueError:
-            errors.append({"Row": index, "Match": "-", "Problem": "match_number must be a number."})
-            continue
-
-        match = matches_by_number.get(match_number)
-        if not match:
-            errors.append({"Row": index, "Match": match_number, "Problem": "No matching fixture in Supabase."})
-            continue
-
-        supplied_a = "" if blank(row.get("team_a_code")) else str(row.get("team_a_code")).strip().casefold()
-        supplied_b = "" if blank(row.get("team_b_code")) else str(row.get("team_b_code")).strip().casefold()
-        expected_a = str(match.get("team_a_code") or "").strip().casefold()
-        expected_b = str(match.get("team_b_code") or "").strip().casefold()
-        if supplied_a != expected_a or supplied_b != expected_b:
-            errors.append({"Row": index, "Match": match_number, "Problem": "Team codes changed unexpectedly. Refresh and try again."})
-            continue
-
-        update, problem, unchanged_row = result_update_from_values(
-            match,
-            row.get("team_a_score"),
-            row.get("team_b_score"),
-            row.get("status"),
-            row.get("advance_team_code"),
-            "table_editor",
-        )
-        if problem:
-            errors.append({"Row": index, "Match": match_number, "Problem": problem})
-            continue
-        if unchanged_row:
-            unchanged += 1
-            continue
-        if update:
-            updates.append(update)
-
-    return updates, errors, unchanged
-
-
-def apply_result_updates(updates: list[dict]) -> int:
-    completed_match_ids = []
-    timestamp = iso_dt(now_utc())
-    for update in updates:
-        status = update["status"]
-        db().table("match_results").upsert(
-            {
-                "match_id": update["match_id"],
-                "status": status,
-                "team_a_score": update["score_a"] if status == "completed" else None,
-                "team_b_score": update["score_b"] if status == "completed" else None,
-                "advance_team": update["advance_team"] if status == "completed" else None,
-                "source": update.get("source") or "admin",
-                "confirmed_at": timestamp,
-                "updated_at": timestamp,
-            },
-            on_conflict="match_id",
-        ).execute()
-        if status == "completed":
-            completed_match_ids.append(update["match_id"])
-
-    clear_data_cache()
-    for match_id in completed_match_ids:
-        generate_bot_predictions(only_match_id=match_id)
-    if completed_match_ids:
-        generate_bot_winner_picks()
-    propagate_knockout_matchups()
-    try:
-        db().table("result_imports").insert(
-            {
-                "row_count": len(updates),
-                "changed_count": len(updates),
-                "error_count": 0,
-                "imported_by": st.session_state.get("player_id"),
-            }
-        ).execute()
-    except Exception:
-        pass
-    return len(updates)
 
 
 def settings_admin() -> None:
@@ -2087,7 +926,7 @@ def result_admin() -> None:
 
             if st.button("Confirm and save table results", type="primary", disabled=bool(errors) or not updates):
                 try:
-                    saved = apply_result_updates(updates)
+                    saved = apply_result_updates(updates, imported_by=st.session_state.get("player_id"))
                     st.success(f"Saved {saved} result change(s).")
                     st.rerun()
                 except Exception as exc:
@@ -2129,7 +968,7 @@ def result_admin() -> None:
             confirm_disabled = bool(errors) or not updates
             if st.button("Confirm and save CSV results", type="primary", disabled=confirm_disabled):
                 try:
-                    saved = apply_result_updates(updates)
+                    saved = apply_result_updates(updates, imported_by=st.session_state.get("player_id"))
                     st.success(f"Saved {saved} result change(s).")
                     st.rerun()
                 except Exception as exc:
@@ -2239,26 +1078,47 @@ def admin_page() -> None:
         backup_admin()
 
 
+def timing_panel() -> None:
+    if not st.session_state.get("is_admin"):
+        return
+    records = get_timings()
+    if not records:
+        return
+    rows = [{"Step": record.label, "ms": round(record.elapsed_ms, 1)} for record in records]
+    page_records = [record for record in records if record.label.startswith("page.")]
+    total_ms = round(sum(record.elapsed_ms for record in page_records), 1)
+    with st.sidebar.expander(f"Timing · {total_ms} ms", expanded=False):
+        st.dataframe(pd.DataFrame(rows).sort_values("ms", ascending=False), hide_index=True, use_container_width=True)
+
+
 def main() -> None:
-    inject_styles()
-    cleared_cookie = emit_pending_cookie_update()
-    if not cleared_cookie:
-        restore_session_from_cookie()
+    reset_timings()
+    with timed("app.inject_styles"):
+        inject_styles()
+    with timed("app.session"):
+        cleared_cookie = emit_pending_cookie_update()
+        if not cleared_cookie:
+            restore_session_from_cookie()
     if "player_id" not in st.session_state:
-        login_page()
+        with timed("page.login"):
+            login_page()
+        timing_panel()
         return
 
-    page = sidebar()
-    if page == "My Predictions":
-        my_predictions_page()
-    elif page == "Leaderboard":
-        leaderboard_page()
-    elif page == "Match Centre":
-        match_centre_page()
-    elif page == "Rules":
-        rules_page()
-    elif page == "Admin":
-        admin_page()
+    with timed("app.sidebar"):
+        page = sidebar()
+    with timed(f"page.{page}"):
+        if page == "My Predictions":
+            my_predictions_page()
+        elif page == "Leaderboard":
+            leaderboard_page()
+        elif page == "Match Centre":
+            match_centre_page()
+        elif page == "Rules":
+            rules_page()
+        elif page == "Admin":
+            admin_page()
+    timing_panel()
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ APP_TITLE = "Tipperoos"
 SESSION_COOKIE_NAME = "tipperoos_session"
 SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 60
 SYDNEY = ZoneInfo("Australia/Sydney")
-ARCHIVE_DIR = Path(__file__).resolve().parent.parent / "archive"
+ARCHIVE_DIR = Path(__file__).resolve().parents[3] / "archive"
 
 HOST_CITY_TIMEZONES = {
     "Atlanta": "America/New_York",

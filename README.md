@@ -33,6 +33,16 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
+## Source Layout
+
+The Streamlit entrypoint stays at `app.py`, while reusable Python code lives under
+`src/tipperoos/`:
+
+- `core/` - constants, scoring, date/time helpers, domain formatting, lock rules
+- `data/` - Supabase access and cached loaders
+- `services/` - player creation, predictions, results, bots, imports, analytics
+- `web/` - Streamlit presentation helpers and styles
+
 ## First Run
 
 On first launch, if no admin exists, the login page shows a `Create first admin` form.

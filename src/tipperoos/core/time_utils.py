@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 from dateutil import parser
 
-from tipperoos.constants import HOST_CITY_TIMEZONES, SYDNEY
+from tipperoos.core.constants import HOST_CITY_TIMEZONES, SYDNEY
 
 
 def now_utc() -> datetime:
