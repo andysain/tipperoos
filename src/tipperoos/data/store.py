@@ -181,6 +181,28 @@ def app_setup_state() -> dict:
     return state
 
 
+def login_setup_state() -> dict:
+    state = {
+        "schema_ok": False,
+        "admin_count": 0,
+        "players": [],
+        "settings": {},
+        "error": None,
+    }
+    try:
+        players = load_players(include_inactive=True)
+        settings = load_settings()
+    except Exception as exc:
+        state["error"] = exc
+        return state
+
+    state["schema_ok"] = True
+    state["admin_count"] = len([p for p in players if p.get("is_admin")])
+    state["players"] = [p for p in players if p.get("active") and not p.get("is_bot")]
+    state["settings"] = settings
+    return state
+
+
 @st.cache_data(ttl=20)
 @ttl_cache(seconds=20)
 def get_player(player_id: str) -> dict | None:

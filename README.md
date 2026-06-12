@@ -103,4 +103,4 @@ team that advanced.
 - The UI avoids gambling language.
 - All display times use `Australia/Sydney`.
 - Match predictions lock server-side before saving.
-- Player login persists in the browser with a signed cookie until `Switch player` is clicked.
+- Player login persists across browser reloads with a signed session token in the URL until `Switch player` is clicked.

@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 
 APP_TITLE = "Tipperoos"
 SESSION_COOKIE_NAME = "tipperoos_session"
+SESSION_QUERY_PARAM = "tr_session"
 SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 60
 SYDNEY = ZoneInfo("Australia/Sydney")
 ARCHIVE_DIR = Path(__file__).resolve().parents[3] / "archive"

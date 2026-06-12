@@ -36,6 +36,7 @@ from tipperoos.core.constants import (
     PLAYER_EMOJIS,
     SESSION_COOKIE_NAME,
     SESSION_MAX_AGE_SECONDS,
+    SESSION_QUERY_PARAM,
     SYDNEY,
 )
 from tipperoos.core.domain import (
@@ -75,6 +76,7 @@ from tipperoos.data.store import (
     db,
     execute,
     get_player,
+    login_setup_state,
     load_matches,
     load_players,
     load_predictions,
@@ -136,6 +138,22 @@ def clear_session_cookie() -> None:
     )
 
 
+def query_param_value(name: str) -> str | None:
+    value = st.query_params.get(name)
+    if isinstance(value, list):
+        return value[0] if value else None
+    return value
+
+
+def set_session_query_param(token: str) -> None:
+    st.query_params[SESSION_QUERY_PARAM] = token
+
+
+def clear_session_query_param() -> None:
+    if SESSION_QUERY_PARAM in st.query_params:
+        del st.query_params[SESSION_QUERY_PARAM]
+
+
 def queue_session_cookie(player_id: str) -> None:
     st.session_state.pending_session_cookie = make_session_token(player_id)
 
@@ -143,9 +161,12 @@ def queue_session_cookie(player_id: str) -> None:
 def emit_pending_cookie_update() -> bool:
     cleared_cookie = False
     if st.session_state.get("pending_session_cookie"):
-        set_session_cookie(st.session_state.pending_session_cookie)
+        token = st.session_state.pending_session_cookie
+        set_session_query_param(token)
+        set_session_cookie(token)
         st.session_state.pop("pending_session_cookie", None)
     if st.session_state.get("clear_session_cookie"):
+        clear_session_query_param()
         clear_session_cookie()
         st.session_state.pop("clear_session_cookie", None)
         cleared_cookie = True
@@ -164,12 +185,16 @@ def apply_player_session(player: dict, persist: bool = False) -> None:
 def restore_session_from_cookie() -> bool:
     if st.session_state.get("player_id"):
         return True
-    token = st.context.cookies.get(SESSION_COOKIE_NAME)
+    token = query_param_value(SESSION_QUERY_PARAM) or st.context.cookies.get(SESSION_COOKIE_NAME)
     player_id = validate_session_token(token)
     if not player_id:
+        if token:
+            clear_session_query_param()
+            st.session_state.clear_session_cookie = True
         return False
     player = get_player(player_id)
     if not player or not player.get("active"):
+        clear_session_query_param()
         st.session_state.clear_session_cookie = True
         return False
     apply_player_session(player, persist=False)
@@ -234,7 +259,7 @@ def login_page() -> None:
         st.title(APP_TITLE)
         st.caption("World Cup predictions")
 
-        setup = app_setup_state()
+        setup = login_setup_state()
         if not setup["schema_ok"]:
             st.error("Setup needed: Supabase tables are not ready yet.")
             st.markdown(
@@ -251,7 +276,7 @@ def login_page() -> None:
 
         bootstrap_admin_if_needed()
         settings = setup["settings"]
-        players = [p for p in load_players() if not p.get("is_bot")]
+        players = setup["players"]
 
         tab_login, tab_create = st.tabs(["Login", "Create player"])
 
