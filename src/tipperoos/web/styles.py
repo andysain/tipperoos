@@ -58,6 +58,36 @@ def inject_styles() -> None:
             font-size: 0.92rem;
             line-height: 1.35;
         }
+        .tr-prediction-stats {
+            display: flex;
+            align-items: stretch;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin: 0.35rem 0 0.85rem;
+        }
+        .tr-prediction-stat {
+            display: inline-flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 0.65rem;
+            min-width: 7rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #ffffff;
+            padding: 0.48rem 0.7rem;
+        }
+        .tr-prediction-stat span {
+            color: #6b7280;
+            font-size: 0.82rem;
+            font-weight: 750;
+            line-height: 1.2;
+        }
+        .tr-prediction-stat strong {
+            color: #111827;
+            font-size: 1.05rem;
+            font-weight: 850;
+            line-height: 1;
+        }
         .tr-badge {
             display: inline-flex;
             align-items: center;
@@ -402,6 +432,33 @@ def inject_styles() -> None:
             }
             .tr-team-label {
                 font-size: 1.12rem;
+            }
+            .tr-prediction-stats {
+                display: grid;
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+                gap: 0.35rem;
+                margin: 0.2rem 0 0.65rem;
+            }
+            .tr-prediction-stat {
+                min-width: 0;
+                flex-direction: column-reverse;
+                align-items: center;
+                justify-content: center;
+                gap: 0.15rem;
+                padding: 0.42rem 0.25rem;
+                background: #f9fafb;
+                box-shadow: none;
+            }
+            .tr-prediction-stat span {
+                max-width: 100%;
+                color: #6b7280;
+                font-size: 0.7rem;
+                font-weight: 700;
+                overflow-wrap: anywhere;
+                text-align: center;
+            }
+            .tr-prediction-stat strong {
+                font-size: 0.95rem;
             }
             .tr-rule-grid,
             .tr-example-grid {

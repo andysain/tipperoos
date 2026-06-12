@@ -477,11 +477,21 @@ def my_predictions_page() -> None:
 
     with timed("page.my_predictions.header"):
         st.title("My Predictions")
-        metric_cols = st.columns(4)
-        metric_cols[0].metric("To tip", view.metrics.get("Open", 0))
-        metric_cols[1].metric("Saved", view.metrics.get("Saved", 0))
-        metric_cols[2].metric("Locked", view.metrics.get("Locked", 0))
-        metric_cols[3].metric("Missed", view.metrics.get("Missed", 0))
+        prediction_stats = [
+            ("To tip", view.metrics.get("Open", 0)),
+            ("Saved", view.metrics.get("Saved", 0)),
+            ("Locked", view.metrics.get("Locked", 0)),
+            ("Missed", view.metrics.get("Missed", 0)),
+        ]
+        st.markdown(
+            '<div class="tr-prediction-stats">'
+            + "".join(
+                f'<div class="tr-prediction-stat"><span>{label}</span><strong>{value}</strong></div>'
+                for label, value in prediction_stats
+            )
+            + "</div>",
+            unsafe_allow_html=True,
+        )
 
     with timed("page.my_predictions.winner_pick"):
         winner_ready = winner_pick_card(player_id, view.winner_pick, require_first=True)
