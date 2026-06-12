@@ -4,7 +4,6 @@ import sys
 from datetime import datetime, timedelta
 from html import escape
 from pathlib import Path
-from urllib.parse import urlencode
 
 SRC_DIR = Path(__file__).resolve().parent / "src"
 if str(SRC_DIR) not in sys.path:
@@ -165,19 +164,6 @@ def set_session_query_param(token: str) -> None:
 def clear_session_query_param() -> None:
     if SESSION_QUERY_PARAM in st.query_params:
         del st.query_params[SESSION_QUERY_PARAM]
-
-
-def query_href_with(**updates: str | None) -> str:
-    params = {}
-    for key, value in st.query_params.items():
-        params[key] = value[0] if isinstance(value, list) and value else value
-    for key, value in updates.items():
-        if value is None:
-            params.pop(key, None)
-        else:
-            params[key] = value
-    query = urlencode(params)
-    return f"?{query}" if query else "?"
 
 
 def hint_numeric_pin_keyboard() -> None:
@@ -447,10 +433,6 @@ def winner_pick_card(player_id: str, winner_pick: WinnerPickView, require_first:
     index = [t["name"] for t in teams].index(current_team) if current_team in [t["name"] for t in teams] else 0
     disabled = not unlocked
     edit_key = "winner_pick_editing"
-    if query_param_value("winner_pick_edit") == "1":
-        st.session_state[edit_key] = True
-        if "winner_pick_edit" in st.query_params:
-            del st.query_params["winner_pick_edit"]
     if require_first and not current_pick and unlocked:
         st.info("Choose your overall winner first, then match predictions will unlock.")
 
@@ -459,17 +441,18 @@ def winner_pick_card(player_id: str, winner_pick: WinnerPickView, require_first:
         pick_label = team_display(current_pick["team"], team.get("icon") if team else None)
         with st.container(border=True):
             if unlocked:
-                action_html = f'<a class="tr-winner-edit" href="{escape(query_href_with(winner_pick_edit="1"), quote=True)}">Edit</a>'
+                if st.button(f"Winner pick · {pick_label} · Edit", key="edit_winner_pick", use_container_width=True):
+                    st.session_state[edit_key] = True
+                    st.rerun()
             else:
-                action_html = '<span class="tr-winner-locked">Locked</span>'
-            st.markdown(
-                '<div class="tr-winner-summary">'
-                '<div class="tr-winner-picked"><span>Winner pick</span>'
-                f'<strong>{escape(pick_label)}</strong></div>'
-                f"{action_html}"
-                "</div>",
-                unsafe_allow_html=True,
-            )
+                st.markdown(
+                    '<div class="tr-winner-summary">'
+                    '<div class="tr-winner-picked"><span>Winner pick</span>'
+                    f'<strong>{escape(pick_label)}</strong></div>'
+                    '<span class="tr-winner-locked">Locked</span>'
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
         return True
 
     st.subheader("Tournament winner pick")
@@ -563,7 +546,7 @@ def tip_deadline_notice(match: dict, settings: dict, status: str) -> tuple[str, 
     return None
 
 
-def prediction_form(match: dict, prediction: dict | None, disabled: bool) -> None:
+def prediction_form(match: dict, prediction: dict | None, status: str, disabled: bool) -> None:
     player_id = st.session_state.player_id
     key = match["id"]
     existing_a = int(prediction["pred_team_a_score"]) if prediction else 0
@@ -576,8 +559,9 @@ def prediction_form(match: dict, prediction: dict | None, disabled: bool) -> Non
         pred_a = score_picker(team_a_label, existing_a, f"a_{key}", disabled)
     with c2:
         pred_b = score_picker(team_b_label, existing_b, f"b_{key}", disabled)
+    preview_status = "needs-tip" if status == "Open" else status.lower().replace(" ", "-")
     st.markdown(
-        '<div class="tr-scoreline-preview">'
+        f'<div class="tr-scoreline-preview tr-scoreline-{preview_status}">'
         f'<span>{escape(team_a_label)}</span><strong>{pred_a} - {pred_b}</strong><span>{escape(team_b_label)}</span>'
         "</div>",
         unsafe_allow_html=True,
@@ -628,7 +612,6 @@ def my_predictions_page() -> None:
         winner_ready = winner_pick_card(player_id, view.winner_pick, require_first=True)
 
     with timed("page.my_predictions.filter"):
-        st.subheader("Match predictions")
         if not winner_ready:
             return
 
@@ -671,10 +654,8 @@ def my_predictions_page() -> None:
                         f'<div class="tr-tip-risk tr-tip-risk-{urgency}">{escape(message)}</div>',
                         unsafe_allow_html=True,
                     )
-                badge_label = "Needs tip" if status == "Open" else status
                 st.markdown(
-                    f'<div class="tr-card-top"><div>{status_badge(badge_label)}</div>'
-                    f'<div class="tr-card-meta">{match_time_summary(match)}</div></div>',
+                    f'<div class="tr-card-top"><div class="tr-card-meta">{match_time_summary(match)}</div></div>',
                     unsafe_allow_html=True,
                 )
                 if match_view.pick_text:
@@ -684,7 +665,7 @@ def my_predictions_page() -> None:
                     st.info("Teams are not set for this fixture yet.")
                     continue
 
-                prediction_form(match, prediction, match_view.disabled)
+                prediction_form(match, prediction, status, match_view.disabled)
 
         if rendered == 0:
             st.info("No matches in this view.")

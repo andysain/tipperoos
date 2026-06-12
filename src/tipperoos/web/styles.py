@@ -124,7 +124,6 @@ def inject_styles() -> None:
             text-overflow: ellipsis;
             white-space: nowrap;
         }
-        .tr-winner-edit,
         .tr-winner-locked {
             display: inline-flex;
             align-items: center;
@@ -137,10 +136,6 @@ def inject_styles() -> None:
             line-height: 1.1;
             white-space: nowrap;
             text-decoration: none;
-        }
-        .tr-winner-edit {
-            color: inherit;
-            background: var(--tr-soft-bg);
         }
         .tr-winner-locked {
             color: var(--tr-muted);
@@ -198,6 +193,46 @@ def inject_styles() -> None:
             font-size: 1.55rem;
             font-weight: 900;
             white-space: nowrap;
+        }
+        .tr-scoreline-needs-tip {
+            background: #fffbeb;
+            border-color: #f59e0b;
+        }
+        .tr-scoreline-needs-tip span,
+        .tr-scoreline-needs-tip strong {
+            color: #78350f;
+        }
+        .tr-scoreline-saved {
+            background: #eff6ff;
+            border-color: #93c5fd;
+        }
+        .tr-scoreline-saved span,
+        .tr-scoreline-saved strong {
+            color: #1e3a8a;
+        }
+        .tr-scoreline-completed {
+            background: #f1f5f9;
+            border-color: #64748b;
+        }
+        .tr-scoreline-completed span,
+        .tr-scoreline-completed strong {
+            color: #334155;
+        }
+        .tr-scoreline-locked {
+            background: #f8fafc;
+            border-color: #cbd5e1;
+        }
+        .tr-scoreline-locked span,
+        .tr-scoreline-locked strong {
+            color: #64748b;
+        }
+        .tr-scoreline-missed {
+            background: #fff1f2;
+            border-color: #fda4af;
+        }
+        .tr-scoreline-missed span,
+        .tr-scoreline-missed strong {
+            color: #9f1239;
         }
         .tr-badge {
             display: inline-flex;
@@ -607,14 +642,12 @@ def inject_styles() -> None:
                 gap: 0.45rem;
             }
             .tr-winner-picked span,
-            .tr-winner-edit,
             .tr-winner-locked {
                 font-size: 0.78rem;
             }
             .tr-winner-picked strong {
                 font-size: 0.95rem;
             }
-            .tr-winner-edit,
             .tr-winner-locked {
                 padding: 0.28rem 0.5rem;
             }

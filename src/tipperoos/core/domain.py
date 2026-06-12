@@ -59,11 +59,11 @@ def matchup_label(match: dict) -> str:
 def status_badge(status: str, compact: bool = False) -> str:
     colors = {
         "Open": ("#ecfdf5", "#047857", "#a7f3d0"),
-        "Needs tip": ("#fffbeb", "#92400e", "#fcd34d"),
-        "Saved": ("#eff6ff", "#1d4ed8", "#bfdbfe"),
-        "Locked": ("#f3f4f6", "#374151", "#d1d5db"),
-        "Missed": ("#fef2f2", "#b91c1c", "#fecaca"),
-        "Completed": ("#fff7ed", "#c2410c", "#fed7aa"),
+        "Needs tip": ("#fffbeb", "#92400e", "#f59e0b"),
+        "Saved": ("#eff6ff", "#1d4ed8", "#93c5fd"),
+        "Locked": ("#f8fafc", "#64748b", "#cbd5e1"),
+        "Missed": ("#fff1f2", "#9f1239", "#fda4af"),
+        "Completed": ("#f1f5f9", "#334155", "#64748b"),
         "To be confirmed": ("#f8fafc", "#475569", "#cbd5e1"),
     }
     background, color, border = colors.get(status, colors["Locked"])
