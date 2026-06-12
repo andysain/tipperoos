@@ -166,6 +166,30 @@ def clear_session_query_param() -> None:
         del st.query_params[SESSION_QUERY_PARAM]
 
 
+def pin_pad(label: str, key: str, max_digits: int = 6) -> str:
+    value = "".join(ch for ch in str(st.session_state.get(key, "")) if ch.isdigit())[:max_digits]
+    st.session_state[key] = value
+    display = " ".join("●" for _ in value) or "&nbsp;"
+    st.markdown(
+        f'<div class="tr-pin-label">{escape(label)}</div><div class="tr-pin-display">{display}</div>',
+        unsafe_allow_html=True,
+    )
+    rows = (("1", "2", "3"), ("4", "5", "6"), ("7", "8", "9"), ("Clear", "0", "Del"))
+    for row_index, row in enumerate(rows):
+        cols = st.columns(3)
+        for col, item in zip(cols, row):
+            disabled = item.isdigit() and len(value) >= max_digits
+            if col.button(item, key=f"{key}_{row_index}_{item}", use_container_width=True, disabled=disabled):
+                if item == "Clear":
+                    st.session_state[key] = ""
+                elif item == "Del":
+                    st.session_state[key] = value[:-1]
+                elif len(value) < max_digits:
+                    st.session_state[key] = value + item
+                st.rerun()
+    return st.session_state.get(key, "")
+
+
 def queue_session_cookie(player_id: str) -> None:
     st.session_state.pending_session_cookie = make_session_token(player_id)
 
@@ -298,7 +322,10 @@ def login_page() -> None:
             else:
                 options = {f"{p.get('emoji') or ''} {p['display_name']}".strip(): p for p in players}
                 label = st.selectbox("Player", list(options.keys()))
-                pin = st.text_input("PIN", type="password", max_chars=6)
+                if st.session_state.get("login_player_label") != label:
+                    st.session_state.login_player_label = label
+                    st.session_state.login_pin = ""
+                pin = pin_pad("PIN", "login_pin")
                 if st.button("Login", type="primary", use_container_width=True):
                     player = options[label]
                     if check_pin(pin, player["pin_hash"]):
@@ -311,15 +338,14 @@ def login_page() -> None:
             if not settings.get("allow_player_signup", True):
                 st.info("Player creation is closed for now. Ask the family admin if you need access.")
             else:
-                with st.form("create_player"):
-                    display_name = st.text_input("Display name")
-                    emoji_choice = st.selectbox("Player emoji (optional)", PLAYER_EMOJIS)
-                    custom_emoji = ""
-                    if emoji_choice == "Other":
-                        custom_emoji = st.text_input("Custom emoji", max_chars=8, placeholder="😎")
-                    pin = st.text_input("Choose a 4 or 6 digit PIN", type="password", max_chars=6)
-                    confirm_pin = st.text_input("Confirm PIN", type="password", max_chars=6)
-                    submitted = st.form_submit_button("Create player", use_container_width=True)
+                display_name = st.text_input("Display name")
+                emoji_choice = st.selectbox("Player emoji (optional)", PLAYER_EMOJIS)
+                custom_emoji = ""
+                if emoji_choice == "Other":
+                    custom_emoji = st.text_input("Custom emoji", max_chars=8, placeholder="😎")
+                pin = pin_pad("Choose a 4 or 6 digit PIN", "create_pin")
+                confirm_pin = pin_pad("Confirm PIN", "create_pin_confirm")
+                submitted = st.button("Create player", use_container_width=True)
                 if submitted:
                     emoji = custom_emoji.strip() if emoji_choice == "Other" else emoji_choice
                     if not display_name.strip():
@@ -336,6 +362,8 @@ def login_page() -> None:
                                 db().table("players").select("*").eq("username", username).limit(1),
                                 "login.created_player_lookup",
                             )[0]
+                            st.session_state.create_pin = ""
+                            st.session_state.create_pin_confirm = ""
                             apply_player_session(player, persist=True)
                             st.rerun()
                         except Exception as exc:
