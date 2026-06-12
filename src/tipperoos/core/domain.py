@@ -56,7 +56,7 @@ def matchup_label(match: dict) -> str:
     return match.get("match_label") or "Fixture to be confirmed"
 
 
-def status_badge(status: str, compact: bool = False, label: str | None = None) -> str:
+def status_badge(status: str, compact: bool = False) -> str:
     colors = {
         "Open": ("#ecfdf5", "#047857", "#a7f3d0"),
         "Needs tip": ("#fffbeb", "#92400e", "#fcd34d"),
@@ -66,8 +66,7 @@ def status_badge(status: str, compact: bool = False, label: str | None = None) -
         "Completed": ("#fff7ed", "#c2410c", "#fed7aa"),
         "To be confirmed": ("#f8fafc", "#475569", "#cbd5e1"),
     }
-    display_status = label or status
-    background, color, border = colors.get(display_status, colors.get(status, colors["Locked"]))
+    background, color, border = colors.get(status, colors["Locked"])
     min_width = "auto" if compact else "84px"
     padding = "0.18rem 0.55rem" if compact else "0.25rem 0.65rem"
     font_size = "0.78rem" if compact else "0.82rem"
@@ -75,7 +74,7 @@ def status_badge(status: str, compact: bool = False, label: str | None = None) -
         f'<span style="display:inline-flex;align-items:center;justify-content:center;'
         f'min-width:{min_width};padding:{padding};border-radius:999px;'
         f'font-size:{font_size};font-weight:750;white-space:nowrap;'
-        f'background:{background};color:{color};border:1px solid {border};">{display_status}</span>'
+        f'background:{background};color:{color};border:1px solid {border};">{status}</span>'
     )
 
 

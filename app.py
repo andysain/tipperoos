@@ -654,7 +654,7 @@ def my_predictions_page() -> None:
                     )
                 badge_label = "Needs tip" if status == "Open" else status
                 st.markdown(
-                    f'<div class="tr-card-top"><div>{status_badge(status, label=badge_label)}</div>'
+                    f'<div class="tr-card-top"><div>{status_badge(badge_label)}</div>'
                     f'<div class="tr-card-meta">{match_time_summary(match)}</div></div>',
                     unsafe_allow_html=True,
                 )
