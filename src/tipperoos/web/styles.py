@@ -8,10 +8,18 @@ def inject_styles() -> None:
         """
         <style>
         :root {
+            color-scheme: light;
             --tr-border: rgba(128, 128, 128, 0.28);
             --tr-muted: #6b7280;
             --tr-subtle-bg: rgba(128, 128, 128, 0.08);
             --tr-soft-bg: rgba(128, 128, 128, 0.05);
+        }
+        html,
+        body,
+        .stApp,
+        [data-testid="stAppViewContainer"] {
+            color-scheme: light;
+            background: #ffffff;
         }
         .block-container {
             max-width: 1180px;
@@ -233,6 +241,26 @@ def inject_styles() -> None:
         .tr-scoreline-missed span,
         .tr-scoreline-missed strong {
             color: #9f1239;
+        }
+        div[data-testid="stElementContainer"]:has(.tr-update-prediction-button-marker) {
+            display: none;
+        }
+        div[data-testid="stElementContainer"]:has(.tr-update-prediction-button-marker)
+            + div[data-testid="stElementContainer"] div[data-testid="stButton"] > button:not(:disabled) {
+            color: #ffffff;
+            background: #2563eb;
+            border-color: #2563eb;
+        }
+        div[data-testid="stElementContainer"]:has(.tr-update-prediction-button-marker)
+            + div[data-testid="stElementContainer"] div[data-testid="stButton"] > button:not(:disabled):hover {
+            color: #ffffff;
+            background: #1d4ed8;
+            border-color: #1d4ed8;
+        }
+        div[data-testid="stElementContainer"]:has(.tr-update-prediction-button-marker)
+            + div[data-testid="stElementContainer"] div[data-testid="stButton"] > button:not(:disabled):active {
+            background: #1e40af;
+            border-color: #1e40af;
         }
         .tr-badge {
             display: inline-flex;

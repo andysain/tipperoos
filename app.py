@@ -574,6 +574,8 @@ def prediction_form(match: dict, prediction: dict | None, status: str, disabled:
         advance_team = st.selectbox("If level, who advances?", options, index=index, key=f"adv_{key}", disabled=disabled)
     button_label = "Update prediction" if prediction else "Save prediction"
     button_type = "secondary" if prediction else "primary"
+    if prediction:
+        st.markdown('<span class="tr-update-prediction-button-marker"></span>', unsafe_allow_html=True)
     submitted = st.button(button_label, disabled=disabled, type=button_type, use_container_width=True, key=f"save_{key}")
 
     if submitted:
