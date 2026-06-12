@@ -13,6 +13,9 @@ def inject_styles() -> None:
             --tr-muted: #6b7280;
             --tr-subtle-bg: rgba(128, 128, 128, 0.08);
             --tr-soft-bg: rgba(128, 128, 128, 0.05);
+            --tr-saved-bg: #eff6ff;
+            --tr-saved-border: #93c5fd;
+            --tr-saved-text: #1e3a8a;
         }
         html,
         body,
@@ -211,12 +214,12 @@ def inject_styles() -> None:
             color: #78350f;
         }
         .tr-scoreline-saved {
-            background: #eff6ff;
-            border-color: #93c5fd;
+            background: var(--tr-saved-bg);
+            border-color: var(--tr-saved-border);
         }
         .tr-scoreline-saved span,
         .tr-scoreline-saved strong {
-            color: #1e3a8a;
+            color: var(--tr-saved-text);
         }
         .tr-scoreline-completed {
             background: #f1f5f9;
@@ -245,22 +248,30 @@ def inject_styles() -> None:
         div[data-testid="stElementContainer"]:has(.tr-update-prediction-button-marker) {
             display: none;
         }
-        div[data-testid="stElementContainer"]:has(.tr-update-prediction-button-marker)
+        div[data-testid="stElementContainer"]:has(.tr-update-prediction-button-active)
             + div[data-testid="stElementContainer"] div[data-testid="stButton"] > button:not(:disabled) {
             color: #ffffff;
-            background: #2563eb;
-            border-color: #2563eb;
+            background: var(--tr-saved-text);
+            border-color: var(--tr-saved-text);
         }
-        div[data-testid="stElementContainer"]:has(.tr-update-prediction-button-marker)
+        div[data-testid="stElementContainer"]:has(.tr-update-prediction-button-active)
             + div[data-testid="stElementContainer"] div[data-testid="stButton"] > button:not(:disabled):hover {
             color: #ffffff;
-            background: #1d4ed8;
-            border-color: #1d4ed8;
+            background: #172554;
+            border-color: #172554;
         }
-        div[data-testid="stElementContainer"]:has(.tr-update-prediction-button-marker)
+        div[data-testid="stElementContainer"]:has(.tr-update-prediction-button-active)
             + div[data-testid="stElementContainer"] div[data-testid="stButton"] > button:not(:disabled):active {
             background: #1e40af;
             border-color: #1e40af;
+        }
+        div[data-testid="stElementContainer"]:has(.tr-update-prediction-button-inactive)
+            + div[data-testid="stElementContainer"] div[data-testid="stButton"] > button:disabled {
+            color: var(--tr-saved-text);
+            background: var(--tr-saved-bg);
+            border-color: var(--tr-saved-border);
+            opacity: 1;
+            cursor: default;
         }
         .tr-badge {
             display: inline-flex;

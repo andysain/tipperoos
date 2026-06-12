@@ -567,16 +567,36 @@ def prediction_form(match: dict, prediction: dict | None, status: str, disabled:
         unsafe_allow_html=True,
     )
 
-    advance_team = prediction.get("pred_advance_team") if prediction else None
+    existing_advance_team = prediction.get("pred_advance_team") if prediction else None
+    advance_team = existing_advance_team
     if match.get("is_knockout"):
         options = [match["team_a"], match["team_b"]]
         index = options.index(advance_team) if advance_team in options else 0
         advance_team = st.selectbox("If level, who advances?", options, index=index, key=f"adv_{key}", disabled=disabled)
-    button_label = "Update prediction" if prediction else "Save prediction"
+
+    if disabled:
+        return
+
+    prediction_changed = bool(prediction) and (
+        pred_a != existing_a
+        or pred_b != existing_b
+        or (bool(match.get("is_knockout")) and advance_team != existing_advance_team)
+    )
+    button_label = "Update prediction" if prediction_changed else "Prediction saved" if prediction else "Save prediction"
     button_type = "secondary" if prediction else "primary"
     if prediction:
-        st.markdown('<span class="tr-update-prediction-button-marker"></span>', unsafe_allow_html=True)
-    submitted = st.button(button_label, disabled=disabled, type=button_type, use_container_width=True, key=f"save_{key}")
+        button_state = "active" if prediction_changed else "inactive"
+        st.markdown(
+            f'<span class="tr-update-prediction-button-marker tr-update-prediction-button-{button_state}"></span>',
+            unsafe_allow_html=True,
+        )
+    submitted = st.button(
+        button_label,
+        disabled=disabled or (bool(prediction) and not prediction_changed),
+        type=button_type,
+        use_container_width=True,
+        key=f"save_{key}",
+    )
 
     if submitted:
         try:
