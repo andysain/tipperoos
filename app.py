@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sys
-from collections import Counter, defaultdict
 from datetime import datetime
 from html import escape
 from pathlib import Path
@@ -15,8 +14,6 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from tipperoos.services.actions import (
-    match_centre_status,
-    match_status,
     save_prediction,
     upsert_winner_pick,
 )
@@ -50,18 +47,13 @@ from tipperoos.core.domain import (
     match_time_summary,
     matchup_label,
     player_display_for_centre,
-    prediction_lookup,
     prediction_scoreline,
-    prediction_summary,
     score_reason,
     status_badge,
     team_display,
     team_format_from_lookup,
-    team_lookup,
-    winner_lookup,
 )
 from tipperoos.services.players import check_pin, create_player, ensure_default_bots, unique_username
-from tipperoos.core.rules import can_edit_winner_pick
 from tipperoos.core.scoring import (
     score_prediction_details,
 )
@@ -76,6 +68,7 @@ from tipperoos.core.time_utils import (
     now_utc,
     parse_dt,
 )
+from tipperoos.core.timing import get_timings, reset_timings, timed
 from tipperoos.data.store import (
     app_setup_state,
     clear_data_cache,
@@ -89,6 +82,8 @@ from tipperoos.data.store import (
     load_teams,
     load_winner_picks,
 )
+from tipperoos.services.views.predictions_view import WinnerPickView, get_predictions_page
+from tipperoos.services.views.match_centre_view import get_match_centre_page
 from tipperoos.web.ui import (
     example_card,
     example_grid,
@@ -301,7 +296,8 @@ def login_page() -> None:
                             username = unique_username(display_name)
                             create_player(username, display_name, pin, emoji)
                             player = execute(
-                                db().table("players").select("*").eq("username", username).limit(1)
+                                db().table("players").select("*").eq("username", username).limit(1),
+                                "login.created_player_lookup",
                             )[0]
                             apply_player_session(player, persist=True)
                             st.rerun()
@@ -336,8 +332,7 @@ def setup_status_page(setup: dict) -> None:
 
 
 def sidebar() -> str:
-    player = get_player(st.session_state.player_id)
-    label = player["display_name"] if player else st.session_state.get("display_name", "Player")
+    label = st.session_state.get("display_name", "Player")
     st.sidebar.subheader(f"Playing as: {label}")
     if st.sidebar.button("Switch player"):
         st.session_state.clear_session_cookie = True
@@ -351,14 +346,11 @@ def sidebar() -> str:
     return st.sidebar.radio("Page", pages)
 
 
-def winner_pick_card(player_id: str, require_first: bool = False) -> bool:
-    settings = load_settings()
-    teams = load_teams()
-    teams_by_name = team_lookup(teams)
-    picks = winner_lookup(load_winner_picks())
-    current_pick = picks.get(player_id)
-    unlocked = can_edit_winner_pick(settings)
-
+def winner_pick_card(player_id: str, winner_pick: WinnerPickView, require_first: bool = False) -> bool:
+    teams = winner_pick.teams
+    teams_by_name = winner_pick.teams_by_name
+    current_pick = winner_pick.current_pick
+    unlocked = winner_pick.unlocked
     st.subheader("Tournament winner pick")
     if not teams:
         if st.session_state.get("is_admin"):
@@ -455,64 +447,79 @@ def prediction_form(match: dict, prediction: dict | None, disabled: bool) -> Non
 
 def my_predictions_page() -> None:
     player_id = st.session_state.player_id
-    settings = load_settings()
-    predictions = prediction_lookup(load_predictions())
-    matches = load_matches()
-    statuses = [match_status(match, predictions.get((player_id, match["id"])), settings) for match in matches]
-    status_counts = Counter(statuses)
-    saved_total = len([m for m in matches if predictions.get((player_id, m["id"]))])
+    with timed("page.my_predictions.view"):
+        view = get_predictions_page(player_id)
 
-    st.title("My Predictions")
-    metric_cols = st.columns(4)
-    metric_cols[0].metric("To tip", status_counts.get("Open", 0))
-    metric_cols[1].metric("Saved", saved_total)
-    metric_cols[2].metric("Locked", status_counts.get("Locked", 0))
-    metric_cols[3].metric("Missed", status_counts.get("Missed", 0))
+    with timed("page.my_predictions.header"):
+        st.title("My Predictions")
+        metric_cols = st.columns(4)
+        metric_cols[0].metric("To tip", view.metrics.get("Open", 0))
+        metric_cols[1].metric("Saved", view.metrics.get("Saved", 0))
+        metric_cols[2].metric("Locked", view.metrics.get("Locked", 0))
+        metric_cols[3].metric("Missed", view.metrics.get("Missed", 0))
 
-    winner_ready = winner_pick_card(player_id, require_first=True)
+    with timed("page.my_predictions.winner_pick"):
+        winner_ready = winner_pick_card(player_id, view.winner_pick, require_first=True)
 
-    st.divider()
-    st.subheader("Match predictions")
-    if not winner_ready:
-        st.stop()
+    with timed("page.my_predictions.filter"):
+        st.divider()
+        st.subheader("Match predictions")
+        if not winner_ready:
+            return
 
-    filter_choice = st.segmented_control(
-        "Filter",
-        ["Open", "Missing", "All", "Completed"],
-        default="Open",
-    )
+        filter_choice = st.segmented_control(
+            "Filter",
+            ["Open", "Missing", "All", "Completed"],
+            default="Open",
+        )
+        filter_state_key = "my_predictions_filter"
+        if st.session_state.get(filter_state_key) != filter_choice:
+            st.session_state[filter_state_key] = filter_choice
+            st.session_state.my_predictions_visible_count = 12
 
-    rendered = 0
-    for match in matches:
-        prediction = predictions.get((player_id, match["id"]))
-        status = match_status(match, prediction, settings)
-        if filter_choice == "Open" and status not in ("Open", "Saved"):
-            continue
-        if filter_choice == "Missing" and (prediction or not has_teams(match) or match.get("status") == "completed"):
-            continue
-        if filter_choice == "Completed" and match.get("status") != "completed":
-            continue
-
-        rendered += 1
-        with st.container(border=True):
-            st.markdown(
-                f'<div class="tr-card-top"><div>{status_badge(status)}</div>'
-                f'<div class="tr-card-meta">{match_time_summary(match)}</div></div>',
-                unsafe_allow_html=True,
-            )
-            pick_text = prediction_summary(prediction)
-            if pick_text:
-                st.markdown(f'<div class="tr-card-pick">{pick_text}</div>', unsafe_allow_html=True)
-
-            if not has_teams(match):
-                st.info("Teams are not set for this fixture yet.")
+    with timed("page.my_predictions.match_list"):
+        visible_count = int(st.session_state.get("my_predictions_visible_count", 12))
+        visible_matches = []
+        for match_view in view.matches:
+            match = match_view.match
+            prediction = match_view.prediction
+            status = match_view.status
+            if filter_choice == "Open" and status not in ("Open", "Saved"):
                 continue
+            if filter_choice == "Missing" and (prediction or not has_teams(match) or match.get("status") == "completed"):
+                continue
+            if filter_choice == "Completed" and match.get("status") != "completed":
+                continue
+            visible_matches.append(match_view)
 
-            disabled = status in ("Locked", "Completed", "Missed") or not has_teams(match)
-            prediction_form(match, prediction, disabled)
+        rendered = 0
+        for match_view in visible_matches[:visible_count]:
+            match = match_view.match
+            prediction = match_view.prediction
+            status = match_view.status
+            rendered += 1
+            with st.container(border=True):
+                st.markdown(
+                    f'<div class="tr-card-top"><div>{status_badge(status)}</div>'
+                    f'<div class="tr-card-meta">{match_time_summary(match)}</div></div>',
+                    unsafe_allow_html=True,
+                )
+                if match_view.pick_text:
+                    st.markdown(f'<div class="tr-card-pick">{match_view.pick_text}</div>', unsafe_allow_html=True)
 
-    if rendered == 0:
-        st.info("No matches in this view.")
+                if not has_teams(match):
+                    st.info("Teams are not set for this fixture yet.")
+                    continue
+
+                prediction_form(match, prediction, match_view.disabled)
+
+        if rendered == 0:
+            st.info("No matches in this view.")
+        elif rendered < len(visible_matches):
+            remaining = len(visible_matches) - rendered
+            if st.button(f"Show 12 more ({remaining} remaining)", use_container_width=True):
+                st.session_state.my_predictions_visible_count = rendered + 12
+                st.rerun()
 
 
 def leaderboard_page() -> None:
@@ -624,61 +631,70 @@ def match_centre_prediction_rows(match: dict, predictions: list[dict], players: 
 
 
 def match_centre_page() -> None:
-    st.title("Match Centre")
-    settings = load_settings()
-    players = {p["id"]: p for p in load_players()}
     player_id = st.session_state.player_id
-    all_predictions = load_predictions()
-    prediction_by_player_match = prediction_lookup(all_predictions)
-    predictions_by_match = defaultdict(list)
-    for pred in all_predictions:
-        predictions_by_match[pred["match_id"]].append(pred)
-
-    filter_choice = st.segmented_control(
-        "Filter",
-        ["Open", "Locked", "Completed", "All"],
-        default="Open",
-    )
-
-    rendered = 0
-    for match in load_matches():
-        status = match_centre_status(match, settings)
-        if filter_choice == "Open" and status != "Open":
-            continue
-        if filter_choice == "Locked" and status != "Locked":
-            continue
-        if filter_choice == "Completed" and status != "Completed":
-            continue
-
-        rendered += 1
-        current_prediction = prediction_by_player_match.get((player_id, match["id"]))
-        completed = status == "Completed"
-        reveal = status in ("Locked", "Completed")
-        pick_text = prediction_summary(current_prediction) or "Your pick: -"
-        predictions = predictions_by_match.get(match["id"], [])
-        row_html = ""
-        if reveal:
-            row_html = match_centre_prediction_rows(match, predictions, players, completed)
-        elif status != "Open":
-            row_html = '<div class="tr-centre-empty">Teams are not set for this fixture yet.</div>'
-        body_html = f'<div class="tr-centre-body">{row_html}</div>' if row_html else ""
-
-        st.markdown(
-            '<div class="tr-centre-card">'
-            '<div class="tr-centre-head">'
-            '<div>'
-            f'<div class="tr-centre-meta">{status_badge(status, compact=True)} <span>{escape(match_time_summary(match))}</span></div>'
-            f'<div class="tr-centre-title">{escape(match_result_line(match))}</div>'
-            f'<div class="tr-card-pick">{escape(pick_text)}</div>'
-            '</div>'
-            '</div>'
-            f'{body_html}'
-            '</div>',
-            unsafe_allow_html=True,
+    with timed("page.match_centre.header"):
+        st.title("Match Centre")
+        filter_choice = st.segmented_control(
+            "Filter",
+            ["Open", "Locked", "Completed", "All"],
+            default="Open",
         )
+        filter_state_key = "match_centre_filter"
+        if st.session_state.get(filter_state_key) != filter_choice:
+            st.session_state[filter_state_key] = filter_choice
+            st.session_state.match_centre_visible_count = 12
 
-    if rendered == 0:
-        st.info("No matches in this view.")
+    with timed("page.match_centre.view"):
+        view = get_match_centre_page(player_id, filter_choice)
+
+    with timed("page.match_centre.match_list"):
+        visible_count = int(st.session_state.get("match_centre_visible_count", 12))
+        visible_matches = []
+        for match_view in view.matches:
+            status = match_view.status
+            if filter_choice == "Open" and status != "Open":
+                continue
+            if filter_choice == "Locked" and status != "Locked":
+                continue
+            if filter_choice == "Completed" and status != "Completed":
+                continue
+            visible_matches.append(match_view)
+
+        rendered = 0
+        for match_view in visible_matches[:visible_count]:
+            match = match_view.match
+            row_html = match_view.row_html
+            if match_view.reveal:
+                row_html = match_centre_prediction_rows(
+                    match,
+                    match_view.predictions,
+                    view.players,
+                    match_view.completed,
+                )
+            body_html = f'<div class="tr-centre-body">{row_html}</div>' if row_html else ""
+
+            rendered += 1
+            st.markdown(
+                '<div class="tr-centre-card">'
+                '<div class="tr-centre-head">'
+                '<div>'
+                f'<div class="tr-centre-meta">{status_badge(match_view.status, compact=True)} <span>{escape(match_time_summary(match))}</span></div>'
+                f'<div class="tr-centre-title">{escape(match_result_line(match))}</div>'
+                f'<div class="tr-card-pick">{escape(match_view.pick_text)}</div>'
+                '</div>'
+                '</div>'
+                f'{body_html}'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+
+        if rendered == 0:
+            st.info("No matches in this view.")
+        elif rendered < len(visible_matches):
+            remaining = len(visible_matches) - rendered
+            if st.button(f"Show 12 more ({remaining} remaining)", key="match_centre_show_more", use_container_width=True):
+                st.session_state.match_centre_visible_count = rendered + 12
+                st.rerun()
 
 
 def rules_page() -> None:
@@ -1062,26 +1078,47 @@ def admin_page() -> None:
         backup_admin()
 
 
+def timing_panel() -> None:
+    if not st.session_state.get("is_admin"):
+        return
+    records = get_timings()
+    if not records:
+        return
+    rows = [{"Step": record.label, "ms": round(record.elapsed_ms, 1)} for record in records]
+    page_records = [record for record in records if record.label.startswith("page.")]
+    total_ms = round(sum(record.elapsed_ms for record in page_records), 1)
+    with st.sidebar.expander(f"Timing · {total_ms} ms", expanded=False):
+        st.dataframe(pd.DataFrame(rows).sort_values("ms", ascending=False), hide_index=True, use_container_width=True)
+
+
 def main() -> None:
-    inject_styles()
-    cleared_cookie = emit_pending_cookie_update()
-    if not cleared_cookie:
-        restore_session_from_cookie()
+    reset_timings()
+    with timed("app.inject_styles"):
+        inject_styles()
+    with timed("app.session"):
+        cleared_cookie = emit_pending_cookie_update()
+        if not cleared_cookie:
+            restore_session_from_cookie()
     if "player_id" not in st.session_state:
-        login_page()
+        with timed("page.login"):
+            login_page()
+        timing_panel()
         return
 
-    page = sidebar()
-    if page == "My Predictions":
-        my_predictions_page()
-    elif page == "Leaderboard":
-        leaderboard_page()
-    elif page == "Match Centre":
-        match_centre_page()
-    elif page == "Rules":
-        rules_page()
-    elif page == "Admin":
-        admin_page()
+    with timed("app.sidebar"):
+        page = sidebar()
+    with timed(f"page.{page}"):
+        if page == "My Predictions":
+            my_predictions_page()
+        elif page == "Leaderboard":
+            leaderboard_page()
+        elif page == "Match Centre":
+            match_centre_page()
+        elif page == "Rules":
+            rules_page()
+        elif page == "Admin":
+            admin_page()
+    timing_panel()
 
 
 if __name__ == "__main__":

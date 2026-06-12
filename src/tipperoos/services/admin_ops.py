@@ -10,6 +10,7 @@ from tipperoos.core.constants import ARCHIVE_DIR, SCORE_POOL
 from tipperoos.core.domain import flag_for_code, has_teams, matchup_label, prediction_lookup, team_lookup, winner_lookup
 from tipperoos.services.players import ensure_default_bots
 from tipperoos.core.rules import is_match_locked
+from tipperoos.core.timing import timed_function
 from tipperoos.data.store import (
     clear_data_cache,
     db,
@@ -24,6 +25,7 @@ from tipperoos.data.store import (
 from tipperoos.core.time_utils import iso_dt, local_label, now_utc, parse_host_kickoff
 
 
+@timed_function("admin.import_archive_fixture_csvs")
 def import_archive_fixture_csvs() -> tuple[int, int]:
     teams_path = ARCHIVE_DIR / "teams.csv"
     matches_path = ARCHIVE_DIR / "matches.csv"
@@ -143,6 +145,7 @@ def resolve_source_token(token: str, matches_by_number: dict[int, dict]) -> str 
     return None
 
 
+@timed_function("admin.propagate_knockout_matchups")
 def propagate_knockout_matchups() -> int:
     matches = load_matches()
     teams_by_name = team_lookup(load_teams())
@@ -206,6 +209,7 @@ def bot_prediction_for_match(bot_type: str, match: dict, human_predictions: list
     return pred_a, pred_b, advance
 
 
+@timed_function("admin.generate_bot_predictions")
 def generate_bot_predictions(bot_type: str | None = None, only_match_id: str | None = None) -> int:
     ensure_default_bots()
     players = load_players()
@@ -244,6 +248,7 @@ def generate_bot_predictions(bot_type: str | None = None, only_match_id: str | N
     return generated
 
 
+@timed_function("admin.generate_bot_winner_picks")
 def generate_bot_winner_picks() -> int:
     ensure_default_bots()
     teams = [t["name"] for t in load_teams()]
@@ -270,6 +275,7 @@ def generate_bot_winner_picks() -> int:
     return generated
 
 
+@timed_function("admin.save_result")
 def save_result(match: dict, score_a: int, score_b: int, advance_team: str | None, status: str) -> None:
     if status == "completed":
         if match.get("is_knockout") and not advance_team:
@@ -448,6 +454,7 @@ def result_update_from_values(
     )
 
 
+@timed_function("admin.build_result_updates_from_csv")
 def build_result_updates_from_csv(uploaded_file) -> tuple[list[dict], list[dict], int]:
     df = pd.read_csv(uploaded_file)
     matches = load_matches()
@@ -542,6 +549,7 @@ def build_result_updates_from_csv(uploaded_file) -> tuple[list[dict], list[dict]
     return updates, errors, unchanged
 
 
+@timed_function("admin.result_editor_rows")
 def result_editor_rows(matches: list[dict]) -> list[dict]:
     rows = []
     for match in matches:
@@ -565,6 +573,7 @@ def result_editor_rows(matches: list[dict]) -> list[dict]:
     return rows
 
 
+@timed_function("admin.build_result_updates_from_table")
 def build_result_updates_from_table(rows) -> tuple[list[dict], list[dict], int]:
     data = rows.to_dict("records") if hasattr(rows, "to_dict") else list(rows)
     matches = load_matches()
@@ -616,6 +625,7 @@ def build_result_updates_from_table(rows) -> tuple[list[dict], list[dict], int]:
     return updates, errors, unchanged
 
 
+@timed_function("admin.apply_result_updates")
 def apply_result_updates(updates: list[dict], imported_by: str | None = None) -> int:
     completed_match_ids = []
     timestamp = iso_dt(now_utc())
