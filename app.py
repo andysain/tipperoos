@@ -13,23 +13,6 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
-from tipperoos.services.actions import (
-    save_prediction,
-    upsert_winner_pick,
-)
-from tipperoos.services.admin_ops import (
-    RESULT_STATUSES,
-    apply_result_updates,
-    assign_round_of_32_match,
-    build_result_updates_from_csv,
-    build_result_updates_from_table,
-    generate_bot_predictions,
-    generate_bot_winner_picks,
-    import_archive_fixture_csvs,
-    result_editor_rows,
-    save_result,
-)
-from tipperoos.services.analytics import calculate_leaderboard, cumulative_human_scores, group_standings
 from tipperoos.core.constants import (
     APP_TITLE,
     BOT_SPECS,
@@ -54,15 +37,9 @@ from tipperoos.core.domain import (
     team_display,
     team_format_from_lookup,
 )
-from tipperoos.services.players import check_pin, create_player, ensure_default_bots, unique_username
 from tipperoos.core.scoring import (
     score_prediction_details,
 )
-from tipperoos.services.session_tokens import (
-    make_session_token as make_signed_session_token,
-    validate_session_token as validate_signed_session_token,
-)
-from tipperoos.web.styles import inject_styles
 from tipperoos.core.time_utils import (
     iso_dt,
     local_label,
@@ -76,16 +53,51 @@ from tipperoos.data.store import (
     db,
     execute,
     get_player,
-    login_setup_state,
     load_matches,
     load_players,
     load_predictions,
     load_settings,
     load_teams,
     load_winner_picks,
+    login_setup_state,
 )
-from tipperoos.services.views.predictions_view import WinnerPickView, get_predictions_page
+from tipperoos.services.actions import (
+    save_prediction,
+    upsert_winner_pick,
+)
+from tipperoos.services.admin_ops import (
+    RESULT_STATUSES,
+    apply_result_updates,
+    assign_round_of_32_match,
+    build_result_updates_from_csv,
+    build_result_updates_from_table,
+    generate_bot_predictions,
+    generate_bot_winner_picks,
+    import_archive_fixture_csvs,
+    result_editor_rows,
+    save_result,
+)
+from tipperoos.services.analytics import (
+    calculate_leaderboard,
+    cumulative_human_scores,
+    group_standings,
+)
+from tipperoos.services.players import (
+    check_pin,
+    create_player,
+    ensure_default_bots,
+    unique_username,
+)
+from tipperoos.services.session_tokens import (
+    make_session_token as make_signed_session_token,
+    validate_session_token as validate_signed_session_token,
+)
 from tipperoos.services.views.match_centre_view import get_match_centre_page
+from tipperoos.services.views.predictions_view import (
+    WinnerPickView,
+    get_predictions_page,
+)
+from tipperoos.web.styles import inject_styles
 from tipperoos.web.ui import (
     example_card,
     example_grid,
@@ -484,9 +496,9 @@ def my_predictions_page() -> None:
             ("Missed", view.metrics.get("Missed", 0)),
         ]
         st.markdown(
-            '<div class="tr-prediction-stats">'
+            '<div class="tr-summary-stats">'
             + "".join(
-                f'<div class="tr-prediction-stat"><span>{label}</span><strong>{value}</strong></div>'
+                f'<div class="tr-summary-stat"><span>{label}</span><strong>{value}</strong></div>'
                 for label, value in prediction_stats
             )
             + "</div>",
@@ -566,23 +578,33 @@ def leaderboard_page() -> None:
 
     matches = load_matches()
     completed_count = len([match for match in matches if match.get("status") == "completed"])
-    player_count = len(df)
     current_player_id = st.session_state.get("player_id")
     current_rows = df[df["Player ID"] == current_player_id]
     top_score = int(df.iloc[0]["Total points"])
     if current_rows.empty:
         current_rank = "-"
+        current_score = 0
     else:
         current_rank_value = int(current_rows.iloc[0]["Rank"])
         current_score = int(current_rows.iloc[0]["Total points"])
         current_tied = len(df[df["Total points"] == current_score]) > 1
         current_rank = leaderboard_rank_label(current_rank_value, current_tied)
 
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Completed", completed_count)
-    m2.metric("Entrants", player_count)
-    m3.metric("Top score", top_score)
-    m4.metric("Your rank", current_rank)
+    leaderboard_stats = [
+        ("Matches", f"{completed_count}/104"),
+        ("Your rank", current_rank),
+        ("Your Score", current_score),
+        ("Top score", top_score),
+    ]
+    st.markdown(
+        '<div class="tr-summary-stats">'
+        + "".join(
+            f'<div class="tr-summary-stat"><span>{label}</span><strong>{value}</strong></div>'
+            for label, value in leaderboard_stats
+        )
+        + "</div>",
+        unsafe_allow_html=True,
+    )
 
     if completed_count == 0:
         st.info("The leaderboard will start moving once the first result is entered. Everyone is tied for now.")
@@ -596,17 +618,23 @@ def leaderboard_page() -> None:
             classes.append("tr-leader-row-bot")
         if is_current:
             classes.append("tr-leader-row-current")
-        if int(row["Total points"]) == 0:
+        total_points = int(row["Total points"])
+        if total_points == 0:
             classes.append("tr-leader-row-zero")
         rank = int(row["Rank"])
+        medal = {1: "Gold", 2: "Silver", 3: "Bronze"}.get(rank) if total_points > 0 else None
+        rank_classes = ["tr-leader-rank"]
+        if medal:
+            rank_classes.append(f"tr-leader-rank-{medal.lower()}")
         tied = len(df[df["Total points"] == row["Total points"]]) > 1
         rank_display = leaderboard_rank_label(rank, tied)
+        rank_html = f'<div class="{" ".join(rank_classes)}">{rank_display}</div>'
         name = escape(leaderboard_player_name(row))
         bot_badge = '<span class="tr-leader-bot">Bot</span>' if row["Bot"] else ""
         you_badge = '<span class="tr-leader-you">You</span>' if is_current else ""
         html = (
             f'<div class="{" ".join(classes)}">'
-            f'<div class="tr-leader-rank">{rank_display}</div>'
+            f"{rank_html}"
             '<div class="tr-leader-player">'
             f'<div class="tr-leader-name">{name} {bot_badge} {you_badge}</div>'
             f'<div class="tr-leader-breakdown">Exact {int(row["Exact"])} · '

@@ -58,14 +58,14 @@ def inject_styles() -> None:
             font-size: 0.92rem;
             line-height: 1.35;
         }
-        .tr-prediction-stats {
+        .tr-summary-stats {
             display: flex;
             align-items: stretch;
             flex-wrap: wrap;
             gap: 0.5rem;
             margin: 0.35rem 0 0.85rem;
         }
-        .tr-prediction-stat {
+        .tr-summary-stat {
             display: inline-flex;
             align-items: baseline;
             justify-content: space-between;
@@ -76,13 +76,13 @@ def inject_styles() -> None:
             background: #ffffff;
             padding: 0.48rem 0.7rem;
         }
-        .tr-prediction-stat span {
+        .tr-summary-stat span {
             color: #6b7280;
             font-size: 0.82rem;
             font-weight: 750;
             line-height: 1.2;
         }
-        .tr-prediction-stat strong {
+        .tr-summary-stat strong {
             color: #111827;
             font-size: 1.05rem;
             font-weight: 850;
@@ -254,9 +254,31 @@ def inject_styles() -> None:
             color: #6b7280;
         }
         .tr-leader-rank {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 3.2rem;
+            min-height: 3rem;
+            border-radius: 8px;
             font-weight: 850;
             font-size: 1rem;
             color: #111827;
+            line-height: 1.1;
+        }
+        .tr-leader-rank-gold {
+            background: #fffbeb;
+            color: #92400e;
+            border: 1px solid #fcd34d;
+        }
+        .tr-leader-rank-silver {
+            background: #f8fafc;
+            color: #334155;
+            border: 1px solid #cbd5e1;
+        }
+        .tr-leader-rank-bronze {
+            background: #fff7ed;
+            color: #9a3412;
+            border: 1px solid #fdba74;
         }
         .tr-leader-name {
             display: flex;
@@ -433,13 +455,13 @@ def inject_styles() -> None:
             .tr-team-label {
                 font-size: 1.12rem;
             }
-            .tr-prediction-stats {
+            .tr-summary-stats {
                 display: grid;
                 grid-template-columns: repeat(4, minmax(0, 1fr));
                 gap: 0.35rem;
                 margin: 0.2rem 0 0.65rem;
             }
-            .tr-prediction-stat {
+            .tr-summary-stat {
                 min-width: 0;
                 flex-direction: column-reverse;
                 align-items: center;
@@ -449,7 +471,7 @@ def inject_styles() -> None:
                 background: #f9fafb;
                 box-shadow: none;
             }
-            .tr-prediction-stat span {
+            .tr-summary-stat span {
                 max-width: 100%;
                 color: #6b7280;
                 font-size: 0.7rem;
@@ -457,7 +479,7 @@ def inject_styles() -> None:
                 overflow-wrap: anywhere;
                 text-align: center;
             }
-            .tr-prediction-stat strong {
+            .tr-summary-stat strong {
                 font-size: 0.95rem;
             }
             .tr-rule-grid,
