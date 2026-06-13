@@ -41,8 +41,8 @@ class MatchCentrePageView:
 def get_match_centre_page(player_id: str, filter_choice: str = "Open") -> MatchCentrePageView:
     with timed("view.match_centre.total"):
         with timed("view.match_centre.load"):
-            needs_reveal_data = filter_choice in ("Locked", "Completed", "All")
-            payload = load_match_centre_open_payload(player_id) if not needs_reveal_data else None
+            needs_social_data = filter_choice in ("Open", "Locked", "Completed", "All")
+            payload = None if needs_social_data else load_match_centre_open_payload(player_id)
             if payload:
                 settings = payload["settings"]
                 matches = payload["matches"]
@@ -55,8 +55,8 @@ def get_match_centre_page(player_id: str, filter_choice: str = "Open") -> MatchC
                     fixtures_future = submit_with_timing(executor, load_match_fixtures)
                     results_future = submit_with_timing(executor, load_match_results)
                     current_predictions_future = submit_with_timing(executor, load_player_predictions, player_id)
-                    players_future = submit_with_timing(executor, load_players) if needs_reveal_data else None
-                    predictions_future = submit_with_timing(executor, load_predictions) if needs_reveal_data else None
+                    players_future = submit_with_timing(executor, load_players) if needs_social_data else None
+                    predictions_future = submit_with_timing(executor, load_predictions) if needs_social_data else None
 
                     settings = settings_future.result()
                     matches = merge_match_results(fixtures_future.result(), results_future.result())
@@ -68,7 +68,7 @@ def get_match_centre_page(player_id: str, filter_choice: str = "Open") -> MatchC
             players = {p["id"]: p for p in players_list}
             prediction_by_player_match = prediction_lookup(current_predictions)
             predictions_by_match = defaultdict(list)
-            if needs_reveal_data:
+            if needs_social_data:
                 for pred in all_predictions:
                     predictions_by_match[pred["match_id"]].append(pred)
 
@@ -77,7 +77,7 @@ def get_match_centre_page(player_id: str, filter_choice: str = "Open") -> MatchC
                 status = match_centre_status(match, settings)
                 current_prediction = prediction_by_player_match.get((player_id, match["id"]))
                 completed = status == "Completed"
-                reveal = status in ("Locked", "Completed")
+                reveal = status in ("Open", "Locked", "Completed")
                 row_html = ""
                 if status != "Open" and not reveal:
                     row_html = '<div class="tr-centre-empty">Teams are not set for this fixture yet.</div>'

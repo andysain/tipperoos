@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from collections import defaultdict
 from datetime import datetime, timedelta
 from html import escape
 from pathlib import Path
@@ -27,11 +28,9 @@ from tipperoos.core.domain import (
     has_teams,
     leaderboard_player_name,
     leaderboard_rank_label,
-    match_result_line,
     match_time_summary,
     matchup_label,
     player_display_for_centre,
-    prediction_scoreline,
     score_reason,
     status_badge,
     team_display,
@@ -783,43 +782,437 @@ def leaderboard_page() -> None:
         st.line_chart(progress_df.set_index("Match"), height=280)
 
 
-def match_centre_prediction_rows(match: dict, predictions: list[dict], players: dict[str, dict], completed: bool) -> str:
-    if not predictions:
-        return '<div class="tr-centre-empty">No predictions for this match.</div>'
+def plural(value: int, singular: str, plural_label: str | None = None) -> str:
+    label = singular if value == 1 else plural_label or f"{singular}s"
+    return f"{value} {label}"
 
-    rows = []
-    predictions = sorted(
-        predictions,
-        key=lambda pred: (
-            bool(players.get(pred["player_id"], {}).get("is_bot")),
-            str(players.get(pred["player_id"], {}).get("display_name") or "").lower(),
-        ),
+
+def match_centre_score_tuple(prediction: dict) -> tuple[int, int]:
+    return int(prediction["pred_team_a_score"]), int(prediction["pred_team_b_score"])
+
+
+def match_centre_score_label(prediction: dict) -> str:
+    score_a, score_b = match_centre_score_tuple(prediction)
+    return f"{score_a} - {score_b}"
+
+
+def match_centre_outcome_key(prediction: dict) -> str:
+    score_a, score_b = match_centre_score_tuple(prediction)
+    if score_a > score_b:
+        return "team_a"
+    if score_b > score_a:
+        return "team_b"
+    return "draw"
+
+
+def match_centre_outcome_label(match: dict, outcome_key: str) -> str:
+    if outcome_key == "team_a":
+        team = team_display(match.get("team_a"), match.get("team_a_icon") or flag_for_code(match.get("team_a_code")))
+        return f"{team} win"
+    if outcome_key == "team_b":
+        team = team_display(match.get("team_b"), match.get("team_b_icon") or flag_for_code(match.get("team_b_code")))
+        return f"{team} win"
+    return "Draw"
+
+
+def match_centre_player_sort_key(player: dict, current_player_id: str) -> tuple:
+    return (
+        player["id"] != current_player_id,
+        bool(player.get("is_bot")),
+        str(player.get("display_name") or "").lower(),
     )
-    for pred in predictions:
-        player = players.get(pred["player_id"])
-        if not player:
-            continue
-        details = score_prediction_details(match, pred)
-        bot_badge = '<span class="tr-leader-bot">Bot</span>' if player.get("is_bot") else ""
-        if completed:
-            points = int(details["total_points"])
-            reason = score_reason(details)
-            result_html = f'<div class="tr-centre-points"><strong>{points}</strong><span>{escape(reason)}</span></div>'
+
+
+def match_centre_player_chip(player: dict, current_player_id: str) -> str:
+    classes = ["tr-compare-player"]
+    if player["id"] == current_player_id:
+        classes.append("tr-compare-player-you")
+    if player.get("is_bot"):
+        classes.append("tr-compare-player-bot")
+    return f'<span class="{" ".join(classes)}">{player_display_for_centre(player)}</span>'
+
+
+def match_centre_player_chips(players: list[dict], current_player_id: str) -> str:
+    sorted_players = sorted(players, key=lambda player: match_centre_player_sort_key(player, current_player_id))
+    return "".join(match_centre_player_chip(player, current_player_id) for player in sorted_players)
+
+
+def match_centre_stat(label: str, value: str | int, stat_class: str = "") -> str:
+    classes = ["tr-compare-stat"]
+    if stat_class:
+        classes.append(stat_class)
+    return f'<div class="{" ".join(classes)}"><strong>{escape(str(value))}</strong><span>{escape(label)}</span></div>'
+
+
+def match_centre_pick_status(label: str, status_class: str) -> str:
+    return f'<div class="tr-centre-pick-status tr-centre-pick-{status_class}">{escape(label)}</div>'
+
+
+def match_centre_pick_preview(match: dict, centre_label: str, preview_status: str) -> str:
+    if not has_teams(match):
+        return f'<div class="tr-centre-pick-status tr-centre-pick-waiting">{escape(matchup_label(match))}</div>'
+    team_a_label = team_display(match["team_a"], match.get("team_a_icon") or flag_for_code(match.get("team_a_code")))
+    team_b_label = team_display(match["team_b"], match.get("team_b_icon") or flag_for_code(match.get("team_b_code")))
+    return (
+        f'<div class="tr-centre-pick-preview tr-scoreline-{preview_status}">'
+        f'<span>{escape(team_a_label)}</span><strong>{escape(centre_label)}</strong><span>{escape(team_b_label)}</span>'
+        "</div>"
+    )
+
+
+def match_centre_prediction_summary(
+    match: dict,
+    predictions_by_player: dict[str, dict],
+    players: dict[str, dict],
+) -> dict:
+    submitted_players = [player for player in players.values() if player["id"] in predictions_by_player]
+    missing_players = [player for player in players.values() if player["id"] not in predictions_by_player]
+    outcome_counts = {"team_a": 0, "draw": 0, "team_b": 0}
+    scoreline_counts: dict[tuple[int, int], int] = defaultdict(int)
+    for prediction in predictions_by_player.values():
+        outcome_counts[match_centre_outcome_key(prediction)] += 1
+        scoreline_counts[match_centre_score_tuple(prediction)] += 1
+    most_picked = "-"
+    if scoreline_counts:
+        most_scoreline, most_count = sorted(scoreline_counts.items(), key=lambda item: (-item[1], item[0]))[0]
+        most_picked = f"{most_scoreline[0]} - {most_scoreline[1]} ({most_count})"
+    return {
+        "submitted_players": submitted_players,
+        "missing_players": missing_players,
+        "outcome_counts": outcome_counts,
+        "scoreline_counts": scoreline_counts,
+        "most_picked": most_picked,
+    }
+
+
+def match_centre_your_panel(
+    match: dict,
+    current_prediction: dict | None,
+    current_player_id: str,
+    status: str,
+    predictions_by_player: dict[str, dict],
+    players: dict[str, dict],
+    completed: bool,
+) -> str:
+    summary = match_centre_prediction_summary(match, predictions_by_player, players)
+    submitted_count = len(summary["submitted_players"])
+    missing_count = len(summary["missing_players"])
+
+    if current_prediction:
+        preview_status = "completed" if completed else "locked" if status == "Locked" else "saved"
+        pick_html = match_centre_pick_preview(match, match_centre_score_label(current_prediction), preview_status)
+    else:
+        pick_html = match_centre_pick_status("No tip yet" if status == "Open" else "No tip", "waiting")
+
+    if status == "Open":
+        if current_prediction:
+            compare_text = f"Other tips unlock at kickoff. {plural(max(submitted_count - 1, 0), 'other')} submitted."
         else:
-            result_html = '<div class="tr-centre-points tr-centre-points-pending"><strong>-</strong><span>Pending</span></div>'
-        advance = ""
-        if match.get("is_knockout") and pred.get("pred_advance_team"):
-            advance = f'<div class="tr-centre-advance">Advances: {escape(str(pred["pred_advance_team"]))}</div>'
-        rows.append(
-            '<div class="tr-centre-row">'
-            '<div>'
-            f'<div class="tr-centre-player">{player_display_for_centre(player)} {bot_badge}</div>'
-            f'<div class="tr-centre-tip">{prediction_scoreline(pred)}{advance}</div>'
-            '</div>'
-            f'{result_html}'
-            '</div>'
+            compare_text = "Add your tip before kickoff to compare with everyone else."
+        stats_html = (
+            match_centre_stat("Submitted", submitted_count)
+            + match_centre_stat("No tip yet", missing_count)
+            + match_centre_stat("Unlocks", "Kickoff", "tr-compare-stat-muted")
         )
-    return "".join(rows) if rows else '<div class="tr-centre-empty">No predictions for this match.</div>'
+    elif status == "Locked" and current_prediction:
+        score_tuple = match_centre_score_tuple(current_prediction)
+        same_score_count = int(summary["scoreline_counts"].get(score_tuple, 0))
+        same_outcome_count = int(summary["outcome_counts"].get(match_centre_outcome_key(current_prediction), 0))
+        score_text = "Only you picked this score." if same_score_count == 1 else f"You were one of {same_score_count} on this score."
+        compare_text = f"{score_text} {plural(same_outcome_count, 'player')} picked the same result."
+        stats_html = (
+            match_centre_stat(match_centre_outcome_label(match, "team_a"), summary["outcome_counts"]["team_a"])
+            + match_centre_stat("Draw", summary["outcome_counts"]["draw"])
+            + match_centre_stat(match_centre_outcome_label(match, "team_b"), summary["outcome_counts"]["team_b"])
+            + match_centre_stat("Most picked", summary["most_picked"])
+        )
+    elif status == "Locked":
+        compare_text = "You did not tip this match. Everyone else's tips are now visible."
+        stats_html = (
+            match_centre_stat(match_centre_outcome_label(match, "team_a"), summary["outcome_counts"]["team_a"])
+            + match_centre_stat("Draw", summary["outcome_counts"]["draw"])
+            + match_centre_stat(match_centre_outcome_label(match, "team_b"), summary["outcome_counts"]["team_b"])
+            + match_centre_stat("Most picked", summary["most_picked"])
+        )
+    elif completed and current_prediction:
+        details = score_prediction_details(match, current_prediction)
+        points = int(details["total_points"])
+        player_scores = []
+        for player_id in players:
+            player_scores.append(int(score_prediction_details(match, predictions_by_player.get(player_id))["total_points"]))
+        better_count = len([score for score in player_scores if score > points])
+        if better_count:
+            compare_text = f"You scored {points} pts. {plural(better_count, 'player')} scored more."
+        else:
+            compare_text = f"You scored {points} pts. That was the top score for this match."
+        exact_count = len(
+            [
+                prediction
+                for prediction in predictions_by_player.values()
+                if score_prediction_details(match, prediction).get("tier") == "Exact"
+            ]
+        )
+        top_score = max(player_scores) if player_scores else 0
+        avg_score = round(sum(player_scores) / len(player_scores), 1) if player_scores else 0
+        stats_html = (
+            match_centre_stat("Your points", points)
+            + match_centre_stat("Top score", top_score)
+            + match_centre_stat("Exact tips", exact_count)
+            + match_centre_stat("Average", avg_score)
+        )
+    else:
+        player_scores = [
+            int(score_prediction_details(match, predictions_by_player.get(player_id))["total_points"])
+            for player_id in players
+        ]
+        top_score = max(player_scores) if player_scores else 0
+        compare_text = f"You did not tip this match. Top score was {top_score} pts."
+        stats_html = (
+            match_centre_stat("Your points", 0)
+            + match_centre_stat("Top score", top_score)
+            + match_centre_stat("Submitted", submitted_count)
+            + match_centre_stat("No tip", missing_count)
+        )
+
+    return (
+        '<div class="tr-compare-panel">'
+        '<div class="tr-compare-your">'
+        '<div class="tr-compare-label">Your tip</div>'
+        f"{pick_html}"
+        f'<div class="tr-compare-note">{escape(compare_text)}</div>'
+        "</div>"
+        f'<div class="tr-compare-stats">{stats_html}</div>'
+        "</div>"
+    )
+
+
+def match_centre_group_row(
+    label: str,
+    players: list[dict],
+    current_player_id: str,
+    meta: str | None = None,
+    row_class: str = "",
+) -> str:
+    classes = ["tr-compare-group-row"]
+    if row_class:
+        classes.append(row_class)
+    if any(player["id"] == current_player_id for player in players):
+        classes.append("tr-compare-group-row-you")
+    meta_html = f'<span>{escape(meta)}</span>' if meta else ""
+    player_html = match_centre_player_chips(players, current_player_id) if players else '<span class="tr-compare-empty-chip">None</span>'
+    return (
+        f'<div class="{" ".join(classes)}">'
+        '<div class="tr-compare-group-main">'
+        f'<strong>{escape(label)}</strong>{meta_html}'
+        "</div>"
+        f'<div class="tr-compare-group-players">{player_html}</div>'
+        "</div>"
+    )
+
+
+def match_centre_section(title: str, count: int | None, rows: list[str], section_class: str = "") -> str:
+    classes = ["tr-compare-section"]
+    if section_class:
+        classes.append(section_class)
+    count_html = f"<strong>{count}</strong>" if count is not None else ""
+    body = "".join(rows) if rows else '<div class="tr-compare-empty">No tips in this group.</div>'
+    return (
+        f'<div class="{" ".join(classes)}">'
+        f'<div class="tr-compare-section-title"><span>{escape(title)}</span>{count_html}</div>'
+        f"{body}"
+        "</div>"
+    )
+
+
+def match_centre_result_section_class(points: int, reason: str) -> str:
+    if reason == "Exact score":
+        return "tr-compare-section-exact"
+    if reason == "Correct goal difference":
+        return "tr-compare-section-goal-diff"
+    if reason == "Correct result":
+        return "tr-compare-section-result"
+    if reason == "No tip":
+        return "tr-compare-section-no-tip"
+    if points > 0:
+        return "tr-compare-section-advancement"
+    return "tr-compare-section-wrong"
+
+
+def match_centre_result_sort_key(key: tuple[int, str]) -> tuple[int, int, str]:
+    points, title = key
+    if title.startswith("No tip"):
+        bucket = 2
+    elif points == 0:
+        bucket = 1
+    else:
+        bucket = 0
+    return (-points, bucket, title)
+
+
+def match_centre_open_groups(
+    predictions_by_player: dict[str, dict],
+    players: dict[str, dict],
+    current_player_id: str,
+) -> str:
+    submitted_hidden = []
+    missing = []
+    bot_rows = []
+    for player in players.values():
+        prediction = predictions_by_player.get(player["id"])
+        if player["id"] == current_player_id:
+            continue
+        if prediction and player.get("is_bot"):
+            bot_rows.append(match_centre_group_row(match_centre_score_label(prediction), [player], current_player_id, "Bot pick"))
+        elif prediction:
+            submitted_hidden.append(player)
+        else:
+            missing.append(player)
+
+    sections = []
+    if submitted_hidden:
+        sections.append(
+            match_centre_section(
+                "Submitted, hidden until lock",
+                len(submitted_hidden),
+                [match_centre_group_row("Submitted", submitted_hidden, current_player_id)],
+            )
+        )
+    if bot_rows:
+        sections.append(match_centre_section("Bot picks", len(bot_rows), bot_rows))
+    if missing:
+        sections.append(
+            match_centre_section(
+                "No tip yet",
+                len(missing),
+                [match_centre_group_row("No tip yet", missing, current_player_id)],
+            )
+        )
+    return f'<div class="tr-compare-groups">{"".join(sections)}</div>' if sections else ""
+
+
+def match_centre_locked_groups(
+    match: dict,
+    predictions_by_player: dict[str, dict],
+    players: dict[str, dict],
+    current_player_id: str,
+) -> str:
+    players_by_scoreline: dict[str, dict[tuple[int, int], list[dict]]] = {
+        "team_a": defaultdict(list),
+        "draw": defaultdict(list),
+        "team_b": defaultdict(list),
+    }
+    missing = []
+    for player in players.values():
+        prediction = predictions_by_player.get(player["id"])
+        if not prediction:
+            missing.append(player)
+            continue
+        players_by_scoreline[match_centre_outcome_key(prediction)][match_centre_score_tuple(prediction)].append(player)
+
+    sections = []
+    for outcome_key in ("team_a", "draw", "team_b"):
+        scoreline_groups = players_by_scoreline[outcome_key]
+        rows = []
+        total = sum(len(group_players) for group_players in scoreline_groups.values())
+        for scoreline, group_players in sorted(scoreline_groups.items(), key=lambda item: (-len(item[1]), item[0])):
+            rows.append(match_centre_group_row(f"{scoreline[0]} - {scoreline[1]}", group_players, current_player_id))
+        if total:
+            sections.append(match_centre_section(match_centre_outcome_label(match, outcome_key), total, rows))
+    if missing:
+        sections.append(
+            match_centre_section("No tip", len(missing), [match_centre_group_row("No tip", missing, current_player_id)])
+        )
+    return f'<div class="tr-compare-groups">{"".join(sections)}</div>'
+
+
+def match_centre_completed_groups(
+    match: dict,
+    predictions_by_player: dict[str, dict],
+    players: dict[str, dict],
+    current_player_id: str,
+) -> str:
+    grouped: dict[tuple[int, str, tuple[int, int] | None], list[dict]] = defaultdict(list)
+    for player in players.values():
+        prediction = predictions_by_player.get(player["id"])
+        if not prediction:
+            grouped[(0, "No tip", None)].append(player)
+            continue
+        details = score_prediction_details(match, prediction)
+        grouped[(int(details["total_points"]), score_reason(details), match_centre_score_tuple(prediction))].append(player)
+
+    sections_by_result: dict[tuple[int, str], list[str]] = defaultdict(list)
+    section_counts: dict[tuple[int, str], int] = defaultdict(int)
+    section_classes: dict[tuple[int, str], str] = {}
+    for (points, reason, scoreline), group_players in sorted(
+        grouped.items(),
+        key=lambda item: (-item[0][0], str(item[0][1]), item[0][2] or (99, 99)),
+    ):
+        title = f"{reason} · {points} pts" if reason != "No tip" else "No tip · 0 pts"
+        section_key = (points, title)
+        label = "No tip" if scoreline is None else f"{scoreline[0]} - {scoreline[1]}"
+        sections_by_result[section_key].append(match_centre_group_row(label, group_players, current_player_id))
+        section_counts[section_key] += len(group_players)
+        section_classes[section_key] = match_centre_result_section_class(points, reason)
+
+    sections = [
+        match_centre_section(
+            title,
+            section_counts[(points, title)],
+            sections_by_result[(points, title)],
+            section_classes[(points, title)],
+        )
+        for points, title in sorted(sections_by_result, key=match_centre_result_sort_key)
+    ]
+    return f'<div class="tr-compare-groups">{"".join(sections)}</div>'
+
+
+def match_centre_prediction_rows(
+    match: dict,
+    predictions: list[dict],
+    players: dict[str, dict],
+    completed: bool,
+    current_player_id: str,
+    status: str,
+) -> str:
+    if not players:
+        return '<div class="tr-centre-empty">No player data for this match.</div>'
+
+    predictions_by_player = {pred["player_id"]: pred for pred in predictions}
+    current_prediction = predictions_by_player.get(current_player_id)
+    panel_html = match_centre_your_panel(
+        match,
+        current_prediction,
+        current_player_id,
+        status,
+        predictions_by_player,
+        players,
+        completed,
+    )
+    if status == "Open":
+        groups_html = match_centre_open_groups(predictions_by_player, players, current_player_id)
+    elif completed:
+        groups_html = match_centre_completed_groups(match, predictions_by_player, players, current_player_id)
+    else:
+        groups_html = match_centre_locked_groups(match, predictions_by_player, players, current_player_id)
+    return panel_html + groups_html
+
+
+def match_centre_scoreline(match: dict, status: str) -> str:
+    if not has_teams(match):
+        return f'<div class="tr-centre-empty">{escape(matchup_label(match))}</div>'
+    team_a_label = team_display(match["team_a"], match.get("team_a_icon") or flag_for_code(match.get("team_a_code")))
+    team_b_label = team_display(match["team_b"], match.get("team_b_icon") or flag_for_code(match.get("team_b_code")))
+    if status == "Completed" and match.get("team_a_score") is not None and match.get("team_b_score") is not None:
+        centre_label = f"{int(match['team_a_score'])} - {int(match['team_b_score'])}"
+        preview_status = "completed"
+    else:
+        centre_label = "vs"
+        preview_status = "open" if status == "Open" else "locked"
+    return (
+        f'<div class="tr-centre-scoreline"><div class="tr-scoreline-preview tr-scoreline-{preview_status}">'
+        f'<span>{escape(team_a_label)}</span><strong>{escape(centre_label)}</strong><span>{escape(team_b_label)}</span>'
+        "</div></div>"
+    )
 
 
 def match_centre_page() -> None:
@@ -829,7 +1222,7 @@ def match_centre_page() -> None:
         filter_choice = st.segmented_control(
             "Filter",
             ["Open", "Locked", "Completed", "All"],
-            default="Open",
+            default="Completed",
         )
         filter_state_key = "match_centre_filter"
         if st.session_state.get(filter_state_key) != filter_choice:
@@ -851,6 +1244,8 @@ def match_centre_page() -> None:
             if filter_choice == "Completed" and status != "Completed":
                 continue
             visible_matches.append(match_view)
+        if filter_choice in ("Completed", "Locked"):
+            visible_matches.sort(key=lambda match_view: str(match_view.match.get("kickoff_time") or ""), reverse=True)
 
         rendered = 0
         for match_view in visible_matches[:visible_count]:
@@ -862,17 +1257,19 @@ def match_centre_page() -> None:
                     match_view.predictions,
                     view.players,
                     match_view.completed,
+                    player_id,
+                    match_view.status,
                 )
             body_html = f'<div class="tr-centre-body">{row_html}</div>' if row_html else ""
 
             rendered += 1
+            scoreline_html = match_centre_scoreline(match, match_view.status)
             st.markdown(
                 '<div class="tr-centre-card">'
                 '<div class="tr-centre-head">'
                 '<div>'
                 f'<div class="tr-centre-meta">{status_badge(match_view.status, compact=True)} <span>{escape(match_time_summary(match))}</span></div>'
-                f'<div class="tr-centre-title">{escape(match_result_line(match))}</div>'
-                f'<div class="tr-card-pick">{escape(match_view.pick_text)}</div>'
+                f'{scoreline_html}'
                 '</div>'
                 '</div>'
                 f'{body_html}'

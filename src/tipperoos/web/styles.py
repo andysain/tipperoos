@@ -16,6 +16,10 @@ def inject_styles() -> None:
             --tr-saved-bg: #eff6ff;
             --tr-saved-border: #93c5fd;
             --tr-saved-text: #1e3a8a;
+            --tr-personal-bg: #eef2ff;
+            --tr-personal-border: #6366f1;
+            --tr-personal-text: #312e81;
+            --tr-score-accent: #1e3a8a;
         }
         html,
         body,
@@ -40,6 +44,14 @@ def inject_styles() -> None:
         }
         div[data-testid="stSegmentedControl"] button {
             min-height: 2.35rem;
+        }
+        div[data-testid="stSegmentedControl"] button[aria-pressed="true"] {
+            color: #1e3a8a;
+            background: #eff6ff;
+            border-color: #93c5fd;
+        }
+        div[data-testid="stSegmentedControl"] button[aria-pressed="true"] * {
+            color: #1e3a8a;
         }
         .tr-card-title {
             font-size: 1.28rem;
@@ -221,6 +233,14 @@ def inject_styles() -> None:
         .tr-scoreline-saved strong {
             color: var(--tr-saved-text);
         }
+        .tr-scoreline-open {
+            background: #ecfdf5;
+            border-color: #a7f3d0;
+        }
+        .tr-scoreline-open span,
+        .tr-scoreline-open strong {
+            color: #047857;
+        }
         .tr-scoreline-completed {
             background: #f1f5f9;
             border-color: #64748b;
@@ -360,7 +380,7 @@ def inject_styles() -> None:
             display: inline-flex;
             align-items: baseline;
             gap: 0.2rem;
-            color: #ff4b4b;
+            color: var(--tr-score-accent);
             font-weight: 850;
             font-size: 1.65rem;
             line-height: 1;
@@ -521,14 +541,14 @@ def inject_styles() -> None:
             letter-spacing: 0;
         }
         .tr-leader-total strong {
-            color: #ff4b4b;
+            color: var(--tr-score-accent);
             font-size: 1.45rem;
         }
         .tr-centre-card {
             border: 1px solid #e5e7eb;
             border-radius: 8px;
-            padding: 0.78rem 0.95rem;
-            margin: 0.5rem 0;
+            padding: 0.95rem;
+            margin: 0.6rem 0;
             background: #ffffff;
             box-shadow: 0 1px 2px rgba(17, 24, 39, 0.04);
         }
@@ -538,6 +558,10 @@ def inject_styles() -> None:
             justify-content: space-between;
             gap: 1rem;
         }
+        .tr-centre-head > div {
+            width: 100%;
+            min-width: 0;
+        }
         .tr-centre-meta {
             display: flex;
             align-items: center;
@@ -546,79 +570,350 @@ def inject_styles() -> None:
             color: #6b7280;
             font-size: 0.88rem;
             line-height: 1.35;
-            margin-bottom: 0.3rem;
+            margin-bottom: 0.5rem;
         }
-        .tr-centre-title {
-            color: #111827;
-            font-size: 1.1rem;
-            font-weight: 850;
-            line-height: 1.25;
-            margin-bottom: 0.15rem;
+        .tr-centre-scoreline {
+            width: 100%;
+            margin: 0.2rem 0 0.55rem;
+        }
+        .tr-centre-scoreline .tr-scoreline-preview {
+            width: 100%;
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0.72rem 0.85rem;
         }
         .tr-centre-body {
-            margin-top: 0.65rem;
+            margin-top: 0.75rem;
             border-top: 1px solid #f3f4f6;
-            padding-top: 0.25rem;
+            padding-top: 0.7rem;
+            display: block;
         }
-        .tr-centre-row {
+        .tr-compare-panel {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) 8rem;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.65rem 0;
-            border-bottom: 1px solid #f3f4f6;
+            grid-template-columns: minmax(0, 1.25fr) minmax(18rem, 0.75fr);
+            gap: 0.7rem;
+            align-items: stretch;
         }
-        .tr-centre-row:last-child {
-            border-bottom: 0;
+        .tr-compare-your {
+            border: 1px solid var(--tr-personal-border);
+            border-radius: 8px;
+            background: var(--tr-personal-bg);
+            padding: 0.65rem;
+            min-width: 0;
         }
-        .tr-centre-player {
+        .tr-compare-label {
+            color: var(--tr-personal-text);
+            font-size: 0.72rem;
+            font-weight: 850;
+            line-height: 1.15;
+            margin-bottom: 0.35rem;
+            text-transform: uppercase;
+        }
+        .tr-compare-note {
+            color: #3730a3;
+            font-size: 0.82rem;
+            font-weight: 700;
+            line-height: 1.3;
+            margin-top: 0.45rem;
+        }
+        .tr-compare-stats {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.45rem;
+            min-width: 0;
+        }
+        .tr-compare-stat {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #ffffff;
+            padding: 0.55rem 0.6rem;
+            min-width: 0;
+        }
+        .tr-compare-stat strong {
+            display: block;
+            color: #111827;
+            font-size: 1.05rem;
+            font-weight: 900;
+            line-height: 1.1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .tr-compare-stat span {
+            display: block;
+            color: #64748b;
+            font-size: 0.72rem;
+            font-weight: 800;
+            line-height: 1.15;
+            margin-top: 0.18rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .tr-compare-stat-muted strong {
+            color: #475569;
+        }
+        .tr-compare-groups {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.65rem;
+            margin-top: 0.75rem;
+        }
+        .tr-compare-section {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #ffffff;
+            overflow: hidden;
+            min-width: 0;
+        }
+        .tr-compare-section-exact {
+            border-color: #86efac;
+            box-shadow: inset 4px 0 0 #16a34a;
+        }
+        .tr-compare-section-exact .tr-compare-section-title {
+            background: #f0fdf4;
+            color: #166534;
+            border-bottom-color: #bbf7d0;
+        }
+        .tr-compare-section-goal-diff {
+            border-color: #67e8f9;
+            box-shadow: inset 4px 0 0 #0891b2;
+        }
+        .tr-compare-section-goal-diff .tr-compare-section-title {
+            background: #ecfeff;
+            color: #155e75;
+            border-bottom-color: #a5f3fc;
+        }
+        .tr-compare-section-result,
+        .tr-compare-section-advancement {
+            border-color: #bfdbfe;
+            box-shadow: inset 4px 0 0 #2563eb;
+        }
+        .tr-compare-section-result .tr-compare-section-title,
+        .tr-compare-section-advancement .tr-compare-section-title {
+            background: #eff6ff;
+            color: #1e3a8a;
+            border-bottom-color: #dbeafe;
+        }
+        .tr-compare-section-wrong {
+            border-color: #e5e7eb;
+            box-shadow: inset 4px 0 0 #94a3b8;
+        }
+        .tr-compare-section-wrong .tr-compare-section-title {
+            background: #f8fafc;
+            color: #475569;
+        }
+        .tr-compare-section-no-tip {
+            border-color: #e5e7eb;
+            border-style: dashed;
+            box-shadow: inset 4px 0 0 #cbd5e1;
+        }
+        .tr-compare-section-no-tip .tr-compare-section-title {
+            background: #f9fafb;
+            color: #64748b;
+        }
+        .tr-compare-section-title {
             display: flex;
             align-items: center;
-            flex-wrap: wrap;
-            gap: 0.4rem;
-            color: #111827;
-            font-size: 1rem;
-            font-weight: 800;
-            line-height: 1.25;
-        }
-        .tr-centre-tip {
-            margin-top: 0.15rem;
-            color: #4b5563;
-            font-size: 0.95rem;
-            font-weight: 650;
-            line-height: 1.3;
-        }
-        .tr-centre-advance {
-            display: inline;
-            margin-left: 0.45rem;
-            color: #6b7280;
-            font-weight: 600;
-        }
-        .tr-centre-points {
-            text-align: right;
-        }
-        .tr-centre-points strong {
-            display: block;
-            color: #ff4b4b;
-            font-size: 1.25rem;
-            line-height: 1.1;
-            font-weight: 900;
-        }
-        .tr-centre-points span {
-            display: block;
-            color: #6b7280;
+            justify-content: space-between;
+            gap: 0.6rem;
+            border-bottom: 1px solid #eef2f7;
+            background: #f8fafc;
+            color: #334155;
+            padding: 0.5rem 0.6rem;
             font-size: 0.78rem;
-            font-weight: 750;
+            font-weight: 900;
             line-height: 1.2;
         }
-        .tr-centre-points-pending strong {
+        .tr-compare-section-title span {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .tr-compare-section-title strong {
+            color: #111827;
+            font-size: 0.9rem;
+            line-height: 1;
+        }
+        .tr-compare-section-exact .tr-compare-section-title strong {
+            color: #15803d;
+        }
+        .tr-compare-section-goal-diff .tr-compare-section-title strong {
+            color: #0e7490;
+        }
+        .tr-compare-section-result .tr-compare-section-title strong,
+        .tr-compare-section-advancement .tr-compare-section-title strong {
+            color: #1d4ed8;
+        }
+        .tr-compare-section-wrong .tr-compare-section-title strong,
+        .tr-compare-section-no-tip .tr-compare-section-title strong {
+            color: #64748b;
+        }
+        .tr-compare-group-row {
+            display: grid;
+            grid-template-columns: minmax(4.5rem, auto) minmax(0, 1fr);
+            gap: 0.55rem;
+            align-items: center;
+            padding: 0.52rem 0.6rem;
+            border-top: 1px solid #f3f4f6;
+        }
+        .tr-compare-group-row:first-of-type {
+            border-top: 0;
+        }
+        .tr-compare-group-main {
+            min-width: 0;
+        }
+        .tr-compare-group-main strong {
+            display: block;
+            color: #111827;
+            font-size: 0.95rem;
+            font-weight: 950;
+            line-height: 1.1;
+            white-space: nowrap;
+        }
+        .tr-compare-group-main span {
+            display: block;
+            color: #64748b;
+            font-size: 0.7rem;
+            font-weight: 800;
+            line-height: 1.2;
+            margin-top: 0.12rem;
+            white-space: nowrap;
+        }
+        .tr-compare-group-players {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 0.25rem;
+            min-width: 0;
+        }
+        .tr-compare-player,
+        .tr-compare-empty-chip {
+            display: inline-flex;
+            align-items: center;
+            max-width: 100%;
+            border: 1px solid #e5e7eb;
+            border-radius: 999px;
+            background: #ffffff;
+            color: #111827;
+            padding: 0.18rem 0.45rem;
+            font-size: 0.76rem;
+            font-weight: 850;
+            line-height: 1.15;
+        }
+        .tr-compare-player-you {
+            background: #dbeafe;
+            border-color: #93c5fd;
+            color: #1e3a8a;
+        }
+        .tr-compare-player-you::after {
+            content: "You";
+            margin-left: 0.32rem;
+            color: #1d4ed8;
+            font-size: 0.62rem;
+            font-weight: 950;
+            text-transform: uppercase;
+        }
+        .tr-compare-player-bot {
+            background: #f0f9ff;
+            border-color: #bae6fd;
+            color: #0369a1;
+        }
+        .tr-compare-empty,
+        .tr-compare-empty-chip {
+            color: #64748b;
+        }
+        .tr-centre-pick-preview {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+            align-items: center;
+            gap: 0.34rem;
+            border: 1px solid var(--tr-border);
+            border-radius: 8px;
+            padding: 0.3rem 0.38rem;
+            margin-top: 0.28rem;
+        }
+        .tr-centre-pick-preview span {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: var(--tr-muted);
+            font-size: 0.76rem;
+            font-weight: 800;
+        }
+        .tr-centre-pick-preview span:first-child {
+            text-align: right;
+        }
+        .tr-centre-pick-preview span:last-child {
+            text-align: left;
+        }
+        .tr-centre-pick-preview strong {
+            color: #111827;
+            font-size: 0.9rem;
+            font-weight: 900;
+            line-height: 1;
+            white-space: nowrap;
+        }
+        .tr-compare-your .tr-centre-pick-preview {
+            background: #ffffff;
+            border-color: #cbd5e1;
+            box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
+        }
+        .tr-compare-your .tr-centre-pick-preview span {
+            color: #64748b;
+        }
+        .tr-compare-your .tr-centre-pick-preview strong {
+            color: #0f172a;
+        }
+        .tr-centre-pick-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--tr-border);
+            border-radius: 8px;
+            padding: 0.34rem 0.45rem;
+            margin-top: 0.28rem;
+            min-height: 2rem;
+            color: #64748b;
+            background: #f8fafc;
+            font-size: 0.82rem;
+            font-weight: 850;
+            line-height: 1.15;
+            text-align: center;
+        }
+        .tr-centre-pick-submitted {
+            background: var(--tr-saved-bg);
+            border-color: var(--tr-saved-border);
+            color: var(--tr-saved-text);
+        }
+        .tr-centre-pick-waiting {
+            background: #f8fafc;
+            border-color: #cbd5e1;
+            color: #64748b;
+        }
+        .tr-centre-advance {
+            display: block;
+            margin-left: 0;
             color: #6b7280;
+            font-weight: 600;
+            font-size: 0.78rem;
         }
         .tr-centre-empty {
             color: #6b7280;
             font-size: 0.92rem;
             font-weight: 650;
             padding: 0.35rem 0 0.15rem;
+        }
+        @media (max-width: 900px) {
+            .tr-compare-panel,
+            .tr-compare-groups {
+                grid-template-columns: 1fr;
+            }
+            .tr-compare-stats {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+            }
         }
         @media (max-width: 640px) {
             .block-container {
@@ -727,22 +1022,28 @@ def inject_styles() -> None:
             .tr-centre-card {
                 padding: 0.85rem;
             }
-            .tr-centre-title {
-                font-size: 1.05rem;
+            .tr-compare-panel,
+            .tr-compare-groups,
+            .tr-compare-stats {
+                grid-template-columns: 1fr;
             }
-            .tr-centre-row {
-                grid-template-columns: minmax(0, 1fr);
-                gap: 0.35rem;
+            .tr-compare-group-row {
+                grid-template-columns: 1fr;
+                gap: 0.4rem;
             }
-            .tr-centre-points {
-                text-align: left;
+            .tr-compare-group-players {
+                justify-content: flex-start;
             }
-            .tr-centre-points strong,
-            .tr-centre-points span {
-                display: inline;
+            .tr-compare-stat {
+                display: grid;
+                grid-template-columns: auto minmax(0, 1fr);
+                align-items: baseline;
+                gap: 0.45rem;
+                padding: 0.48rem 0.55rem;
             }
-            .tr-centre-points span {
-                margin-left: 0.35rem;
+            .tr-compare-stat strong,
+            .tr-compare-stat span {
+                margin-top: 0;
             }
         }
         </style>
