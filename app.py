@@ -10,6 +10,7 @@ SRC_DIR = Path(__file__).resolve().parent / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
@@ -72,6 +73,7 @@ from tipperoos.services.admin_ops import (
     build_result_updates_from_table,
     generate_bot_predictions,
     generate_bot_winner_picks,
+    import_elo_team_data,
     import_archive_fixture_csvs,
     result_editor_rows,
     save_result,
@@ -89,6 +91,8 @@ from tipperoos.services.players import (
 )
 from tipperoos.services.session_tokens import (
     make_session_token as make_signed_session_token,
+)
+from tipperoos.services.session_tokens import (
     validate_session_token as validate_signed_session_token,
 )
 from tipperoos.services.views.match_centre_view import get_match_centre_page
@@ -779,7 +783,119 @@ def leaderboard_page() -> None:
     progress_df = cumulative_human_scores()
     if not progress_df.empty:
         st.subheader("Score progression")
-        st.line_chart(progress_df.set_index("Match"), height=280)
+        render_score_progression_chart(progress_df, df, current_player_id)
+
+
+def render_score_progression_chart(progress_df: pd.DataFrame, leaderboard_df: pd.DataFrame, current_player_id: str | None) -> None:
+    player_columns = [column for column in progress_df.columns if column != "Match"]
+    if not player_columns:
+        return
+
+    final_scores = progress_df.iloc[-1][player_columns].sort_values(ascending=False)
+    leader_score = int(final_scores.iloc[0])
+    leader_names = set(final_scores[final_scores == leader_score].index)
+
+    current_name = None
+    if current_player_id:
+        current_rows = leaderboard_df[leaderboard_df["Player ID"] == current_player_id]
+        if not current_rows.empty:
+            candidate = leaderboard_player_name(current_rows.iloc[0].to_dict())
+            if candidate in player_columns:
+                current_name = candidate
+
+    long_df = progress_df.melt("Match", var_name="Player", value_name="Score")
+
+    def role_for_player(player: str) -> str:
+        if player == current_name:
+            return "You"
+        if player in leader_names:
+            return "Leader"
+        return "Pack"
+
+    long_df["Role"] = long_df["Player"].map(role_for_player)
+    long_df["Line color"] = long_df["Role"].map(
+        {
+            "You": "#1d4ed8",
+            "Leader": "#16a34a",
+            "Pack": "#94a3b8",
+        }
+    )
+    long_df["Line width"] = 4
+    long_df["Line opacity"] = long_df["Role"].map({"You": 1.0, "Leader": 0.95, "Pack": 0.85})
+    long_df["Label"] = long_df.apply(
+        lambda row: f"{row['Player']} {int(row['Score'])}" if row["Role"] in ("You", "Leader") else "",
+        axis=1,
+    )
+
+    min_match = progress_df["Match"].min()
+    max_match = progress_df["Match"].max()
+    label_df = long_df[(long_df["Match"] == max_match) & (long_df["Label"] != "")]
+
+    if current_name:
+        current_score = int(final_scores.get(current_name, 0))
+        gap = max(leader_score - current_score, 0)
+        if gap:
+            st.caption(f"{current_name} is {gap} pts behind the leader after {max_match} matches.")
+        else:
+            st.caption(f"{current_name} is leading after {max_match} matches.")
+
+    base = alt.Chart(long_df).encode(
+        x=alt.X(
+            "Match:Q",
+            title="Match",
+            axis=alt.Axis(format="d", tickMinStep=1),
+            scale=alt.Scale(domain=[min_match, max_match + 0.35]),
+        ),
+        y=alt.Y("Score:Q", title="Points"),
+    )
+    lines = base.mark_line(point=False).encode(
+        detail="Player:N",
+        color=alt.Color("Line color:N", scale=None, legend=None),
+        strokeWidth=alt.StrokeWidth("Line width:Q", legend=None),
+        strokeDash=alt.StrokeDash(
+            "Role:N",
+            scale=alt.Scale(domain=["You", "Leader", "Pack"], range=[[1, 0], [1, 0], [6, 4]]),
+            legend=None,
+        ),
+        opacity=alt.Opacity("Line opacity:Q", legend=None),
+        tooltip=[
+            alt.Tooltip("Player:N"),
+            alt.Tooltip("Match:Q", format=".0f"),
+            alt.Tooltip("Score:Q", format=".0f"),
+        ],
+    )
+    focus_points = alt.Chart(label_df).mark_circle(size=70).encode(
+        x=alt.X("Match:Q"),
+        y=alt.Y("Score:Q"),
+        color=alt.Color("Line color:N", scale=None, legend=None),
+        tooltip=[
+            alt.Tooltip("Player:N"),
+            alt.Tooltip("Score:Q", format=".0f"),
+        ],
+    )
+    labels = alt.Chart(label_df).mark_text(
+        align="left",
+        baseline="middle",
+        dx=8,
+        fontSize=12,
+        fontWeight="bold",
+    ).encode(
+        x=alt.X("Match:Q"),
+        y=alt.Y("Score:Q"),
+        text="Label:N",
+        color=alt.Color("Line color:N", scale=None, legend=None),
+    )
+    zero_rule = alt.Chart(pd.DataFrame({"Score": [0]})).mark_rule(color="#e5e7eb").encode(
+        y=alt.Y("Score:Q")
+    )
+    chart = (
+        (zero_rule + lines + focus_points + labels)
+        .properties(height=320)
+        .configure_axis(labelColor="#64748b", titleColor="#475569")
+        .configure_axisY(grid=False)
+        .configure_view(strokeWidth=0)
+    )
+    st.altair_chart(chart, width="stretch")
 
 
 def plural(value: int, singular: str, plural_label: str | None = None) -> str:
@@ -1619,6 +1735,18 @@ def import_admin() -> None:
             with st.expander("Technical detail"):
                 st.code(str(exc))
 
+    st.divider()
+    st.subheader("Elo data")
+    st.write("Updates existing teams with Elo ratings and last-10 attack/defence values from the local Elo CSVs.")
+    if st.button("Import Elo team data"):
+        try:
+            updated = import_elo_team_data()
+            st.success(f"Updated Elo data for {updated} teams.")
+        except Exception as exc:
+            st.error("Elo import failed.")
+            with st.expander("Technical detail"):
+                st.code(str(exc))
+
 
 def round_of_32_admin() -> None:
     st.subheader("Round of 32 setup")
@@ -1814,14 +1942,20 @@ def bot_admin() -> None:
     if st.button("Ensure default bots exist"):
         ensure_default_bots()
         st.success("Default bots are ready.")
-    cols = st.columns(4)
+
+    action_cols = st.columns(2)
+    if action_cols[0].button("Generate all bot match predictions"):
+        count = generate_bot_predictions()
+        st.success(f"Generated {count} predictions.")
+    if action_cols[1].button("Generate all bot winner picks"):
+        count = generate_bot_winner_picks()
+        st.success(f"Generated {count} winner picks.")
+
+    cols = st.columns(len(BOT_SPECS))
     for i, (bot_type, spec) in enumerate(BOT_SPECS.items()):
         if cols[i].button(f"Generate {spec['display_name']} predictions"):
             count = generate_bot_predictions(bot_type)
             st.success(f"Generated {count} predictions.")
-    if cols[3].button("Generate bot winner picks"):
-        count = generate_bot_winner_picks()
-        st.success(f"Generated {count} winner picks.")
 
 
 def backup_admin() -> None:

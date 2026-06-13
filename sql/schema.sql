@@ -14,7 +14,7 @@ create table if not exists players (
   created_at timestamptz default now(),
   updated_at timestamptz default now(),
   constraint valid_bot_type check (
-    bot_type is null or bot_type in ('random', 'median', 'one_one')
+    bot_type is null or bot_type in ('random', 'median', 'one_one', 'elo')
   )
 );
 
@@ -25,10 +25,30 @@ create table if not exists teams (
   fifa_code text,
   group_letter text,
   icon text,
+  elo_rating integer,
+  elo_source text default 'eloratings.net',
+  elo_source_date date,
+  elo_attack numeric,
+  elo_defence numeric,
   active boolean default true,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
+
+alter table players
+drop constraint if exists valid_bot_type;
+
+alter table players
+add constraint valid_bot_type check (
+  bot_type is null or bot_type in ('random', 'median', 'one_one', 'elo')
+);
+
+alter table teams
+add column if not exists elo_rating integer,
+add column if not exists elo_source text default 'eloratings.net',
+add column if not exists elo_source_date date,
+add column if not exists elo_attack numeric,
+add column if not exists elo_defence numeric;
 
 create table if not exists matches (
   id uuid primary key default gen_random_uuid(),

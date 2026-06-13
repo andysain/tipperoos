@@ -1,6 +1,8 @@
 streamlit
 supabase
 pandas
+altair
 pytz
 python-dateutil
 bcrypt
+scipy

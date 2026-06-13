@@ -9,6 +9,7 @@ SESSION_QUERY_PARAM = "tr_session"
 SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 60
 SYDNEY = ZoneInfo("Australia/Sydney")
 ARCHIVE_DIR = Path(__file__).resolve().parents[3] / "archive"
+ELO_BOT_DIR = Path(__file__).resolve().parents[3] / "elo_bot"
 
 HOST_CITY_TIMEZONES = {
     "Atlanta": "America/New_York",
@@ -84,6 +85,7 @@ BOT_SPECS = {
     "random": {"username": "bot_random", "display_name": "Random Bot"},
     "median": {"username": "bot_median", "display_name": "Median Bot"},
     "one_one": {"username": "bot_one_one", "display_name": "1-1 Bot"},
+    "elo": {"username": "bot_elo", "display_name": "Elo Bot"},
 }
 
 SCORE_POOL = [0, 0, 1, 1, 1, 2, 2, 3]

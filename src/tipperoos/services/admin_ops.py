@@ -1,15 +1,24 @@
 from __future__ import annotations
 
+import hashlib
 import random
 from collections import Counter
 from statistics import median
 
 import pandas as pd
+from scipy.stats import poisson
 
-from tipperoos.core.constants import ARCHIVE_DIR, SCORE_POOL
-from tipperoos.core.domain import flag_for_code, has_teams, matchup_label, prediction_lookup, team_lookup, winner_lookup
-from tipperoos.services.players import ensure_default_bots
+from tipperoos.core.constants import ARCHIVE_DIR, ELO_BOT_DIR, SCORE_POOL
+from tipperoos.core.domain import (
+    flag_for_code,
+    has_teams,
+    matchup_label,
+    prediction_lookup,
+    team_lookup,
+    winner_lookup,
+)
 from tipperoos.core.rules import is_match_locked
+from tipperoos.core.time_utils import iso_dt, local_label, now_utc, parse_host_kickoff
 from tipperoos.core.timing import timed_function
 from tipperoos.data.store import (
     clear_data_cache,
@@ -22,7 +31,37 @@ from tipperoos.data.store import (
     load_teams,
     load_winner_picks,
 )
-from tipperoos.core.time_utils import iso_dt, local_label, now_utc, parse_host_kickoff
+from tipperoos.services.players import ensure_default_bots
+
+RNG_SEED = 73142
+ELO_HOME_ADVANTAGE = 50
+ELO_DRAW_PROBABILITY = 0.24
+ELO_MAX_SCORELINE_ATTEMPTS = 500
+ELO_LAMBDA_FLOOR = 0.15
+ELO_DEFAULT_SCORELINE = (1, 1)
+ELO_BASE_TOTAL_GOALS = 2.55
+ELO_GOAL_DIFF_FACTOR = 350
+ELO_EXPECTANCY_MAX_SCORE = 10
+ELO_RESULT_FORM_WEIGHT = 0.2
+ELO_SCORELINE_FORM_WEIGHT = 0.40
+HOST_COUNTRY_BY_CITY = {
+    "Atlanta": "USA",
+    "Boston": "USA",
+    "Dallas": "USA",
+    "Houston": "USA",
+    "Kansas City": "USA",
+    "Los Angeles": "USA",
+    "Miami": "USA",
+    "New York/New Jersey": "USA",
+    "Philadelphia": "USA",
+    "San Francisco Bay Area": "USA",
+    "Seattle": "USA",
+    "Toronto": "CAN",
+    "Vancouver": "CAN",
+    "Guadalajara": "MEX",
+    "Mexico City": "MEX",
+    "Monterrey": "MEX",
+}
 
 
 @timed_function("admin.import_archive_fixture_csvs")
@@ -38,6 +77,7 @@ def import_archive_fixture_csvs() -> tuple[int, int]:
     stages_df = pd.read_csv(stages_path)
     cities_df = pd.read_csv(cities_path)
     matches_df = pd.read_csv(matches_path)
+    elo_rows = elo_team_rows()
 
     team_rows = []
     team_by_id = {}
@@ -52,6 +92,7 @@ def import_archive_fixture_csvs() -> tuple[int, int]:
             "active": True,
             "updated_at": iso_dt(now_utc()),
         }
+        team.update(elo_rows.get(int(row["id"]), {}))
         team_rows.append(team)
         team_by_id[int(row["id"])] = team
     db().table("teams").upsert(team_rows, on_conflict="external_id").execute()
@@ -97,6 +138,65 @@ def import_archive_fixture_csvs() -> tuple[int, int]:
     db().table("matches").upsert(match_rows, on_conflict="match_id").execute()
     clear_data_cache()
     return len(team_rows), len(match_rows)
+
+
+def elo_team_rows(required: bool = False) -> dict[int, dict]:
+    ratings_path = ELO_BOT_DIR / "elo_rankings_linked.csv"
+    form_path = ELO_BOT_DIR / "last10_games.csv"
+    if not ratings_path.exists() or not form_path.exists():
+        if required:
+            raise FileNotFoundError(
+                f"Missing Elo CSV files. Expected {ratings_path} and {form_path}."
+            )
+        return {}
+
+    ratings_df = pd.read_csv(ratings_path)
+    form_df = pd.read_csv(form_path)
+    form_df["elo_attack"] = (form_df["GF"] / 10 + form_df["xG"]) / 2
+    form_df["elo_defence"] = (form_df["GA"] / 10 + form_df["xGA"]) / 2
+
+    cols = ["external_id", "elo_attack", "elo_defence"]
+    merged = pd.merge(ratings_df, form_df[cols], on="external_id", how="left")
+
+    rows = {}
+    for row in merged.to_dict("records"):
+        if pd.isna(row.get("external_id")) or pd.isna(row.get("elo_rating")):
+            continue
+        external_id = int(row["external_id"])
+        rows[external_id] = {
+            "elo_rating": int(row["elo_rating"]),
+            "elo_source": "eloratings.net",
+            "elo_source_date": None,
+            "elo_attack": None if pd.isna(row.get("elo_attack")) else float(row["elo_attack"]),
+            "elo_defence": None if pd.isna(row.get("elo_defence")) else float(row["elo_defence"]),
+        }
+    return rows
+
+
+@timed_function("admin.import_elo_team_data")
+def import_elo_team_data() -> int:
+    rows_by_external_id = elo_team_rows(required=True)
+    updated = 0
+    timestamp = iso_dt(now_utc())
+
+    for external_id, row in rows_by_external_id.items():
+        payload = dict(row)
+        payload["updated_at"] = timestamp
+        result = (
+            db()
+            .table("teams")
+            .update(payload)
+            .eq("external_id", external_id)
+            .execute()
+            .data
+            or []
+        )
+        if result:
+            updated += len(result)
+
+    if updated:
+        clear_data_cache()
+    return updated
 
 
 def prediction_count_for_match(match_id: str) -> int:
@@ -188,12 +288,194 @@ def choose_advance(match: dict, pred_a: int, pred_b: int) -> str | None:
     return random.choice([match["team_a"], match["team_b"]])
 
 
-def bot_prediction_for_match(bot_type: str, match: dict, human_predictions: list[dict]) -> tuple[int, int, str | None]:
+def stable_rng(*parts) -> random.Random:
+    seed = "|".join(str(part) for part in parts)
+    digest = hashlib.sha256(seed.encode("utf-8")).hexdigest()
+    return random.Random(int(digest[:16], 16))
+
+
+def poisson_rvs(expected_goals: float, rng: random.Random) -> int:
+    return int(poisson.rvs(expected_goals, random_state=rng.randrange(0, 2**32 - 1)))
+
+
+def elo_rating_for_match(team: dict, match: dict) -> int | None:
+    rating = team.get("elo_rating")
+    if rating is None:
+        return None
+    adjusted = int(rating)
+    if team.get("fifa_code") == HOST_COUNTRY_BY_CITY.get(match.get("city")):
+        adjusted += ELO_HOME_ADVANTAGE
+    return adjusted
+
+
+def elo_result_probabilities(win_expectancy: float) -> tuple[float, float, float]:
+    draw = min(ELO_DRAW_PROBABILITY, 2 * win_expectancy, 2 * (1 - win_expectancy))
+    win_a = max(0.0, win_expectancy - draw / 2)
+    win_b = max(0.0, 1 - win_expectancy - draw / 2)
+    total = win_a + draw + win_b
+    return win_a / total, draw / total, win_b / total
+
+
+def sample_elo_result(win_expectancy: float, rng: random.Random) -> str:
+    win_a, draw, _win_b = elo_result_probabilities(win_expectancy)
+    roll = rng.random()
+    if roll < win_a:
+        return "A"
+    if roll < win_a + draw:
+        return "D"
+    return "B"
+
+
+def poisson_expectancy(lambda_a: float, lambda_b: float) -> float:
+    scores = range(ELO_EXPECTANCY_MAX_SCORE + 1)
+    probs_a = [poisson.pmf(score, lambda_a) for score in scores]
+    probs_b = [poisson.pmf(score, lambda_b) for score in scores]
+    total = 0.0
+    win_a = 0.0
+    draw = 0.0
+
+    for score_a, prob_a in enumerate(probs_a):
+        for score_b, prob_b in enumerate(probs_b):
+            p_score = prob_a * prob_b
+            total += p_score
+            if score_a > score_b:
+                win_a += p_score
+            elif score_a == score_b:
+                draw += p_score
+
+    if total <= 0:
+        return 0.5
+    return (win_a + 0.5 * draw) / total
+
+
+def form_lambdas(team_a: dict, team_b: dict) -> tuple[float, float] | None:
+    if team_a.get("elo_attack") is None or team_a.get("elo_defence") is None:
+        return None
+    if team_b.get("elo_attack") is None or team_b.get("elo_defence") is None:
+        return None
+    lambda_a = max(
+        ELO_LAMBDA_FLOOR,
+        (float(team_a["elo_attack"]) + float(team_b["elo_defence"])) / 2,
+    )
+    lambda_b = max(
+        ELO_LAMBDA_FLOOR,
+        (float(team_b["elo_attack"]) + float(team_a["elo_defence"])) / 2,
+    )
+    return lambda_a, lambda_b
+
+
+def elo_lambdas(elo_a: int, elo_b: int) -> tuple[float, float]:
+    goal_shift = (elo_a - elo_b) / ELO_GOAL_DIFF_FACTOR / 2
+    base_lambda = ELO_BASE_TOTAL_GOALS / 2
+    return (
+        max(ELO_LAMBDA_FLOOR, base_lambda + goal_shift),
+        max(ELO_LAMBDA_FLOOR, base_lambda - goal_shift),
+    )
+
+
+def blended_lambdas(elo_a: int, elo_b: int, team_a: dict, team_b: dict) -> tuple[float, float] | None:
+    form = form_lambdas(team_a, team_b)
+    elo = elo_lambdas(elo_a, elo_b)
+    if form is None:
+        return elo
+
+    lambda_a = (elo[0] * (1 - ELO_SCORELINE_FORM_WEIGHT)) + (form[0] * ELO_SCORELINE_FORM_WEIGHT)
+    lambda_b = (elo[1] * (1 - ELO_SCORELINE_FORM_WEIGHT)) + (form[1] * ELO_SCORELINE_FORM_WEIGHT)
+    return max(ELO_LAMBDA_FLOOR, lambda_a), max(ELO_LAMBDA_FLOOR, lambda_b)
+
+
+def blended_win_expectancy(elo_a: int, elo_b: int, team_a: dict, team_b: dict) -> float | None:
+    elo_expectancy = 1 / (1 + 10 ** (-(elo_a - elo_b) / 400))
+    form = form_lambdas(team_a, team_b)
+    if form is None:
+        return elo_expectancy
+
+    form_expectancy = poisson_expectancy(form[0], form[1])
+    return (elo_expectancy * (1 - ELO_RESULT_FORM_WEIGHT)) + (form_expectancy * ELO_RESULT_FORM_WEIGHT)
+
+
+def scoreline_matches_result(pred_a: int, pred_b: int, result: str) -> bool:
+    if result == "A":
+        return pred_a > pred_b
+    if result == "B":
+        return pred_b > pred_a
+    return pred_a == pred_b
+
+
+def fallback_scoreline_for_result(lambda_a: float, lambda_b: float, result: str) -> tuple[int, int]:
+    pred_a = max(0, int(round(lambda_a)))
+    pred_b = max(0, int(round(lambda_b)))
+    if result == "A":
+        return max(pred_a, pred_b + 1), pred_b
+    if result == "B":
+        return pred_a, max(pred_b, pred_a + 1)
+    draw_score = max(0, int(round((lambda_a + lambda_b) / 2)))
+    return draw_score, draw_score
+
+
+def sample_scoreline_for_result(lambda_a: float, lambda_b: float, result: str, rng: random.Random) -> tuple[int, int]:
+    for _attempt in range(ELO_MAX_SCORELINE_ATTEMPTS):
+        pred_a = poisson_rvs(lambda_a, rng)
+        pred_b = poisson_rvs(lambda_b, rng)
+        if scoreline_matches_result(pred_a, pred_b, result):
+            return pred_a, pred_b
+    return fallback_scoreline_for_result(lambda_a, lambda_b, result)
+
+
+def elo_prediction_for_match(match: dict, teams_by_name: dict[str, dict]) -> tuple[int, int, str | None]:
+    rng = stable_rng(
+        "elo",
+        match.get("match_number") or match.get("id"),
+        match.get("team_a_code"),
+        match.get("team_b_code"),
+        RNG_SEED,
+    )
+    team_a = teams_by_name.get(match.get("team_a") or "")
+    team_b = teams_by_name.get(match.get("team_b") or "")
+    if not team_a or not team_b:
+        pred_a, pred_b = ELO_DEFAULT_SCORELINE
+        advance = None
+        if match.get("is_knockout"):
+            advance = match.get("team_a") if rng.random() < 0.5 else match.get("team_b")
+        return pred_a, pred_b, advance
+
+    elo_a = elo_rating_for_match(team_a, match)
+    elo_b = elo_rating_for_match(team_b, match)
+    has_elo = elo_a is not None and elo_b is not None
+    lambdas = blended_lambdas(elo_a, elo_b, team_a, team_b) if has_elo else None
+    win_expectancy = blended_win_expectancy(elo_a, elo_b, team_a, team_b) if has_elo else None
+    if elo_a is None or elo_b is None or lambdas is None:
+        pred_a, pred_b = ELO_DEFAULT_SCORELINE
+        advance = None
+        if match.get("is_knockout"):
+            advance = match.get("team_a") if rng.random() < 0.5 else match.get("team_b")
+        return pred_a, pred_b, advance
+
+    if win_expectancy is None:
+        win_expectancy = 1 / (1 + 10 ** (-(elo_a - elo_b) / 400))
+    result = sample_elo_result(win_expectancy, rng)
+    pred_a, pred_b = sample_scoreline_for_result(lambdas[0], lambdas[1], result, rng)
+
+    if match.get("is_knockout") and pred_a == pred_b:
+        advance = match.get("team_a") if rng.random() < win_expectancy else match.get("team_b")
+    else:
+        advance = choose_advance(match, pred_a, pred_b)
+    return pred_a, pred_b, advance
+
+
+def bot_prediction_for_match(
+    bot_type: str,
+    match: dict,
+    human_predictions: list[dict],
+    teams_by_name: dict[str, dict] | None = None,
+) -> tuple[int, int, str | None]:
     if bot_type == "random":
         pred_a = random.choice(SCORE_POOL)
         pred_b = random.choice(SCORE_POOL)
     elif bot_type == "one_one":
         pred_a = pred_b = 1
+    elif bot_type == "elo":
+        return elo_prediction_for_match(match, teams_by_name or {})
     else:
         if human_predictions:
             pred_a = int(round(median([int(p["pred_team_a_score"]) for p in human_predictions])))
@@ -219,6 +501,7 @@ def generate_bot_predictions(bot_type: str | None = None, only_match_id: str | N
     if only_match_id:
         matches = [m for m in matches if m["id"] == only_match_id]
     settings = load_settings()
+    teams_by_name = team_lookup(load_teams())
     all_predictions = load_predictions()
     existing = prediction_lookup(all_predictions)
     generated = 0
@@ -232,7 +515,12 @@ def generate_bot_predictions(bot_type: str | None = None, only_match_id: str | N
             human_predictions = [
                 p for p in all_predictions if p["match_id"] == match["id"] and p["player_id"] in humans
             ]
-            pred_a, pred_b, advance = bot_prediction_for_match(bot["bot_type"], match, human_predictions)
+            pred_a, pred_b, advance = bot_prediction_for_match(
+                bot["bot_type"],
+                match,
+                human_predictions,
+                teams_by_name,
+            )
             db().table("predictions").insert(
                 {
                     "player_id": bot["id"],
@@ -251,8 +539,9 @@ def generate_bot_predictions(bot_type: str | None = None, only_match_id: str | N
 @timed_function("admin.generate_bot_winner_picks")
 def generate_bot_winner_picks() -> int:
     ensure_default_bots()
-    teams = [t["name"] for t in load_teams()]
-    if not teams:
+    teams = load_teams()
+    team_names = [t["name"] for t in teams]
+    if not team_names:
         return 0
     players = load_players()
     bots = [p for p in players if p.get("is_bot")]
@@ -266,8 +555,15 @@ def generate_bot_winner_picks() -> int:
             continue
         if bot.get("bot_type") == "median" and human_picks:
             team = Counter(human_picks).most_common(1)[0][0]
+        elif bot.get("bot_type") == "elo":
+            rated_teams = [t for t in teams if t.get("elo_rating") is not None]
+            team = (
+                max(rated_teams, key=lambda t: int(t["elo_rating"]))["name"]
+                if rated_teams
+                else random.choice(team_names)
+            )
         else:
-            team = random.choice(teams)
+            team = random.choice(team_names)
         db().table("winner_picks").insert({"player_id": bot["id"], "team": team}).execute()
         generated += 1
     if generated:
