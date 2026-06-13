@@ -1197,6 +1197,308 @@ def match_centre_prediction_rows(
     return panel_html + groups_html
 
 
+def inject_match_centre_styles() -> None:
+    st.markdown(
+        """
+        <style>
+        div[data-testid="stSegmentedControl"] button[aria-pressed="true"] {
+            color: #1e3a8a;
+            background: #eff6ff;
+            border-color: #93c5fd;
+        }
+        div[data-testid="stSegmentedControl"] button[aria-pressed="true"] * {
+            color: #1e3a8a;
+        }
+        .tr-centre-body {
+            display: block;
+        }
+        .tr-compare-panel {
+            display: grid;
+            grid-template-columns: minmax(0, 1.25fr) minmax(18rem, 0.75fr);
+            gap: 0.7rem;
+            align-items: stretch;
+        }
+        .tr-compare-your {
+            border: 1px solid #6366f1;
+            border-radius: 8px;
+            background: #eef2ff;
+            padding: 0.65rem;
+            min-width: 0;
+        }
+        .tr-compare-label {
+            color: #312e81;
+            font-size: 0.72rem;
+            font-weight: 850;
+            line-height: 1.15;
+            margin-bottom: 0.35rem;
+            text-transform: uppercase;
+        }
+        .tr-compare-note {
+            color: #3730a3;
+            font-size: 0.82rem;
+            font-weight: 700;
+            line-height: 1.3;
+            margin-top: 0.45rem;
+        }
+        .tr-compare-stats {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.45rem;
+            min-width: 0;
+        }
+        .tr-compare-stat {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #ffffff;
+            padding: 0.55rem 0.6rem;
+            min-width: 0;
+        }
+        .tr-compare-stat strong {
+            display: block;
+            color: #111827;
+            font-size: 1.05rem;
+            font-weight: 900;
+            line-height: 1.1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .tr-compare-stat span {
+            display: block;
+            color: #64748b;
+            font-size: 0.72rem;
+            font-weight: 800;
+            line-height: 1.15;
+            margin-top: 0.18rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .tr-compare-stat-muted strong {
+            color: #475569;
+        }
+        .tr-compare-groups {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.65rem;
+            margin-top: 0.75rem;
+        }
+        .tr-compare-section {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #ffffff;
+            overflow: hidden;
+            min-width: 0;
+        }
+        .tr-compare-section-exact {
+            border-color: #86efac;
+            box-shadow: inset 4px 0 0 #16a34a;
+        }
+        .tr-compare-section-exact .tr-compare-section-title {
+            background: #f0fdf4;
+            color: #166534;
+            border-bottom-color: #bbf7d0;
+        }
+        .tr-compare-section-goal-diff {
+            border-color: #67e8f9;
+            box-shadow: inset 4px 0 0 #0891b2;
+        }
+        .tr-compare-section-goal-diff .tr-compare-section-title {
+            background: #ecfeff;
+            color: #155e75;
+            border-bottom-color: #a5f3fc;
+        }
+        .tr-compare-section-result,
+        .tr-compare-section-advancement {
+            border-color: #bfdbfe;
+            box-shadow: inset 4px 0 0 #2563eb;
+        }
+        .tr-compare-section-result .tr-compare-section-title,
+        .tr-compare-section-advancement .tr-compare-section-title {
+            background: #eff6ff;
+            color: #1e3a8a;
+            border-bottom-color: #dbeafe;
+        }
+        .tr-compare-section-wrong {
+            border-color: #e5e7eb;
+            box-shadow: inset 4px 0 0 #94a3b8;
+        }
+        .tr-compare-section-wrong .tr-compare-section-title {
+            background: #f8fafc;
+            color: #475569;
+        }
+        .tr-compare-section-no-tip {
+            border-color: #e5e7eb;
+            border-style: dashed;
+            box-shadow: inset 4px 0 0 #cbd5e1;
+        }
+        .tr-compare-section-no-tip .tr-compare-section-title {
+            background: #f9fafb;
+            color: #64748b;
+        }
+        .tr-compare-section-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.6rem;
+            border-bottom: 1px solid #eef2f7;
+            background: #f8fafc;
+            color: #334155;
+            padding: 0.5rem 0.6rem;
+            font-size: 0.78rem;
+            font-weight: 900;
+            line-height: 1.2;
+        }
+        .tr-compare-section-title span {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .tr-compare-section-title strong {
+            color: #111827;
+            font-size: 0.9rem;
+            line-height: 1;
+        }
+        .tr-compare-section-exact .tr-compare-section-title strong {
+            color: #15803d;
+        }
+        .tr-compare-section-goal-diff .tr-compare-section-title strong {
+            color: #0e7490;
+        }
+        .tr-compare-section-result .tr-compare-section-title strong,
+        .tr-compare-section-advancement .tr-compare-section-title strong {
+            color: #1d4ed8;
+        }
+        .tr-compare-section-wrong .tr-compare-section-title strong,
+        .tr-compare-section-no-tip .tr-compare-section-title strong {
+            color: #64748b;
+        }
+        .tr-compare-group-row {
+            display: grid;
+            grid-template-columns: minmax(4.5rem, auto) minmax(0, 1fr);
+            gap: 0.55rem;
+            align-items: center;
+            padding: 0.52rem 0.6rem;
+            border-top: 1px solid #f3f4f6;
+        }
+        .tr-compare-group-row:first-of-type {
+            border-top: 0;
+        }
+        .tr-compare-group-main {
+            min-width: 0;
+        }
+        .tr-compare-group-main strong {
+            display: block;
+            color: #111827;
+            font-size: 0.95rem;
+            font-weight: 950;
+            line-height: 1.1;
+            white-space: nowrap;
+        }
+        .tr-compare-group-main span {
+            display: block;
+            color: #64748b;
+            font-size: 0.7rem;
+            font-weight: 800;
+            line-height: 1.2;
+            margin-top: 0.12rem;
+            white-space: nowrap;
+        }
+        .tr-compare-group-players {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 0.25rem;
+            min-width: 0;
+        }
+        .tr-compare-player,
+        .tr-compare-empty-chip {
+            display: inline-flex;
+            align-items: center;
+            max-width: 100%;
+            border: 1px solid #e5e7eb;
+            border-radius: 999px;
+            background: #ffffff;
+            color: #111827;
+            padding: 0.18rem 0.45rem;
+            font-size: 0.76rem;
+            font-weight: 850;
+            line-height: 1.15;
+        }
+        .tr-compare-player-you {
+            background: #dbeafe;
+            border-color: #93c5fd;
+            color: #1e3a8a;
+        }
+        .tr-compare-player-you::after {
+            content: "You";
+            margin-left: 0.32rem;
+            color: #1d4ed8;
+            font-size: 0.62rem;
+            font-weight: 950;
+            text-transform: uppercase;
+        }
+        .tr-compare-player-bot {
+            background: #f0f9ff;
+            border-color: #bae6fd;
+            color: #0369a1;
+        }
+        .tr-compare-empty,
+        .tr-compare-empty-chip {
+            color: #64748b;
+        }
+        .tr-compare-your .tr-centre-pick-preview {
+            background: #ffffff;
+            border-color: #cbd5e1;
+            box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
+        }
+        .tr-compare-your .tr-centre-pick-preview span {
+            color: #64748b;
+        }
+        .tr-compare-your .tr-centre-pick-preview strong {
+            color: #0f172a;
+        }
+        @media (max-width: 900px) {
+            .tr-compare-panel,
+            .tr-compare-groups {
+                grid-template-columns: 1fr;
+            }
+            .tr-compare-stats {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+            }
+        }
+        @media (max-width: 640px) {
+            .tr-compare-panel,
+            .tr-compare-groups,
+            .tr-compare-stats {
+                grid-template-columns: 1fr;
+            }
+            .tr-compare-group-row {
+                grid-template-columns: 1fr;
+                gap: 0.4rem;
+            }
+            .tr-compare-group-players {
+                justify-content: flex-start;
+            }
+            .tr-compare-stat {
+                display: grid;
+                grid-template-columns: auto minmax(0, 1fr);
+                align-items: baseline;
+                gap: 0.45rem;
+                padding: 0.48rem 0.55rem;
+            }
+            .tr-compare-stat strong,
+            .tr-compare-stat span {
+                margin-top: 0;
+            }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def match_centre_scoreline(match: dict, status: str) -> str:
     if not has_teams(match):
         return f'<div class="tr-centre-empty">{escape(matchup_label(match))}</div>'
@@ -1217,6 +1519,7 @@ def match_centre_scoreline(match: dict, status: str) -> str:
 
 def match_centre_page() -> None:
     player_id = st.session_state.player_id
+    inject_match_centre_styles()
     with timed("page.match_centre.header"):
         st.title("Match Centre")
         filter_choice = st.segmented_control(
