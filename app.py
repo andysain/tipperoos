@@ -837,13 +837,6 @@ def match_centre_player_chips(players: list[dict], current_player_id: str) -> st
     return "".join(match_centre_player_chip(player, current_player_id) for player in sorted_players)
 
 
-def match_centre_stat(label: str, value: str | int, stat_class: str = "") -> str:
-    classes = ["tr-compare-stat"]
-    if stat_class:
-        classes.append(stat_class)
-    return f'<div class="{" ".join(classes)}"><strong>{escape(str(value))}</strong><span>{escape(label)}</span></div>'
-
-
 def match_centre_pick_status(label: str, status_class: str) -> str:
     return f'<div class="tr-centre-pick-status tr-centre-pick-{status_class}">{escape(label)}</div>'
 
@@ -906,34 +899,27 @@ def match_centre_your_panel(
 
     if status == "Open":
         if current_prediction:
-            compare_text = f"Other tips unlock at kickoff. {plural(max(submitted_count - 1, 0), 'other')} submitted."
+            compare_text = f"Other tips unlock at kickoff. {submitted_count} submitted · {missing_count} still to tip."
         else:
-            compare_text = "Add your tip before kickoff to compare with everyone else."
-        stats_html = (
-            match_centre_stat("Submitted", submitted_count)
-            + match_centre_stat("No tip yet", missing_count)
-            + match_centre_stat("Unlocks", "Kickoff", "tr-compare-stat-muted")
-        )
+            compare_text = f"Add your tip before kickoff. {submitted_count} submitted · {missing_count} still to tip."
     elif status == "Locked" and current_prediction:
         score_tuple = match_centre_score_tuple(current_prediction)
         same_score_count = int(summary["scoreline_counts"].get(score_tuple, 0))
         same_outcome_count = int(summary["outcome_counts"].get(match_centre_outcome_key(current_prediction), 0))
         score_text = "Only you picked this score." if same_score_count == 1 else f"You were one of {same_score_count} on this score."
-        compare_text = f"{score_text} {plural(same_outcome_count, 'player')} picked the same result."
-        stats_html = (
-            match_centre_stat(match_centre_outcome_label(match, "team_a"), summary["outcome_counts"]["team_a"])
-            + match_centre_stat("Draw", summary["outcome_counts"]["draw"])
-            + match_centre_stat(match_centre_outcome_label(match, "team_b"), summary["outcome_counts"]["team_b"])
-            + match_centre_stat("Most picked", summary["most_picked"])
+        outcome_text = (
+            f'{match_centre_outcome_label(match, "team_a")} {summary["outcome_counts"]["team_a"]} · '
+            f'Draw {summary["outcome_counts"]["draw"]} · '
+            f'{match_centre_outcome_label(match, "team_b")} {summary["outcome_counts"]["team_b"]}'
         )
+        compare_text = f"{score_text} {plural(same_outcome_count, 'player')} picked the same result. {outcome_text}. Most picked: {summary['most_picked']}."
     elif status == "Locked":
-        compare_text = "You did not tip this match. Everyone else's tips are now visible."
-        stats_html = (
-            match_centre_stat(match_centre_outcome_label(match, "team_a"), summary["outcome_counts"]["team_a"])
-            + match_centre_stat("Draw", summary["outcome_counts"]["draw"])
-            + match_centre_stat(match_centre_outcome_label(match, "team_b"), summary["outcome_counts"]["team_b"])
-            + match_centre_stat("Most picked", summary["most_picked"])
+        outcome_text = (
+            f'{match_centre_outcome_label(match, "team_a")} {summary["outcome_counts"]["team_a"]} · '
+            f'Draw {summary["outcome_counts"]["draw"]} · '
+            f'{match_centre_outcome_label(match, "team_b")} {summary["outcome_counts"]["team_b"]}'
         )
+        compare_text = f"You did not tip this match. Everyone else's tips are visible. {outcome_text}. Most picked: {summary['most_picked']}."
     elif completed and current_prediction:
         details = score_prediction_details(match, current_prediction)
         points = int(details["total_points"])
@@ -941,25 +927,11 @@ def match_centre_your_panel(
         for player_id in players:
             player_scores.append(int(score_prediction_details(match, predictions_by_player.get(player_id))["total_points"]))
         better_count = len([score for score in player_scores if score > points])
+        top_score = max(player_scores) if player_scores else 0
         if better_count:
-            compare_text = f"You scored {points} pts. {plural(better_count, 'player')} scored more."
+            compare_text = f"You scored {points} pts. Top score was {top_score}. {plural(better_count, 'player')} scored more."
         else:
             compare_text = f"You scored {points} pts. That was the top score for this match."
-        exact_count = len(
-            [
-                prediction
-                for prediction in predictions_by_player.values()
-                if score_prediction_details(match, prediction).get("tier") == "Exact"
-            ]
-        )
-        top_score = max(player_scores) if player_scores else 0
-        avg_score = round(sum(player_scores) / len(player_scores), 1) if player_scores else 0
-        stats_html = (
-            match_centre_stat("Your points", points)
-            + match_centre_stat("Top score", top_score)
-            + match_centre_stat("Exact tips", exact_count)
-            + match_centre_stat("Average", avg_score)
-        )
     else:
         player_scores = [
             int(score_prediction_details(match, predictions_by_player.get(player_id))["total_points"])
@@ -967,12 +939,6 @@ def match_centre_your_panel(
         ]
         top_score = max(player_scores) if player_scores else 0
         compare_text = f"You did not tip this match. Top score was {top_score} pts."
-        stats_html = (
-            match_centre_stat("Your points", 0)
-            + match_centre_stat("Top score", top_score)
-            + match_centre_stat("Submitted", submitted_count)
-            + match_centre_stat("No tip", missing_count)
-        )
 
     return (
         '<div class="tr-compare-panel">'
@@ -981,7 +947,6 @@ def match_centre_your_panel(
         f"{pick_html}"
         f'<div class="tr-compare-note">{escape(compare_text)}</div>'
         "</div>"
-        f'<div class="tr-compare-stats">{stats_html}</div>'
         "</div>"
     )
 
@@ -1213,10 +1178,7 @@ def inject_match_centre_styles() -> None:
             display: block;
         }
         .tr-compare-panel {
-            display: grid;
-            grid-template-columns: minmax(0, 1.25fr) minmax(18rem, 0.75fr);
-            gap: 0.7rem;
-            align-items: stretch;
+            display: block;
         }
         .tr-compare-your {
             border: 1px solid #6366f1;
@@ -1239,43 +1201,6 @@ def inject_match_centre_styles() -> None:
             font-weight: 700;
             line-height: 1.3;
             margin-top: 0.45rem;
-        }
-        .tr-compare-stats {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 0.45rem;
-            min-width: 0;
-        }
-        .tr-compare-stat {
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            background: #ffffff;
-            padding: 0.55rem 0.6rem;
-            min-width: 0;
-        }
-        .tr-compare-stat strong {
-            display: block;
-            color: #111827;
-            font-size: 1.05rem;
-            font-weight: 900;
-            line-height: 1.1;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        .tr-compare-stat span {
-            display: block;
-            color: #64748b;
-            font-size: 0.72rem;
-            font-weight: 800;
-            line-height: 1.15;
-            margin-top: 0.18rem;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        .tr-compare-stat-muted strong {
-            color: #475569;
         }
         .tr-compare-groups {
             display: grid;
@@ -1460,18 +1385,12 @@ def inject_match_centre_styles() -> None:
             color: #0f172a;
         }
         @media (max-width: 900px) {
-            .tr-compare-panel,
             .tr-compare-groups {
                 grid-template-columns: 1fr;
             }
-            .tr-compare-stats {
-                grid-template-columns: repeat(4, minmax(0, 1fr));
-            }
         }
         @media (max-width: 640px) {
-            .tr-compare-panel,
-            .tr-compare-groups,
-            .tr-compare-stats {
+            .tr-compare-groups {
                 grid-template-columns: 1fr;
             }
             .tr-compare-group-row {
@@ -1480,17 +1399,6 @@ def inject_match_centre_styles() -> None:
             }
             .tr-compare-group-players {
                 justify-content: flex-start;
-            }
-            .tr-compare-stat {
-                display: grid;
-                grid-template-columns: auto minmax(0, 1fr);
-                align-items: baseline;
-                gap: 0.45rem;
-                padding: 0.48rem 0.55rem;
-            }
-            .tr-compare-stat strong,
-            .tr-compare-stat span {
-                margin-top: 0;
             }
         }
         </style>

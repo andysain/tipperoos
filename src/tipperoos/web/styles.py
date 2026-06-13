@@ -589,10 +589,7 @@ def inject_styles() -> None:
             display: block;
         }
         .tr-compare-panel {
-            display: grid;
-            grid-template-columns: minmax(0, 1.25fr) minmax(18rem, 0.75fr);
-            gap: 0.7rem;
-            align-items: stretch;
+            display: block;
         }
         .tr-compare-your {
             border: 1px solid var(--tr-personal-border);
@@ -615,43 +612,6 @@ def inject_styles() -> None:
             font-weight: 700;
             line-height: 1.3;
             margin-top: 0.45rem;
-        }
-        .tr-compare-stats {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 0.45rem;
-            min-width: 0;
-        }
-        .tr-compare-stat {
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            background: #ffffff;
-            padding: 0.55rem 0.6rem;
-            min-width: 0;
-        }
-        .tr-compare-stat strong {
-            display: block;
-            color: #111827;
-            font-size: 1.05rem;
-            font-weight: 900;
-            line-height: 1.1;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        .tr-compare-stat span {
-            display: block;
-            color: #64748b;
-            font-size: 0.72rem;
-            font-weight: 800;
-            line-height: 1.15;
-            margin-top: 0.18rem;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        .tr-compare-stat-muted strong {
-            color: #475569;
         }
         .tr-compare-groups {
             display: grid;
@@ -907,12 +867,8 @@ def inject_styles() -> None:
             padding: 0.35rem 0 0.15rem;
         }
         @media (max-width: 900px) {
-            .tr-compare-panel,
             .tr-compare-groups {
                 grid-template-columns: 1fr;
-            }
-            .tr-compare-stats {
-                grid-template-columns: repeat(4, minmax(0, 1fr));
             }
         }
         @media (max-width: 640px) {
@@ -1022,9 +978,7 @@ def inject_styles() -> None:
             .tr-centre-card {
                 padding: 0.85rem;
             }
-            .tr-compare-panel,
-            .tr-compare-groups,
-            .tr-compare-stats {
+            .tr-compare-groups {
                 grid-template-columns: 1fr;
             }
             .tr-compare-group-row {
@@ -1033,17 +987,6 @@ def inject_styles() -> None:
             }
             .tr-compare-group-players {
                 justify-content: flex-start;
-            }
-            .tr-compare-stat {
-                display: grid;
-                grid-template-columns: auto minmax(0, 1fr);
-                align-items: baseline;
-                gap: 0.45rem;
-                padding: 0.48rem 0.55rem;
-            }
-            .tr-compare-stat strong,
-            .tr-compare-stat span {
-                margin-top: 0;
             }
         }
         </style>
