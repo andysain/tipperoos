@@ -73,8 +73,8 @@ from tipperoos.services.admin_ops import (
     build_result_updates_from_table,
     generate_bot_predictions,
     generate_bot_winner_picks,
-    import_elo_team_data,
     import_archive_fixture_csvs,
+    import_elo_team_data,
     result_editor_rows,
     save_result,
 )
@@ -711,15 +711,26 @@ def leaderboard_page() -> None:
     matches = load_matches()
     completed_count = len([match for match in matches if match.get("status") == "completed"])
     current_player_id = st.session_state.get("player_id")
-    current_rows = df[df["Player ID"] == current_player_id]
-    top_score = int(df.iloc[0]["Total points"])
+    leaderboard_view_key = "leaderboard_view"
+    if leaderboard_view_key not in st.session_state:
+        st.session_state[leaderboard_view_key] = "Include bots"
+    leaderboard_view = st.session_state[leaderboard_view_key]
+    show_bots = leaderboard_view == "Include bots"
+    visible_df = df if show_bots else df[(~df["Bot"]) | (df["Player ID"] == current_player_id)].copy()
+    if visible_df.empty:
+        st.info("No leaderboard rows to show.")
+        return
+    visible_df = visible_df.copy()
+    visible_df["Rank"] = visible_df["Total points"].rank(method="min", ascending=False).astype(int)
+    current_rows = visible_df[visible_df["Player ID"] == current_player_id]
+    top_score = int(visible_df.iloc[0]["Total points"])
     if current_rows.empty:
         current_rank = "-"
         current_score = 0
     else:
         current_rank_value = int(current_rows.iloc[0]["Rank"])
         current_score = int(current_rows.iloc[0]["Total points"])
-        current_tied = len(df[df["Total points"] == current_score]) > 1
+        current_tied = len(visible_df[visible_df["Total points"] == current_score]) > 1
         current_rank = leaderboard_rank_label(current_rank_value, current_tied)
 
     leaderboard_stats = [
@@ -737,13 +748,27 @@ def leaderboard_page() -> None:
         + "</div>",
         unsafe_allow_html=True,
     )
-
-    if completed_count == 0:
-        st.info("The leaderboard will start moving once the first result is entered. Everyone is tied for now.")
+    
     st.caption("Match points come from exact scores, correct goal differences, and correct results. Winner bonuses are shown separately.")
 
+    if hasattr(st, "segmented_control"):
+        leaderboard_view = st.segmented_control(
+            "Leaderboard view",
+            ["Players only", "Include bots"],
+            key=leaderboard_view_key,
+        )
+    else:
+        leaderboard_view = st.radio(
+            "Leaderboard view",
+            ["Players only", "Include bots"],
+            index=0 if st.session_state[leaderboard_view_key] == "Players only" else 1,
+            horizontal=True,
+            key=leaderboard_view_key,
+        )
+    if completed_count == 0:
+        st.info("The leaderboard will start moving once the first result is entered. Everyone is tied for now.")
 
-    for row in df.to_dict("records"):
+    for row in visible_df.to_dict("records"):
         is_current = row["Player ID"] == current_player_id
         classes = ["tr-leader-row"]
         if row["Bot"]:
@@ -758,7 +783,7 @@ def leaderboard_page() -> None:
         rank_classes = ["tr-leader-rank"]
         if medal:
             rank_classes.append(f"tr-leader-rank-{medal.lower()}")
-        tied = len(df[df["Total points"] == row["Total points"]]) > 1
+        tied = len(visible_df[visible_df["Total points"] == row["Total points"]]) > 1
         rank_display = leaderboard_rank_label(rank, tied)
         rank_html = f'<div class="{" ".join(rank_classes)}">{rank_display}</div>'
         name = escape(leaderboard_player_name(row))
@@ -783,7 +808,7 @@ def leaderboard_page() -> None:
     progress_df = cumulative_human_scores()
     if not progress_df.empty:
         st.subheader("Score progression")
-        render_score_progression_chart(progress_df, df, current_player_id)
+        render_score_progression_chart(progress_df, visible_df, current_player_id)
 
 
 def render_score_progression_chart(progress_df: pd.DataFrame, leaderboard_df: pd.DataFrame, current_player_id: str | None) -> None:
