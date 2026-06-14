@@ -1146,6 +1146,8 @@ def match_centre_open_groups(
             bot_rows.append(match_centre_group_row(match_centre_score_label(prediction), [player], current_player_id, "Bot pick"))
         elif prediction:
             submitted_hidden.append(player)
+        elif player.get("is_bot") and player.get("bot_type") == "median":
+            continue
         else:
             missing.append(player)
 
