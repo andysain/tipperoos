@@ -110,8 +110,8 @@ def inject_styles() -> None:
         }
         .tr-summary-stat span {
             color: var(--tr-muted);
-            font-size: 0.82rem;
-            font-weight: 750;
+            font-size: 0.78rem;
+            font-weight: 650;
             line-height: 1.2;
         }
         .tr-summary-stat strong {
@@ -447,12 +447,12 @@ def inject_styles() -> None:
             box-shadow: 0 1px 2px rgba(17, 24, 39, 0.04);
         }
         .tr-leader-row-current {
-            border-color: #ff9f9f;
-            background: #fff7f7;
+            border-color: #93c5fd;
+            background: #eff6ff;
         }
         .tr-leader-row-bot {
             background: #f8fafc;
-            border-style: dashed;
+            border-color: #dbeafe;
             color: #475569;
         }
         .tr-leader-row-zero .tr-leader-total strong {
@@ -517,9 +517,9 @@ def inject_styles() -> None:
             border: 1px solid #bae6fd;
         }
         .tr-leader-you {
-            background: #fee2e2;
-            color: #b91c1c;
-            border: 1px solid #fecaca;
+            background: #dbeafe;
+            color: #1e3a8a;
+            border: 1px solid #93c5fd;
         }
         .tr-leader-stat,
         .tr-leader-total {
