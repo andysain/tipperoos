@@ -1320,6 +1320,21 @@ def inject_match_centre_styles() -> None:
         .tr-centre-body {
             display: block;
         }
+        .tr-admin-result-note {
+            color: #475569;
+            font-size: 0.86rem;
+            font-weight: 650;
+            line-height: 1.35;
+            margin: -0.15rem 0 0.65rem;
+        }
+        div[data-testid="stExpander"]:has(.tr-admin-result-note) {
+            border-color: #cbd5e1;
+            margin: 0.65rem 0 0.75rem;
+            background: #f8fafc;
+        }
+        div[data-testid="stExpander"]:has(.tr-admin-result-note) summary {
+            font-weight: 800;
+        }
         .tr-compare-panel {
             display: block;
         }
@@ -1568,6 +1583,89 @@ def match_centre_scoreline(match: dict, status: str) -> str:
     )
 
 
+def match_centre_admin_result_editor(match: dict, match_status_label: str) -> None:
+    if not st.session_state.get("is_admin"):
+        return
+
+    if match_status_label not in ("Locked", "Completed"):
+        return
+
+    if not has_teams(match):
+        with st.expander("Admin · Result"):
+            st.info("Set both teams before entering a result.")
+        return
+
+    match_id = match["id"]
+    result_exists = match.get("team_a_score") is not None and match.get("team_b_score") is not None
+    title = "Admin · Correct result" if result_exists else "Admin · Set result"
+    with st.expander(title, expanded=False):
+        st.markdown(
+            '<div class="tr-admin-result-note">'
+            "Enter the official score. Locked matches default to completed; use status only for rare exceptions."
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        current_status = match.get("status") or "scheduled"
+        if match_status_label == "Locked" and current_status in ("scheduled", "completed"):
+            default_status = "completed"
+        else:
+            default_status = current_status
+        status_options = ["completed", "postponed", "cancelled", "scheduled"]
+
+        current_a = 0 if match.get("team_a_score") is None else int(match["team_a_score"])
+        current_b = 0 if match.get("team_b_score") is None else int(match["team_b_score"])
+        team_a_label = team_display(match["team_a"], match.get("team_a_icon") or flag_for_code(match.get("team_a_code")))
+        team_b_label = team_display(match["team_b"], match.get("team_b_icon") or flag_for_code(match.get("team_b_code")))
+
+        score_cols = st.columns(2)
+        with score_cols[0]:
+            score_a = score_picker(team_a_label, current_a, f"admin_result_a_{match_id}", False)
+        with score_cols[1]:
+            score_b = score_picker(team_b_label, current_b, f"admin_result_b_{match_id}", False)
+
+        st.markdown(
+            '<div class="tr-scoreline-preview tr-scoreline-completed">'
+            f'<span>{escape(team_a_label)}</span><strong>{int(score_a)} - {int(score_b)}</strong><span>{escape(team_b_label)}</span>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+        status = st.segmented_control(
+            "Result status",
+            status_options,
+            default=default_status if default_status in status_options else "completed",
+            key=f"mc_result_status_{match_id}",
+            help="Leave as completed for normal score entry.",
+        ) or default_status
+
+        advance_team = None
+        if match.get("is_knockout") and status == "completed":
+            options = [match["team_a"], match["team_b"]]
+            existing = match.get("advance_team")
+            if score_a > score_b:
+                advance_team = match["team_a"]
+                st.caption(f"Advances: {team_display(match['team_a'], match.get('team_a_icon'))}")
+            elif score_b > score_a:
+                advance_team = match["team_b"]
+                st.caption(f"Advances: {team_display(match['team_b'], match.get('team_b_icon'))}")
+            else:
+                advance_team = st.selectbox(
+                    "If level, who advanced?",
+                    options,
+                    index=options.index(existing) if existing in options else 0,
+                    key=f"mc_result_adv_{match_id}",
+                )
+
+        submitted = st.button("Save result", type="primary", use_container_width=True, key=f"mc_result_save_{match_id}")
+        if submitted:
+            try:
+                save_result(match, int(score_a), int(score_b), advance_team, status)
+                st.success("Result saved.")
+                st.rerun()
+            except Exception as exc:
+                st.error(str(exc))
+
+
 def match_centre_page() -> None:
     player_id = st.session_state.player_id
     inject_match_centre_styles()
@@ -1618,18 +1716,19 @@ def match_centre_page() -> None:
 
             rendered += 1
             scoreline_html = match_centre_scoreline(match, match_view.status)
-            st.markdown(
-                '<div class="tr-centre-card">'
-                '<div class="tr-centre-head">'
-                '<div>'
-                f'<div class="tr-centre-meta">{status_badge(match_view.status, compact=True)} <span>{escape(match_time_summary(match))}</span></div>'
-                f'{scoreline_html}'
-                '</div>'
-                '</div>'
-                f'{body_html}'
-                '</div>',
-                unsafe_allow_html=True,
-            )
+            with st.container(border=True):
+                st.markdown(
+                    '<div class="tr-centre-head">'
+                    '<div>'
+                    f'<div class="tr-centre-meta">{status_badge(match_view.status, compact=True)} <span>{escape(match_time_summary(match))}</span></div>'
+                    f'{scoreline_html}'
+                    '</div>'
+                    '</div>',
+                    unsafe_allow_html=True,
+                )
+                match_centre_admin_result_editor(match, match_view.status)
+                if body_html:
+                    st.markdown(body_html, unsafe_allow_html=True)
 
         if rendered == 0:
             st.info("No matches in this view.")
