@@ -36,6 +36,7 @@ from tipperoos.core.domain import (
     status_badge,
     team_display,
     team_format_from_lookup,
+    uses_advancement_pick,
 )
 from tipperoos.core.scoring import (
     score_prediction_details,
@@ -517,6 +518,82 @@ def score_picker(label: str, current_score: int, key: str, disabled: bool) -> in
     return int(selected if selected is not None else current_score)
 
 
+def match_team_options(match: dict) -> list[str]:
+    return [match["team_a"], match["team_b"]]
+
+
+def match_team_label(match: dict, team: str | None) -> str:
+    if team == match.get("team_a"):
+        return team_display(match.get("team_a"), match.get("team_a_icon") or flag_for_code(match.get("team_a_code")))
+    if team == match.get("team_b"):
+        return team_display(match.get("team_b"), match.get("team_b_icon") or flag_for_code(match.get("team_b_code")))
+    return str(team or "-")
+
+
+def derived_advance_team(match: dict, score_a: int, score_b: int) -> str | None:
+    if not uses_advancement_pick(match):
+        return None
+    if score_a > score_b:
+        return match.get("team_a")
+    if score_b > score_a:
+        return match.get("team_b")
+    return None
+
+
+def advancement_segment(
+    match: dict,
+    score_a: int,
+    score_b: int,
+    existing_advance_team: str | None,
+    key: str,
+    disabled: bool = False,
+) -> str | None:
+    if not uses_advancement_pick(match):
+        return None
+
+    auto_advance = derived_advance_team(match, score_a, score_b)
+    if auto_advance:
+        st.caption(f"Advances: {match_team_label(match, auto_advance)}")
+        return auto_advance
+
+    options = match_team_options(match)
+    option_labels = {team: match_team_label(match, team) for team in options}
+    default = existing_advance_team if existing_advance_team in options else None
+    if hasattr(st, "segmented_control"):
+        selected = st.segmented_control(
+            "Advances",
+            options,
+            default=default,
+            format_func=lambda team: option_labels.get(team, team),
+            key=key,
+            disabled=disabled,
+        )
+    else:
+        selected = st.radio(
+            "Advances",
+            options,
+            index=options.index(default) if default in options else None,
+            format_func=lambda team: option_labels.get(team, team),
+            horizontal=True,
+            key=key,
+            disabled=disabled,
+        )
+    return selected
+
+
+def advancement_pick_missing(match: dict, score_a: int, score_b: int, advance_team: str | None) -> bool:
+    return uses_advancement_pick(match) and score_a == score_b and not advance_team
+
+
+def advancement_meta(match: dict, prediction: dict | None) -> str | None:
+    if not prediction or not uses_advancement_pick(match):
+        return None
+    advance_team = prediction.get("pred_advance_team")
+    if not advance_team:
+        return None
+    return f"Advances {match_team_label(match, advance_team)}"
+
+
 def time_remaining_label(delta: timedelta) -> str:
     total_minutes = max(0, int(delta.total_seconds() // 60))
     days, remainder = divmod(total_minutes, 60 * 24)
@@ -572,10 +649,9 @@ def prediction_form(match: dict, prediction: dict | None, status: str, disabled:
 
     existing_advance_team = prediction.get("pred_advance_team") if prediction else None
     advance_team = existing_advance_team
-    if match.get("is_knockout"):
-        options = [match["team_a"], match["team_b"]]
-        index = options.index(advance_team) if advance_team in options else 0
-        advance_team = st.selectbox("If level, who advances?", options, index=index, key=f"adv_{key}", disabled=disabled)
+    if uses_advancement_pick(match):
+        advance_team = advancement_segment(match, int(pred_a), int(pred_b), existing_advance_team, f"adv_{key}", disabled)
+    missing_advance_pick = advancement_pick_missing(match, int(pred_a), int(pred_b), advance_team)
 
     if disabled:
         return
@@ -583,7 +659,7 @@ def prediction_form(match: dict, prediction: dict | None, status: str, disabled:
     prediction_changed = bool(prediction) and (
         pred_a != existing_a
         or pred_b != existing_b
-        or (bool(match.get("is_knockout")) and advance_team != existing_advance_team)
+        or (uses_advancement_pick(match) and advance_team != existing_advance_team)
     )
     button_label = "Update prediction" if prediction_changed else "Prediction saved" if prediction else "Save prediction"
     button_type = "secondary" if prediction else "primary"
@@ -595,11 +671,13 @@ def prediction_form(match: dict, prediction: dict | None, status: str, disabled:
         )
     submitted = st.button(
         button_label,
-        disabled=disabled or (bool(prediction) and not prediction_changed),
+        disabled=disabled or missing_advance_pick or (bool(prediction) and not prediction_changed),
         type=button_type,
         use_container_width=True,
         key=f"save_{key}",
     )
+    if missing_advance_pick:
+        st.caption("Choose who advances to save this prediction.")
 
     if submitted:
         try:
@@ -749,7 +827,18 @@ def leaderboard_page() -> None:
         unsafe_allow_html=True,
     )
     
-    st.caption("Match points come from exact scores, correct goal differences, and correct results. Winner bonuses are shown separately.")
+    show_advancement = int(visible_df["Advancement"].sum()) > 0
+    show_winner_bonus = int(visible_df["Winner bonus"].sum()) > 0
+    show_match_stat = show_advancement or show_winner_bonus
+    bonus_column_count = int(show_advancement) + int(show_winner_bonus)
+
+    if show_match_stat:
+        st.caption(
+            "Match points come from exact scores, correct goal differences, and correct results. "
+            "Bonuses are shown separately once they start contributing."
+        )
+    else:
+        st.caption("Match points come from exact scores, correct goal differences, and correct results.")
 
     if hasattr(st, "segmented_control"):
         leaderboard_view = st.segmented_control(
@@ -771,6 +860,8 @@ def leaderboard_page() -> None:
     for row in visible_df.to_dict("records"):
         is_current = row["Player ID"] == current_player_id
         classes = ["tr-leader-row"]
+        if bonus_column_count:
+            classes.append(f"tr-leader-row-bonus-{bonus_column_count}")
         if row["Bot"]:
             classes.append("tr-leader-row-bot")
         if is_current:
@@ -789,16 +880,33 @@ def leaderboard_page() -> None:
         name = escape(leaderboard_player_name(row))
         bot_badge = '<span class="tr-leader-bot">Bot</span>' if row["Bot"] else ""
         you_badge = '<span class="tr-leader-you">You</span>' if is_current else ""
+        breakdown_parts = []
+        if int(row["Exact"]):
+            breakdown_parts.append(f'Exact {int(row["Exact"])}')
+        if int(row["Goal diff"]):
+            breakdown_parts.append(f'Goal diff {int(row["Goal diff"])}')
+        if int(row["Result"]):
+            breakdown_parts.append(f'Result {int(row["Result"])}')
+        if show_advancement and int(row["Advancement"]):
+            breakdown_parts.append(f'Advance {int(row["Advancement"])}')
+        if show_winner_bonus and int(row["Winner bonus"]):
+            breakdown_parts.append(f'Winner {int(row["Winner bonus"])}')
+        breakdown = escape(" · ".join(breakdown_parts) if breakdown_parts else "No points yet")
+        stats_html = ""
+        if show_match_stat:
+            stats_html += f'<div class="tr-leader-stat"><strong>{int(row["Score points"])}</strong><span>Match</span></div>'
+        if show_advancement:
+            stats_html += f'<div class="tr-leader-stat"><strong>{int(row["Advancement"])}</strong><span>Advance</span></div>'
+        if show_winner_bonus:
+            stats_html += f'<div class="tr-leader-stat"><strong>{int(row["Winner bonus"])}</strong><span>Winner</span></div>'
         html = (
             f'<div class="{" ".join(classes)}">'
             f"{rank_html}"
             '<div class="tr-leader-player">'
             f'<div class="tr-leader-name">{name} {bot_badge} {you_badge}</div>'
-            f'<div class="tr-leader-breakdown">Exact {int(row["Exact"])} · '
-            f'Goal diff {int(row["Goal diff"])} · Result {int(row["Result"])}</div>'
+            f'<div class="tr-leader-breakdown">{breakdown}</div>'
             "</div>"
-            f'<div class="tr-leader-stat"><strong>{int(row["Score points"])}</strong><span>Match</span></div>'
-            f'<div class="tr-leader-stat"><strong>{int(row["Winner bonus"])}</strong><span>Winner</span></div>'
+            f"{stats_html}"
             f'<div class="tr-leader-total"><strong>{int(row["Total points"])}</strong><span>Total</span></div>'
             "</div>"
         )
@@ -982,14 +1090,16 @@ def match_centre_pick_status(label: str, status_class: str) -> str:
     return f'<div class="tr-centre-pick-status tr-centre-pick-{status_class}">{escape(label)}</div>'
 
 
-def match_centre_pick_preview(match: dict, centre_label: str, preview_status: str) -> str:
+def match_centre_pick_preview(match: dict, centre_label: str, preview_status: str, meta: str | None = None) -> str:
     if not has_teams(match):
         return f'<div class="tr-centre-pick-status tr-centre-pick-waiting">{escape(matchup_label(match))}</div>'
     team_a_label = team_display(match["team_a"], match.get("team_a_icon") or flag_for_code(match.get("team_a_code")))
     team_b_label = team_display(match["team_b"], match.get("team_b_icon") or flag_for_code(match.get("team_b_code")))
+    meta_html = f'<div class="tr-centre-pick-advance">{escape(meta)}</div>' if meta else ""
     return (
         f'<div class="tr-centre-pick-preview tr-scoreline-{preview_status}">'
         f'<span>{escape(team_a_label)}</span><strong>{escape(centre_label)}</strong><span>{escape(team_b_label)}</span>'
+        f"{meta_html}"
         "</div>"
     )
 
@@ -1034,7 +1144,12 @@ def match_centre_your_panel(
 
     if current_prediction:
         preview_status = "completed" if completed else "locked" if status == "Locked" else "saved"
-        pick_html = match_centre_pick_preview(match, match_centre_score_label(current_prediction), preview_status)
+        pick_html = match_centre_pick_preview(
+            match,
+            match_centre_score_label(current_prediction),
+            preview_status,
+            advancement_meta(match, current_prediction),
+        )
     else:
         pick_html = match_centre_pick_status("No tip yet" if status == "Open" else "No tip", "waiting")
 
@@ -1156,6 +1271,7 @@ def match_centre_result_sort_key(key: tuple[int, str]) -> tuple[int, int, str]:
 
 
 def match_centre_open_groups(
+    match: dict,
     predictions_by_player: dict[str, dict],
     players: dict[str, dict],
     current_player_id: str,
@@ -1168,7 +1284,15 @@ def match_centre_open_groups(
         if player["id"] == current_player_id:
             continue
         if prediction and player.get("is_bot"):
-            bot_rows.append(match_centre_group_row(match_centre_score_label(prediction), [player], current_player_id, "Bot pick"))
+            bot_meta = advancement_meta(match, prediction)
+            bot_rows.append(
+                match_centre_group_row(
+                    match_centre_score_label(prediction),
+                    [player],
+                    current_player_id,
+                    bot_meta or "Bot pick",
+                )
+            )
         elif prediction:
             submitted_hidden.append(player)
         elif player.get("is_bot") and player.get("bot_type") == "median":
@@ -1204,7 +1328,7 @@ def match_centre_locked_groups(
     players: dict[str, dict],
     current_player_id: str,
 ) -> str:
-    players_by_scoreline: dict[str, dict[tuple[int, int], list[dict]]] = {
+    players_by_scoreline: dict[str, dict[tuple[tuple[int, int], str | None], list[dict]]] = {
         "team_a": defaultdict(list),
         "draw": defaultdict(list),
         "team_b": defaultdict(list),
@@ -1215,15 +1339,20 @@ def match_centre_locked_groups(
         if not prediction:
             missing.append(player)
             continue
-        players_by_scoreline[match_centre_outcome_key(prediction)][match_centre_score_tuple(prediction)].append(player)
+        key = (match_centre_score_tuple(prediction), prediction.get("pred_advance_team"))
+        players_by_scoreline[match_centre_outcome_key(prediction)][key].append(player)
 
     sections = []
     for outcome_key in ("team_a", "draw", "team_b"):
         scoreline_groups = players_by_scoreline[outcome_key]
         rows = []
         total = sum(len(group_players) for group_players in scoreline_groups.values())
-        for scoreline, group_players in sorted(scoreline_groups.items(), key=lambda item: (-len(item[1]), item[0])):
-            rows.append(match_centre_group_row(f"{scoreline[0]} - {scoreline[1]}", group_players, current_player_id))
+        for (scoreline, advance_team), group_players in sorted(
+            scoreline_groups.items(),
+            key=lambda item: (-len(item[1]), item[0][0], str(item[0][1] or "")),
+        ):
+            meta = f"Advances {match_team_label(match, advance_team)}" if advance_team else None
+            rows.append(match_centre_group_row(f"{scoreline[0]} - {scoreline[1]}", group_players, current_player_id, meta))
         if total:
             sections.append(match_centre_section(match_centre_outcome_label(match, outcome_key), total, rows))
     if missing:
@@ -1239,26 +1368,34 @@ def match_centre_completed_groups(
     players: dict[str, dict],
     current_player_id: str,
 ) -> str:
-    grouped: dict[tuple[int, str, tuple[int, int] | None], list[dict]] = defaultdict(list)
+    grouped: dict[tuple[int, str, tuple[int, int] | None, str | None], list[dict]] = defaultdict(list)
     for player in players.values():
         prediction = predictions_by_player.get(player["id"])
         if not prediction:
-            grouped[(0, "No tip", None)].append(player)
+            grouped[(0, "No tip", None, None)].append(player)
             continue
         details = score_prediction_details(match, prediction)
-        grouped[(int(details["total_points"]), score_reason(details), match_centre_score_tuple(prediction))].append(player)
+        grouped[
+            (
+                int(details["total_points"]),
+                score_reason(details),
+                match_centre_score_tuple(prediction),
+                prediction.get("pred_advance_team"),
+            )
+        ].append(player)
 
     sections_by_result: dict[tuple[int, str], list[str]] = defaultdict(list)
     section_counts: dict[tuple[int, str], int] = defaultdict(int)
     section_classes: dict[tuple[int, str], str] = {}
-    for (points, reason, scoreline), group_players in sorted(
+    for (points, reason, scoreline, advance_team), group_players in sorted(
         grouped.items(),
-        key=lambda item: (-item[0][0], str(item[0][1]), item[0][2] or (99, 99)),
+        key=lambda item: (-item[0][0], str(item[0][1]), item[0][2] or (99, 99), str(item[0][3] or "")),
     ):
         title = f"{reason} · {points} pts" if reason != "No tip" else "No tip · 0 pts"
         section_key = (points, title)
         label = "No tip" if scoreline is None else f"{scoreline[0]} - {scoreline[1]}"
-        sections_by_result[section_key].append(match_centre_group_row(label, group_players, current_player_id))
+        meta = f"Advances {match_team_label(match, advance_team)}" if advance_team else None
+        sections_by_result[section_key].append(match_centre_group_row(label, group_players, current_player_id, meta))
         section_counts[section_key] += len(group_players)
         section_classes[section_key] = match_centre_result_section_class(points, reason)
 
@@ -1297,7 +1434,7 @@ def match_centre_prediction_rows(
         completed,
     )
     if status == "Open":
-        groups_html = match_centre_open_groups(predictions_by_player, players, current_player_id)
+        groups_html = match_centre_open_groups(match, predictions_by_player, players, current_player_id)
     elif completed:
         groups_html = match_centre_completed_groups(match, predictions_by_player, players, current_player_id)
     else:
@@ -1542,6 +1679,17 @@ def inject_match_centre_styles() -> None:
         .tr-compare-your .tr-centre-pick-preview strong {
             color: #0f172a;
         }
+        .tr-centre-pick-advance {
+            grid-column: 1 / -1;
+            color: #1e3a8a;
+            font-size: 0.72rem;
+            font-weight: 850;
+            line-height: 1.2;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
         @media (max-width: 900px) {
             .tr-compare-groups {
                 grid-template-columns: 1fr;
@@ -1639,24 +1787,30 @@ def match_centre_admin_result_editor(match: dict, match_status_label: str) -> No
         ) or default_status
 
         advance_team = None
-        if match.get("is_knockout") and status == "completed":
-            options = [match["team_a"], match["team_b"]]
-            existing = match.get("advance_team")
-            if score_a > score_b:
-                advance_team = match["team_a"]
-                st.caption(f"Advances: {team_display(match['team_a'], match.get('team_a_icon'))}")
-            elif score_b > score_a:
-                advance_team = match["team_b"]
-                st.caption(f"Advances: {team_display(match['team_b'], match.get('team_b_icon'))}")
-            else:
-                advance_team = st.selectbox(
-                    "If level, who advanced?",
-                    options,
-                    index=options.index(existing) if existing in options else 0,
-                    key=f"mc_result_adv_{match_id}",
-                )
+        if status == "completed":
+            advance_team = advancement_segment(
+                match,
+                int(score_a),
+                int(score_b),
+                match.get("advance_team"),
+                f"mc_result_adv_{match_id}",
+            )
+        missing_advance_pick = status == "completed" and advancement_pick_missing(
+            match,
+            int(score_a),
+            int(score_b),
+            advance_team,
+        )
 
-        submitted = st.button("Save result", type="primary", use_container_width=True, key=f"mc_result_save_{match_id}")
+        submitted = st.button(
+            "Save result",
+            type="primary",
+            use_container_width=True,
+            key=f"mc_result_save_{match_id}",
+            disabled=missing_advance_pick,
+        )
+        if missing_advance_pick:
+            st.caption("Choose who advances to save this result.")
         if submitted:
             try:
                 save_result(match, int(score_a), int(score_b), advance_team, status)
@@ -1758,10 +1912,10 @@ def rules_page() -> None:
                 ]
             ),
             section_title("Bonuses"),
-            note("Knockout scoring is still under review and will be finalised before the knockout rounds kick off."),
+            note("Advancement points only apply to knockout matches."),
             points_grid(
                 [
-                    ("Correct knockout advancement", "+2"),
+                    ("Correct knockout advancement", "+1"),
                     ("Correct overall winner", "+10"),
                 ]
             ),
@@ -1791,8 +1945,9 @@ def rules_page() -> None:
             section_title("Knockout matches"),
             panel(
                 "Pick who progresses",
-                "If you predict a draw in a knockout match, choose who progresses. Advancement points are "
-                "added separately from score points.",
+                "For knockout matches, the score is after all playing time: 90 minutes if there is no extra time, "
+                "or 120 minutes if extra time is played. Penalty shootout goals do not count. Pick the team "
+                "that advances for a +1 bonus.",
             ),
             muted("Bots are computer players for fun and appear on the leaderboard."),
         ]
@@ -2049,11 +2204,23 @@ def result_admin() -> None:
                 index=["scheduled", "completed", "cancelled", "postponed"].index(match.get("status") or "scheduled"),
             )
             advance_team = None
-            if match.get("is_knockout"):
-                options = [match["team_a"], match["team_b"]]
-                existing = match.get("advance_team")
-                advance_team = st.selectbox("Team advanced", options, index=options.index(existing) if existing in options else 0)
-            submitted = st.form_submit_button("Save result")
+            if status == "completed":
+                advance_team = advancement_segment(
+                    match,
+                    int(score_a),
+                    int(score_b),
+                    match.get("advance_team"),
+                    f"admin_result_adv_{match['id']}",
+                )
+            missing_advance_pick = status == "completed" and advancement_pick_missing(
+                match,
+                int(score_a),
+                int(score_b),
+                advance_team,
+            )
+            submitted = st.form_submit_button("Save result", disabled=missing_advance_pick)
+            if missing_advance_pick:
+                st.caption("Choose who advances to save this result.")
         if submitted:
             try:
                 save_result(match, int(score_a), int(score_b), advance_team, status)

@@ -15,6 +15,7 @@ from tipperoos.core.domain import (
     matchup_label,
     prediction_lookup,
     team_lookup,
+    uses_advancement_pick,
     winner_lookup,
 )
 from tipperoos.core.rules import is_match_locked
@@ -279,7 +280,7 @@ def propagate_knockout_matchups() -> int:
 
 
 def choose_advance(match: dict, pred_a: int, pred_b: int) -> str | None:
-    if not match.get("is_knockout"):
+    if not uses_advancement_pick(match):
         return None
     if pred_a > pred_b:
         return match.get("team_a")
@@ -574,7 +575,7 @@ def generate_bot_winner_picks() -> int:
 @timed_function("admin.save_result")
 def save_result(match: dict, score_a: int, score_b: int, advance_team: str | None, status: str) -> None:
     if status == "completed":
-        if match.get("is_knockout") and not advance_team:
+        if uses_advancement_pick(match) and not advance_team:
             raise ValueError("Choose who advanced.")
         result_updated_at = iso_dt(now_utc())
     else:
@@ -637,7 +638,7 @@ def parse_score_value(value, label: str) -> int:
 
 
 def resolve_advance_value(value, match: dict, score_a: int, score_b: int) -> str | None:
-    if not match.get("is_knockout"):
+    if not uses_advancement_pick(match):
         return None
     options = [match.get("team_a"), match.get("team_b")]
     if score_a > score_b:

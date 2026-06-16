@@ -436,7 +436,7 @@ def inject_styles() -> None:
         }
         .tr-leader-row {
             display: grid;
-            grid-template-columns: 4rem minmax(0, 1fr) 5.5rem 5.5rem 6rem;
+            grid-template-columns: 4rem minmax(0, 1fr) 6rem;
             align-items: center;
             gap: 0.65rem;
             border: 1px solid #e5e7eb;
@@ -445,6 +445,12 @@ def inject_styles() -> None:
             margin: 0.5rem 0;
             background: #ffffff;
             box-shadow: 0 1px 2px rgba(17, 24, 39, 0.04);
+        }
+        .tr-leader-row-bonus-1 {
+            grid-template-columns: 4rem minmax(0, 1fr) 5.3rem 5.3rem 6rem;
+        }
+        .tr-leader-row-bonus-2 {
+            grid-template-columns: 4rem minmax(0, 1fr) 5.3rem 5.3rem 5.3rem 6rem;
         }
         .tr-leader-row-current {
             border-color: #93c5fd;
@@ -815,6 +821,17 @@ def inject_styles() -> None:
             font-weight: 900;
             line-height: 1;
             white-space: nowrap;
+        }
+        .tr-centre-pick-advance {
+            grid-column: 1 / -1;
+            color: #1e3a8a;
+            font-size: 0.72rem;
+            font-weight: 850;
+            line-height: 1.2;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .tr-compare-your .tr-centre-pick-preview {
             background: #ffffff;

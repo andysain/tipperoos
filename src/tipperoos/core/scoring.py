@@ -48,7 +48,7 @@ def score_prediction_details(match: dict, prediction: dict | None) -> dict:
 
     advancement_points = 0
     if match.get("is_knockout") and prediction.get("pred_advance_team") == match.get("advance_team"):
-        advancement_points = 2
+        advancement_points = 1
     return {
         "score_points": score_points,
         "advancement_points": advancement_points,

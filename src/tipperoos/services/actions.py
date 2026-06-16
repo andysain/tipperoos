@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from tipperoos.core.domain import has_teams
+from tipperoos.core.domain import has_teams, uses_advancement_pick
 from tipperoos.core.rules import can_edit_winner_pick, is_match_locked
 from tipperoos.core.timing import timed
 from tipperoos.data.store import clear_data_cache, db, get_match, load_settings
@@ -32,13 +32,13 @@ def save_prediction(player_id: str, match_id: str, pred_a: int, pred_b: int, adv
         if pred_a < 0 or pred_b < 0:
             raise ValueError("Scores must be zero or higher.")
 
-        if match.get("is_knockout"):
+        if uses_advancement_pick(match):
             if pred_a > pred_b:
                 advance_team = match["team_a"]
             elif pred_b > pred_a:
                 advance_team = match["team_b"]
             elif not advance_team:
-                raise ValueError("Choose who advances for a drawn knockout score.")
+                raise ValueError("Choose who advances for a drawn score.")
         else:
             advance_team = None
 

@@ -42,6 +42,10 @@ def has_teams(match: dict) -> bool:
     return bool(match.get("team_a") and match.get("team_b"))
 
 
+def uses_advancement_pick(match: dict) -> bool:
+    return bool(match.get("is_knockout"))
+
+
 def team_display(name: str | None, icon: str | None = None) -> str:
     if not name:
         return "TBC"
@@ -88,7 +92,10 @@ def match_time_summary(match: dict) -> str:
 def prediction_summary(prediction: dict | None) -> str:
     if not prediction:
         return ""
-    return f"Your pick: {prediction['pred_team_a_score']}-{prediction['pred_team_b_score']}"
+    summary = f"Your pick: {prediction['pred_team_a_score']}-{prediction['pred_team_b_score']}"
+    if prediction.get("pred_advance_team"):
+        summary = f"{summary} · advances {prediction['pred_advance_team']}"
+    return summary
 
 
 def prediction_scoreline(prediction: dict | None) -> str:
