@@ -103,6 +103,8 @@ from tipperoos.services.views.predictions_view import (
 )
 from tipperoos.web.styles import inject_styles
 from tipperoos.web.ui import (
+    bot_panel,
+    bot_panel_grid,
     example_card,
     example_grid,
     muted,
@@ -1949,7 +1951,28 @@ def rules_page() -> None:
                 "or 120 minutes if extra time is played. Penalty shootout goals do not count. Pick the team "
                 "that advances for a +1 bonus.",
             ),
+            section_title("Bots"),
             muted("Bots are computer players for fun and appear on the leaderboard."),
+            bot_panel_grid(
+                [
+                    bot_panel(
+                        "Random Bot",
+                        "Picks each match score randomly; for tied knockout matches, it randomly picks who advances. Tournament winner is randomly selected.",
+                    ),
+                    bot_panel(
+                        "Median Bot",
+                        "Takes the median human score prediction for that fixture. For tied knockouts and tournament winner, it follows the most common human pick when available.",
+                    ),
+                    bot_panel(
+                        "1-1 Bot",
+                        "Predicts 1-1 for every match; for tied knockout matches, it randomly picks who advances. Tournament winner is randomly selected.",
+                    ),
+                    bot_panel(
+                        "Elo Bot",
+                        "Uses team Elo ratings plus recent attacking and defensive form to estimate each result, scoreline, and knockout advancer. For tournament winner, it picks the highest-rated team available.",
+                    ),
+                ]
+            ),
         ]
     )
     st.markdown(html, unsafe_allow_html=True)

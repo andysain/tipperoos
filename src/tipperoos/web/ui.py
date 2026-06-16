@@ -12,6 +12,19 @@ def panel(title: str, body: str) -> str:
     )
 
 
+def bot_panel(title: str, body: str) -> str:
+    return (
+        '<div class="tr-bot-rule-card">'
+        f'<div class="tr-bot-rule-title">{escape(title)}</div>'
+        f'<div class="tr-bot-rule-copy">{escape(body)}</div>'
+        "</div>"
+    )
+
+
+def bot_panel_grid(cards: list[str]) -> str:
+    return f'<div class="tr-bot-rule-grid">{"".join(cards)}</div>'
+
+
 def section_title(title: str, caption: str | None = None) -> str:
     caption_html = f'<div class="tr-muted">{escape(caption)}</div>' if caption else ""
     return f'<div class="tr-rule-section-title">{escape(title)}</div>{caption_html}'

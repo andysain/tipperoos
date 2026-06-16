@@ -434,6 +434,32 @@ def inject_styles() -> None:
             margin: 1rem 0;
             font-weight: 650;
         }
+        .tr-bot-rule-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.75rem;
+            margin: 0.75rem 0 1.25rem;
+        }
+        .tr-bot-rule-card {
+            border: 1px solid #bae6fd;
+            border-radius: 8px;
+            background: #f0f9ff;
+            color: #0369a1;
+            padding: 0.9rem 1rem;
+        }
+        .tr-bot-rule-title {
+            color: #075985;
+            font-size: 0.98rem;
+            font-weight: 900;
+            line-height: 1.2;
+            margin-bottom: 0.35rem;
+        }
+        .tr-bot-rule-copy {
+            color: #0369a1;
+            font-size: 0.9rem;
+            font-weight: 650;
+            line-height: 1.4;
+        }
         .tr-leader-row {
             display: grid;
             grid-template-columns: 4rem minmax(0, 1fr) 6rem;
@@ -978,7 +1004,8 @@ def inject_styles() -> None:
                 font-size: 1.45rem;
             }
             .tr-rule-grid,
-            .tr-example-grid {
+            .tr-example-grid,
+            .tr-bot-rule-grid {
                 grid-template-columns: 1fr;
             }
             .tr-leader-row {
