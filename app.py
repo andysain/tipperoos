@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 from html import escape
 from pathlib import Path
@@ -32,6 +32,7 @@ from tipperoos.core.domain import (
     match_time_summary,
     matchup_label,
     player_display_for_centre,
+    player_joined_after_match,
     score_reason,
     status_badge,
     team_display,
@@ -88,6 +89,10 @@ from tipperoos.services.players import (
     check_pin,
     create_player,
     ensure_default_bots,
+    reset_player_pin,
+    update_player_access,
+    update_player_identity,
+    update_player_late_join,
     unique_username,
 )
 from tipperoos.services.session_tokens import (
@@ -770,6 +775,10 @@ def my_predictions_page() -> None:
                     st.info("Teams are not set for this fixture yet.")
                     continue
 
+                if status == "Joined later":
+                    st.info("You joined after this match, so it is not counted as a missed tip.")
+                    continue
+
                 prediction_form(match, prediction, status, match_view.disabled)
 
         if rendered == 0:
@@ -831,6 +840,7 @@ def leaderboard_page() -> None:
     
     show_advancement = int(visible_df["Advancement"].sum()) > 0
     show_winner_bonus = int(visible_df["Winner bonus"].sum()) > 0
+    show_starting_points = "Starting points" in visible_df and int(visible_df["Starting points"].sum()) > 0
     show_match_stat = show_advancement or show_winner_bonus
     bonus_column_count = int(show_advancement) + int(show_winner_bonus)
 
@@ -893,6 +903,8 @@ def leaderboard_page() -> None:
             breakdown_parts.append(f'Advance {int(row["Advancement"])}')
         if show_winner_bonus and int(row["Winner bonus"]):
             breakdown_parts.append(f'Winner {int(row["Winner bonus"])}')
+        if show_starting_points and int(row.get("Starting points") or 0):
+            breakdown_parts.append(f'Starting +{int(row["Starting points"])}')
         breakdown = escape(" · ".join(breakdown_parts) if breakdown_parts else "No points yet")
         stats_html = ""
         if show_match_stat:
@@ -1112,7 +1124,16 @@ def match_centre_prediction_summary(
     players: dict[str, dict],
 ) -> dict:
     submitted_players = [player for player in players.values() if player["id"] in predictions_by_player]
-    missing_players = [player for player in players.values() if player["id"] not in predictions_by_player]
+    joined_later_players = [
+        player
+        for player in players.values()
+        if player["id"] not in predictions_by_player and player_joined_after_match(player, match)
+    ]
+    missing_players = [
+        player
+        for player in players.values()
+        if player["id"] not in predictions_by_player and not player_joined_after_match(player, match)
+    ]
     outcome_counts = {"team_a": 0, "draw": 0, "team_b": 0}
     scoreline_counts: dict[tuple[int, int], int] = defaultdict(int)
     for prediction in predictions_by_player.values():
@@ -1125,6 +1146,7 @@ def match_centre_prediction_summary(
     return {
         "submitted_players": submitted_players,
         "missing_players": missing_players,
+        "joined_later_players": joined_later_players,
         "outcome_counts": outcome_counts,
         "scoreline_counts": scoreline_counts,
         "most_picked": most_picked,
@@ -1254,7 +1276,7 @@ def match_centre_result_section_class(points: int, reason: str) -> str:
         return "tr-compare-section-goal-diff"
     if reason == "Correct result":
         return "tr-compare-section-result"
-    if reason == "No tip":
+    if reason in ("No tip", "Joined later"):
         return "tr-compare-section-no-tip"
     if points > 0:
         return "tr-compare-section-advancement"
@@ -1265,6 +1287,8 @@ def match_centre_result_sort_key(key: tuple[int, str]) -> tuple[int, int, str]:
     points, title = key
     if title.startswith("No tip"):
         bucket = 2
+    elif title.startswith("Joined later"):
+        bucket = 3
     elif points == 0:
         bucket = 1
     else:
@@ -1280,6 +1304,7 @@ def match_centre_open_groups(
 ) -> str:
     submitted_hidden = []
     missing = []
+    joined_later = []
     bot_rows = []
     for player in players.values():
         prediction = predictions_by_player.get(player["id"])
@@ -1297,6 +1322,8 @@ def match_centre_open_groups(
             )
         elif prediction:
             submitted_hidden.append(player)
+        elif player_joined_after_match(player, match):
+            joined_later.append(player)
         elif player.get("is_bot") and player.get("bot_type") == "median":
             continue
         else:
@@ -1321,6 +1348,15 @@ def match_centre_open_groups(
                 [match_centre_group_row("No tip yet", missing, current_player_id)],
             )
         )
+    if joined_later:
+        sections.append(
+            match_centre_section(
+                "Joined later",
+                len(joined_later),
+                [match_centre_group_row("Joined later", joined_later, current_player_id)],
+                "tr-compare-section-no-tip",
+            )
+        )
     return f'<div class="tr-compare-groups">{"".join(sections)}</div>' if sections else ""
 
 
@@ -1336,9 +1372,13 @@ def match_centre_locked_groups(
         "team_b": defaultdict(list),
     }
     missing = []
+    joined_later = []
     for player in players.values():
         prediction = predictions_by_player.get(player["id"])
         if not prediction:
+            if player_joined_after_match(player, match):
+                joined_later.append(player)
+                continue
             missing.append(player)
             continue
         key = (match_centre_score_tuple(prediction), prediction.get("pred_advance_team"))
@@ -1361,6 +1401,15 @@ def match_centre_locked_groups(
         sections.append(
             match_centre_section("No tip", len(missing), [match_centre_group_row("No tip", missing, current_player_id)])
         )
+    if joined_later:
+        sections.append(
+            match_centre_section(
+                "Joined later",
+                len(joined_later),
+                [match_centre_group_row("Joined later", joined_later, current_player_id)],
+                "tr-compare-section-no-tip",
+            )
+        )
     return f'<div class="tr-compare-groups">{"".join(sections)}</div>'
 
 
@@ -1374,6 +1423,9 @@ def match_centre_completed_groups(
     for player in players.values():
         prediction = predictions_by_player.get(player["id"])
         if not prediction:
+            if player_joined_after_match(player, match):
+                grouped[(0, "Joined later", None, None)].append(player)
+                continue
             grouped[(0, "No tip", None, None)].append(player)
             continue
         details = score_prediction_details(match, prediction)
@@ -1393,9 +1445,9 @@ def match_centre_completed_groups(
         grouped.items(),
         key=lambda item: (-item[0][0], str(item[0][1]), item[0][2] or (99, 99), str(item[0][3] or "")),
     ):
-        title = f"{reason} · {points} pts" if reason != "No tip" else "No tip · 0 pts"
+        title = f"{reason} · {points} pts" if reason not in ("No tip", "Joined later") else f"{reason} · 0 pts"
         section_key = (points, title)
-        label = "No tip" if scoreline is None else f"{scoreline[0]} - {scoreline[1]}"
+        label = reason if scoreline is None else f"{scoreline[0]} - {scoreline[1]}"
         meta = f"Advances {match_team_label(match, advance_team)}" if advance_team else None
         sections_by_result[section_key].append(match_centre_group_row(label, group_players, current_player_id, meta))
         section_counts[section_key] += len(group_players)
@@ -1978,6 +2030,159 @@ def rules_page() -> None:
     st.markdown(html, unsafe_allow_html=True)
 
 
+def player_management_admin() -> None:
+    st.subheader("Players")
+    players = load_players(include_inactive=True)
+    predictions = load_predictions()
+    winner_picks = load_winner_picks()
+    leaderboard = calculate_leaderboard()
+    leaderboard_by_id = (
+        {row["Player ID"]: row for row in leaderboard.to_dict("records")}
+        if not leaderboard.empty
+        else {}
+    )
+    prediction_counts = Counter(prediction["player_id"] for prediction in predictions)
+    winner_by_player = {pick["player_id"]: pick for pick in winner_picks}
+
+    show_players = st.segmented_control(
+        "Show",
+        ["Active humans", "All humans", "Inactive", "Bots"],
+        default="Active humans",
+    )
+    visible_players = []
+    for player in players:
+        is_bot = bool(player.get("is_bot"))
+        active = bool(player.get("active"))
+        if show_players == "Active humans" and (is_bot or not active):
+            continue
+        if show_players == "All humans" and is_bot:
+            continue
+        if show_players == "Inactive" and active:
+            continue
+        if show_players == "Bots" and not is_bot:
+            continue
+        visible_players.append(player)
+
+    rows = []
+    for player in visible_players:
+        board_row = leaderboard_by_id.get(player["id"], {})
+        rows.append(
+            {
+                "Player": f"{player.get('emoji') or ''} {player.get('display_name') or ''}".strip(),
+                "Username": player.get("username"),
+                "Active": bool(player.get("active")),
+                "Admin": bool(player.get("is_admin")),
+                "Bot": bool(player.get("is_bot")),
+                "Predictions": int(prediction_counts.get(player["id"], 0)),
+                "Winner pick": winner_by_player.get(player["id"], {}).get("team") or "",
+                "Starting match": player.get("late_join_match_number") or "",
+                "Starting points": int(player.get("starting_points") or 0),
+                "Total points": int(board_row.get("Total points") or 0),
+                "Inactive reason": player.get("inactive_reason") or "",
+            }
+        )
+
+    if rows:
+        st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+    else:
+        st.info("No players in this view.")
+
+    human_players = [p for p in players if not p.get("is_bot")]
+    if not human_players:
+        return
+
+    options = {
+        f"{'Inactive · ' if not p.get('active') else ''}{p.get('emoji') or ''} {p['display_name']} ({p['username']})".strip(): p
+        for p in human_players
+    }
+    selected_label = st.selectbox("Manage player", list(options.keys()))
+    player = options[selected_label]
+
+    with st.container(border=True):
+        st.markdown(f"**{player.get('emoji') or ''} {player['display_name']}**  \n`{player['username']}`")
+
+        access_tab, late_join_tab, identity_tab, pin_tab = st.tabs(
+            ["Access", "Late Join", "Identity", "Reset PIN"]
+        )
+
+        with access_tab:
+            with st.form(f"player_access_{player['id']}"):
+                active = st.toggle("Active", value=bool(player.get("active")))
+                inactive_reason = st.text_input(
+                    "Inactive reason",
+                    value=player.get("inactive_reason") or "",
+                    disabled=active,
+                    placeholder="Duplicate account",
+                )
+                submitted = st.form_submit_button("Save access")
+            if submitted:
+                try:
+                    update_player_access(player["id"], active, inactive_reason)
+                    st.success("Player access saved.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(str(exc))
+
+        with late_join_tab:
+            with st.form(f"player_late_join_{player['id']}"):
+                current_start = int(player.get("late_join_match_number") or 0)
+                late_join_match_number = st.number_input(
+                    "Starting match number",
+                    min_value=0,
+                    max_value=200,
+                    value=current_start,
+                    help="Use 0 if the player started from the beginning.",
+                )
+                starting_points = st.number_input(
+                    "Starting points",
+                    min_value=0,
+                    max_value=500,
+                    value=int(player.get("starting_points") or 0),
+                )
+                submitted = st.form_submit_button("Save late join settings")
+            if submitted:
+                try:
+                    update_player_late_join(
+                        player["id"],
+                        None if int(late_join_match_number) == 0 else int(late_join_match_number),
+                        int(starting_points),
+                    )
+                    st.success("Late join settings saved.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(str(exc))
+
+        with identity_tab:
+            with st.form(f"player_identity_{player['id']}"):
+                display_name = st.text_input("Display name", value=player.get("display_name") or "")
+                emoji = st.text_input("Emoji", value=player.get("emoji") or "", max_chars=8)
+                submitted = st.form_submit_button("Save identity")
+            if submitted:
+                try:
+                    update_player_identity(player["id"], display_name, emoji)
+                    st.success("Player identity saved.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error(str(exc))
+
+        with pin_tab:
+            with st.form(f"player_pin_{player['id']}"):
+                new_pin = pin_input("New PIN", f"player_reset_pin_{player['id']}")
+                confirm_pin = pin_input("Confirm new PIN", f"player_reset_pin_confirm_{player['id']}")
+                submitted = st.form_submit_button("Reset PIN")
+            if submitted:
+                if new_pin != confirm_pin:
+                    st.error("The PINs do not match.")
+                else:
+                    try:
+                        reset_player_pin(player["id"], new_pin)
+                        st.session_state[f"player_reset_pin_{player['id']}"] = ""
+                        st.session_state[f"player_reset_pin_confirm_{player['id']}"] = ""
+                        st.success("PIN reset.")
+                    except Exception as exc:
+                        st.error(str(exc))
+
+
 def settings_admin() -> None:
     settings = load_settings()
     teams = load_teams()
@@ -2307,11 +2512,13 @@ def standings_admin() -> None:
 
 def admin_page() -> None:
     st.title("Admin")
-    tab_setup, tab_settings, tab_import, tab_results, tab_r32, tab_bots, tab_standings, tab_backups = st.tabs(
-        ["Setup", "Settings", "Import", "Results", "Round of 32", "Bots", "Standings", "Backups"]
+    tab_setup, tab_players, tab_settings, tab_import, tab_results, tab_r32, tab_bots, tab_standings, tab_backups = st.tabs(
+        ["Setup", "Players", "Settings", "Import", "Results", "Round of 32", "Bots", "Standings", "Backups"]
     )
     with tab_setup:
         setup_status_page(app_setup_state())
+    with tab_players:
+        player_management_admin()
     with tab_settings:
         settings_admin()
     with tab_import:

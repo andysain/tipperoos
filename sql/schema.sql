@@ -11,6 +11,9 @@ create table if not exists players (
   is_bot boolean default false,
   bot_type text,
   active boolean default true,
+  inactive_reason text,
+  late_join_match_number integer,
+  starting_points integer default 0,
   created_at timestamptz default now(),
   updated_at timestamptz default now(),
   constraint valid_bot_type check (
@@ -42,6 +45,11 @@ alter table players
 add constraint valid_bot_type check (
   bot_type is null or bot_type in ('random', 'median', 'one_one', 'elo')
 );
+
+alter table players
+add column if not exists inactive_reason text,
+add column if not exists late_join_match_number integer,
+add column if not exists starting_points integer default 0;
 
 alter table teams
 add column if not exists elo_rating integer,

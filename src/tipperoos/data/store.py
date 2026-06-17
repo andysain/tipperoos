@@ -209,7 +209,7 @@ def get_player(player_id: str) -> dict | None:
     rows = execute(
         db()
         .table("players")
-        .select("id,username,display_name,emoji,is_admin,is_bot,bot_type,active")
+        .select("id,username,display_name,emoji,is_admin,is_bot,bot_type,active,inactive_reason,late_join_match_number,starting_points")
         .eq("id", player_id)
         .limit(1),
         "store.get_player",

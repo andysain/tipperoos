@@ -42,6 +42,19 @@ def has_teams(match: dict) -> bool:
     return bool(match.get("team_a") and match.get("team_b"))
 
 
+def player_joined_after_match(player: dict | None, match: dict) -> bool:
+    if not player:
+        return False
+    start = player.get("late_join_match_number")
+    match_number = match.get("match_number")
+    if start in (None, "") or match_number in (None, ""):
+        return False
+    try:
+        return int(match_number) < int(start)
+    except (TypeError, ValueError):
+        return False
+
+
 def uses_advancement_pick(match: dict) -> bool:
     return bool(match.get("is_knockout"))
 
@@ -67,6 +80,7 @@ def status_badge(status: str, compact: bool = False) -> str:
         "Saved": ("#eff6ff", "#1d4ed8", "#93c5fd"),
         "Locked": ("#f8fafc", "#64748b", "#cbd5e1"),
         "Missed": ("#fff1f2", "#9f1239", "#fda4af"),
+        "Joined later": ("#f8fafc", "#64748b", "#cbd5e1"),
         "Completed": ("#f1f5f9", "#334155", "#64748b"),
         "To be confirmed": ("#f8fafc", "#475569", "#cbd5e1"),
     }

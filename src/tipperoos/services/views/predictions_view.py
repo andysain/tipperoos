@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from collections import Counter
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 from tipperoos.core.domain import prediction_lookup, prediction_summary, team_lookup
-from tipperoos.core.timing import submit_with_timing, timed
+from tipperoos.core.timing import timed
 from tipperoos.data.store import (
     load_match_fixtures,
     load_match_results,
+    get_player,
     merge_match_results,
     load_player_predictions,
     load_player_winner_pick,
@@ -48,19 +48,12 @@ class PredictionsPageView:
 def get_predictions_page(player_id: str) -> PredictionsPageView:
     with timed("view.predictions.total"):
         with timed("view.predictions.load"):
-            with ThreadPoolExecutor(max_workers=6) as executor:
-                settings_future = submit_with_timing(executor, load_settings)
-                teams_future = submit_with_timing(executor, load_teams)
-                fixtures_future = submit_with_timing(executor, load_match_fixtures)
-                results_future = submit_with_timing(executor, load_match_results)
-                predictions_future = submit_with_timing(executor, load_player_predictions, player_id)
-                winner_pick_future = submit_with_timing(executor, load_player_winner_pick, player_id)
-
-                settings = settings_future.result()
-                teams = teams_future.result()
-                matches = merge_match_results(fixtures_future.result(), results_future.result())
-                player_predictions = predictions_future.result()
-                current_pick = winner_pick_future.result()
+            settings = load_settings()
+            player = get_player(player_id)
+            teams = load_teams()
+            matches = merge_match_results(load_match_fixtures(), load_match_results())
+            player_predictions = load_player_predictions(player_id)
+            current_pick = load_player_winner_pick(player_id)
 
         with timed("view.predictions.build"):
             predictions = prediction_lookup(player_predictions)
@@ -69,7 +62,7 @@ def get_predictions_page(player_id: str) -> PredictionsPageView:
             saved_total = 0
             for match in matches:
                 prediction = predictions.get((player_id, match["id"]))
-                status = match_status(match, prediction, settings)
+                status = match_status(match, prediction, settings, player)
                 statuses.append(status)
                 if prediction:
                     saved_total += 1
@@ -79,7 +72,7 @@ def get_predictions_page(player_id: str) -> PredictionsPageView:
                         prediction=prediction,
                         status=status,
                         pick_text=prediction_summary(prediction),
-                        disabled=status in ("Locked", "Completed", "Missed") or not (match.get("team_a") and match.get("team_b")),
+                        disabled=status in ("Locked", "Completed", "Missed", "Joined later") or not (match.get("team_a") and match.get("team_b")),
                     )
                 )
             status_counts = Counter(statuses)

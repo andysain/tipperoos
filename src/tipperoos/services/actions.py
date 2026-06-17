@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from tipperoos.core.domain import has_teams, uses_advancement_pick
+from tipperoos.core.domain import has_teams, player_joined_after_match, uses_advancement_pick
 from tipperoos.core.rules import can_edit_winner_pick, is_match_locked
 from tipperoos.core.timing import timed
 from tipperoos.data.store import clear_data_cache, db, get_match, load_settings
@@ -56,11 +56,13 @@ def save_prediction(player_id: str, match_id: str, pred_a: int, pred_b: int, adv
         clear_data_cache()
 
 
-def match_status(match: dict, prediction: dict | None, settings: dict) -> str:
-    if match.get("status") == "completed":
-        return "Completed"
+def match_status(match: dict, prediction: dict | None, settings: dict, player: dict | None = None) -> str:
     if not has_teams(match):
         return "To be confirmed"
+    if not prediction and player_joined_after_match(player, match):
+        return "Joined later"
+    if match.get("status") == "completed":
+        return "Completed"
     if is_match_locked(match, settings):
         return "Locked" if prediction else "Missed"
     return "Saved" if prediction else "Open"

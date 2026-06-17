@@ -1,27 +1,21 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor
 
 import pandas as pd
 
 from tipperoos.core.domain import prediction_lookup, winner_lookup
 from tipperoos.core.scoring import score_prediction_details, score_winner_pick
-from tipperoos.core.timing import submit_with_timing, timed
+from tipperoos.core.timing import timed
 from tipperoos.data.store import load_matches, load_players, load_predictions, load_settings, load_teams, load_winner_picks
 
 
 def calculate_leaderboard() -> pd.DataFrame:
     with timed("analytics.leaderboard.total"):
         with timed("analytics.leaderboard.load"):
-            with ThreadPoolExecutor(max_workers=3) as executor:
-                players_future = submit_with_timing(executor, load_players)
-                matches_future = submit_with_timing(executor, load_matches)
-                settings_future = submit_with_timing(executor, load_settings)
-
-                players = players_future.result()
-                matches = matches_future.result()
-                settings = settings_future.result()
+            players = load_players()
+            matches = load_matches()
+            settings = load_settings()
 
             completed_matches = [
                 match
@@ -32,28 +26,17 @@ def calculate_leaderboard() -> pd.DataFrame:
             ]
             predictions = {}
             winners = {}
-            with ThreadPoolExecutor(max_workers=2) as executor:
-                predictions_future = (
-                    submit_with_timing(executor, load_predictions)
-                    if completed_matches
-                    else None
-                )
-                winners_future = (
-                    submit_with_timing(executor, load_winner_picks)
-                    if settings.get("final_winner")
-                    else None
-                )
-
-                if predictions_future:
-                    predictions = prediction_lookup(predictions_future.result())
-                if winners_future:
-                    winners = winner_lookup(winners_future.result())
+            if completed_matches:
+                predictions = prediction_lookup(load_predictions())
+            if settings.get("final_winner"):
+                winners = winner_lookup(load_winner_picks())
 
         with timed("analytics.leaderboard.build"):
             rows = []
             for player in players:
                 score_points = 0
                 advancement_points = 0
+                starting_points = int(player.get("starting_points") or 0)
                 exact_count = 0
                 goal_diff_count = 0
                 result_count = 0
@@ -75,10 +58,11 @@ def calculate_leaderboard() -> pd.DataFrame:
                         "Emoji": player.get("emoji") or "",
                         "Bot": bool(player.get("is_bot")),
                         "Bot sort": 1 if player.get("is_bot") else 0,
+                        "Starting points": starting_points,
                         "Score points": score_points,
                         "Advancement": advancement_points,
                         "Winner bonus": winner_bonus,
-                        "Total points": score_points + advancement_points + winner_bonus,
+                        "Total points": starting_points + score_points + advancement_points + winner_bonus,
                         "Exact": exact_count,
                         "Goal diff": goal_diff_count,
                         "Result": result_count,
@@ -123,7 +107,7 @@ def cumulative_human_scores() -> pd.DataFrame:
         predictions = prediction_lookup(load_predictions())
         used_names: set[str] = set()
         player_names = {player["id"]: unique_chart_name(player, used_names) for player in humans}
-        totals = {player["id"]: 0 for player in humans}
+        totals = {player["id"]: int(player.get("starting_points") or 0) for player in humans}
         rows = []
 
         for index, match in enumerate(completed_matches, start=1):
