@@ -2295,7 +2295,10 @@ def round_of_32_admin() -> None:
             , "kickoff_time", "city"
             ]
     df_r32 = pd.DataFrame(r32_matches)[cols].sort_values("match_number")
-    st.dataframe(df_r32)
+
+    calculated_height = 35 + (len(df_r32) * 35) + 2
+
+    st.dataframe(df_r32, height=calculated_height, use_container_width=True)
 
 
 def result_admin() -> None:
