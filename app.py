@@ -90,10 +90,10 @@ from tipperoos.services.players import (
     create_player,
     ensure_default_bots,
     reset_player_pin,
+    unique_username,
     update_player_access,
     update_player_identity,
     update_player_late_join,
-    unique_username,
 )
 from tipperoos.services.session_tokens import (
     make_session_token as make_signed_session_token,
@@ -2267,8 +2267,10 @@ def round_of_32_admin() -> None:
     if not r32_matches:
         st.info("No Round of 32 fixtures found.")
         return
+    
     for match in r32_matches:
-        with st.expander(f"Match {match.get('match_number')}: {match.get('match_label')}"):
+        prefix = '✅' if match.get("team_a") is not None else ""
+        with st.expander(f"{prefix} Match {match.get('match_number')}: {match.get('match_label')}"):
             with st.form(f"r32_{match['id']}"):
                 options = [""] + teams
                 idx_a = options.index(match.get("team_a")) if match.get("team_a") in options else 0
@@ -2286,6 +2288,14 @@ def round_of_32_admin() -> None:
                         st.rerun()
                     except Exception as exc:
                         st.error(str(exc))
+    
+    cols = ["match_number", "match_label"
+            , "team_a_icon", "team_a_code"
+            , "team_b_icon", "team_b_code" 
+            , "kickoff_time", "city"
+            ]
+    df_r32 = pd.DataFrame(r32_matches)[cols].sort_values("match_number")
+    st.dataframe(df_r32)
 
 
 def result_admin() -> None:
