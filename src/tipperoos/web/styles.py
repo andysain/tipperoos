@@ -533,6 +533,7 @@ def inject_styles() -> None:
             line-height: 1.3;
         }
         .tr-leader-bot,
+        .tr-leader-streak,
         .tr-leader-you {
             display: inline-flex;
             align-items: center;
@@ -552,6 +553,11 @@ def inject_styles() -> None:
             background: #dbeafe;
             color: #1e3a8a;
             border: 1px solid #93c5fd;
+        }
+.tr-leader-streak {
+            background: #fff7ed;
+            color: #9a3412;
+            border: 1px solid #fdba74;
         }
         .tr-leader-stat,
         .tr-leader-total {

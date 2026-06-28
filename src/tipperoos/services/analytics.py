@@ -24,6 +24,7 @@ def calculate_leaderboard() -> pd.DataFrame:
                 and match.get("team_a_score") is not None
                 and match.get("team_b_score") is not None
             ]
+            completed_matches.sort(key=lambda m: int(m.get("match_number") or 0))
             predictions = {}
             winners = {}
             if completed_matches:
@@ -40,8 +41,10 @@ def calculate_leaderboard() -> pd.DataFrame:
                 exact_count = 0
                 goal_diff_count = 0
                 result_count = 0
-                for match in matches:
+                streak_points = []
+                for match in completed_matches:
                     details = score_prediction_details(match, predictions.get((player["id"], match["id"])))
+                    streak_points.append(int(details["total_points"]))
                     score_points += details["score_points"]
                     advancement_points += details["advancement_points"]
                     if details["tier"] == "Exact":
@@ -50,6 +53,8 @@ def calculate_leaderboard() -> pd.DataFrame:
                         goal_diff_count += 1
                     elif details["tier"] == "Result":
                         result_count += 1
+
+                current_streak, best_streak = calculate_streaks(streak_points)
                 winner_bonus = score_winner_pick(settings, winners.get(player["id"]))
                 rows.append(
                     {
@@ -66,6 +71,8 @@ def calculate_leaderboard() -> pd.DataFrame:
                         "Exact": exact_count,
                         "Goal diff": goal_diff_count,
                         "Result": result_count,
+                        "Current streak": current_streak,
+                        "Best streak": best_streak,
                     }
                 )
             df = pd.DataFrame(rows)
@@ -77,6 +84,18 @@ def calculate_leaderboard() -> pd.DataFrame:
             ).reset_index(drop=True)
             df["Rank"] = df["Total points"].rank(method="min", ascending=False).astype(int)
             return df
+
+
+def calculate_streaks(points: list[int]) -> tuple[int, int]:
+    current_streak = 0
+    best_streak = 0
+    for pts in points:
+        if pts > 0:
+            current_streak += 1
+            best_streak = max(best_streak, current_streak)
+        else:
+            current_streak = 0
+    return current_streak, best_streak
 
 
 def unique_chart_name(player: dict, used_names: set[str]) -> str:

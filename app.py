@@ -892,6 +892,8 @@ def leaderboard_page() -> None:
         name = escape(leaderboard_player_name(row))
         bot_badge = '<span class="tr-leader-bot">Bot</span>' if row["Bot"] else ""
         you_badge = '<span class="tr-leader-you">You</span>' if is_current else ""
+        current_streak = int(row.get("Current streak", 0))
+        streak_badge = f'<span class="tr-leader-streak">⚡ { current_streak }</span>' if current_streak >= 5 else ""
         breakdown_parts = []
         if int(row["Exact"]):
             breakdown_parts.append(f'Exact {int(row["Exact"])}')
@@ -917,7 +919,8 @@ def leaderboard_page() -> None:
             f'<div class="{" ".join(classes)}">'
             f"{rank_html}"
             '<div class="tr-leader-player">'
-            f'<div class="tr-leader-name">{name} {bot_badge} {you_badge}</div>'
+            f'<div class="tr-leader-name">{name} {bot_badge} {you_badge} {streak_badge}</div>'
+            # f'<div class="tr-leader-name">{name} {bot_badge} {you_badge} {streak_badge}</div>'
             f'<div class="tr-leader-breakdown">{breakdown}</div>'
             "</div>"
             f"{stats_html}"
