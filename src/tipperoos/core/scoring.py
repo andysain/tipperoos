@@ -54,6 +54,8 @@ def score_prediction_details(match: dict, prediction: dict | None) -> dict:
         "advancement_points": advancement_points,
         "total_points": score_points + advancement_points,
         "tier": tier,
+        "pred_a": pred_a,
+        "pred_b": pred_b,
     }
 
 

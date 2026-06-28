@@ -82,6 +82,8 @@ from tipperoos.services.admin_ops import (
 )
 from tipperoos.services.analytics import (
     calculate_leaderboard,
+    calculate_player_match_history,
+    calculate_player_stats,
     cumulative_human_scores,
     group_standings,
 )
@@ -929,11 +931,60 @@ def leaderboard_page() -> None:
         )
         st.markdown(html, unsafe_allow_html=True)
 
-
     progress_df = cumulative_human_scores()
     if not progress_df.empty:
         st.subheader("Score progression")
         render_score_progression_chart(progress_df, visible_df, current_player_id)
+
+    with st.expander("Player Statistics"):
+        detail_player_id = st.selectbox(
+            "Select player",
+            options=[""] + [row["Player ID"] for row in visible_df.to_dict("records")],
+            format_func=lambda pid: next(
+                (r["Player"] for r in visible_df.to_dict("records") if r["Player ID"] == pid), "Select a player"
+            ) if pid else "Select a player",
+            key="leaderboard_detail_player",
+            label_visibility="collapsed",
+        )
+        if detail_player_id:
+            stats = calculate_player_stats(detail_player_id)
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Correct tips", f"{stats['all_tips_count']}")
+            c2.metric("Exact", f"{stats['exact_count']}")
+            c3.metric("Goal diff", f"{stats['goal_diff_count']}")
+            c4.metric("Result", f"{stats['result_count']}")
+            if stats['winner_pick']:
+                st.markdown(f"**Tournament winner pick:** {escape(stats['winner_pick'])}")
+            if stats['best_tip']:
+                bt = stats['best_tip']
+                match = bt['match']
+                teams_line = f"{escape(match.get('team_a') or 'TBC')} vs {escape(match.get('team_b') or 'TBC')}"
+                st.markdown(f"**Best tip:** Match {match.get('match_number')} · {teams_line} · {bt['points']} pts (+{bt['difference']:.1f} vs avg)")
+            if stats['worst_tip']:
+                wt = stats['worst_tip']
+                match = wt['match']
+                teams_line = f"{escape(match.get('team_a') or 'TBC')} vs {escape(match.get('team_b') or 'TBC')}"
+                st.markdown(f"**Worst tip:** Match {match.get('match_number')} · {teams_line} · {wt['points']} pts ({wt['difference']:.1f} vs avg)")
+            if stats['lucky_team']:
+                st.markdown(f"**Lucky team:** {escape(stats['lucky_team'])} ({stats['lucky_team_points']:.2f} avg)")
+            if stats['bogey_team']:
+                st.markdown(f"**Bogey team:** {escape(stats['bogey_team'])} ({stats['bogey_team_points']:.2f} avg)")
+            history = calculate_player_match_history(detail_player_id, limit=5)
+            if history:
+                st.caption("Recent tips")
+                for h in history:
+                    teams_line = f"{escape(h['team_a'])} vs {escape(h['team_b'])}"
+                    badge_class = {
+                        "Exact": "tr-badge-completed",
+                        "Goal diff": "tr-badge-saved",
+                        "Result": "tr-badge-locked",
+                        "Wrong": "tr-badge-missed",
+                    }.get(h["tier"], "tr-badge-tbc")
+                    st.markdown(
+                        f'<div style="margin: 0.25rem 0;"><span class="tr-badge {badge_class}">{escape(h["tier"])} · '
+                        f'{escape(h["predicted_score"])} ({h["points"]} pts) · {escape(teams_line)}</span></div>',
+                        unsafe_allow_html=True,
+                    )
 
 
 def render_score_progression_chart(progress_df: pd.DataFrame, leaderboard_df: pd.DataFrame, current_player_id: str | None) -> None:

@@ -7,7 +7,148 @@ import pandas as pd
 from tipperoos.core.domain import prediction_lookup, winner_lookup
 from tipperoos.core.scoring import score_prediction_details, score_winner_pick
 from tipperoos.core.timing import timed
-from tipperoos.data.store import load_matches, load_players, load_predictions, load_settings, load_teams, load_winner_picks
+from tipperoos.data.store import (
+    load_matches,
+    load_players,
+    load_predictions,
+    load_settings,
+    load_teams,
+    load_winner_picks,
+)
+
+
+def calculate_player_stats(player_id: str) -> dict:
+    with timed("analytics.player_stats"):
+        matches = load_matches()
+        players = load_players()
+        settings = load_settings()
+        completed_matches = [
+            match for match in matches
+            if match.get("status") == "completed"
+            and match.get("team_a_score") is not None
+            and match.get("team_b_score") is not None
+        ]
+        predictions = prediction_lookup(load_predictions())
+        winners = winner_lookup(load_winner_picks())
+
+        exact_count = 0
+        goal_diff_count = 0
+        result_count = 0
+        all_tips_count = 0
+
+        match_differences = {}
+        player_team_points = defaultdict(list)
+
+        for match in completed_matches:
+            prediction = predictions.get((player_id, match["id"]))
+            details = score_prediction_details(match, prediction)
+            pts = int(details["total_points"])
+
+            if prediction:
+                if details["tier"] == "Exact":
+                    exact_count += 1
+                    all_tips_count += 1
+                elif details["tier"] == "Goal diff":
+                    goal_diff_count += 1
+                    all_tips_count += 1
+                elif details["tier"] == "Result":
+                    result_count += 1
+                    all_tips_count += 1
+
+                pred_a = int(prediction.get("pred_team_a_score", 0))
+                pred_b = int(prediction.get("pred_team_b_score", 0))
+
+                other_match_scores = []
+                for p in players:
+                    other_pred = predictions.get((p["id"], match["id"]))
+                    if other_pred:
+                        other_details = score_prediction_details(match, other_pred)
+                        other_match_scores.append(int(other_details["total_points"]))
+
+                avg_other = sum(other_match_scores) / len(other_match_scores) if other_match_scores else 0
+                difference = pts - avg_other
+
+                match_differences[match["id"]] = {
+                    "difference": difference,
+                    "points": pts,
+                    "avg_other": avg_other,
+                    "match": match,
+                    "prediction": prediction,
+                }
+
+                player_team_points[match["team_a"]].append(pts)
+                player_team_points[match["team_b"]].append(pts)
+
+        winner_team = None
+        winner_pick = winners.get(player_id)
+        if winner_pick:
+            winner_team = winner_pick.get("team")
+
+        best_tip = None
+        worst_tip = None
+        for match_id, data in match_differences.items():
+            if best_tip is None or data["difference"] > best_tip["difference"]:
+                best_tip = data
+            if worst_tip is None or data["difference"] < worst_tip["difference"]:
+                worst_tip = data
+
+        lucky_team = None
+        lucky_avg = 0
+        bogey_team = None
+        bogey_avg = 0
+        for team, pts_list in player_team_points.items():
+            if not pts_list:
+                continue
+            avg = sum(pts_list) / len(pts_list)
+            if lucky_team is None or avg > lucky_avg:
+                lucky_team = team
+                lucky_avg = avg
+            if bogey_team is None or avg < bogey_avg:
+                bogey_team = team
+                bogey_avg = avg
+
+        return {
+            "winner_pick": winner_team,
+            "exact_count": exact_count,
+            "goal_diff_count": goal_diff_count,
+            "result_count": result_count,
+            "all_tips_count": all_tips_count,
+            "best_tip": best_tip,
+            "worst_tip": worst_tip,
+            "lucky_team": lucky_team,
+            "lucky_team_points": lucky_avg,
+            "bogey_team": bogey_team,
+            "bogey_team_points": bogey_avg,
+        }
+
+
+def calculate_player_match_history(player_id: str, limit: int = 5) -> list[dict]:
+    with timed("analytics.player_match_history"):
+        matches = load_matches()
+        completed_matches = [
+            match for match in matches
+            if match.get("status") == "completed"
+            and match.get("team_a_score") is not None
+            and match.get("team_b_score") is not None
+        ]
+        completed_matches.sort(key=lambda m: int(m.get("match_number") or 0), reverse=True)
+        predictions = prediction_lookup(load_predictions())
+        history = []
+        for match in completed_matches[:limit]:
+            prediction = predictions.get((player_id, match["id"]))
+            details = score_prediction_details(match, prediction)
+            pred_a = int(prediction.get("pred_team_a_score", 0)) if prediction else 0
+            pred_b = int(prediction.get("pred_team_b_score", 0)) if prediction else 0
+            history.append({
+                "match_number": int(match.get("match_number") or 0),
+                "team_a": match.get("team_a"),
+                "team_b": match.get("team_b"),
+                "actual_score": f"{match.get('team_a_score')}-{match.get('team_b_score')}",
+                "predicted_score": f"{pred_a}-{pred_b}" if prediction else "- -",
+                "points": int(details["total_points"]),
+                "tier": details["tier"],
+            })
+        return history
 
 
 def calculate_leaderboard() -> pd.DataFrame:
