@@ -263,6 +263,7 @@ def cumulative_human_scores() -> pd.DataFrame:
         ]
         if not humans or not completed_matches:
             return pd.DataFrame()
+        completed_matches = sorted(completed_matches, key=lambda x: x['match_number'])
 
         predictions = prediction_lookup(load_predictions())
         used_names: set[str] = set()
