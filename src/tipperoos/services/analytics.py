@@ -38,7 +38,7 @@ def calculate_player_stats(player_id: str) -> dict:
 
         match_differences = {}
         player_team_points = defaultdict(list)
-
+        bots = ['deae792c-9f4d-4655-b1b9-c213d104e5fb', '536d2423-d30c-46d8-903e-80e89338f142', 'd1316d4c-e766-4b51-8831-cd73814b6caf', 'ae316d82-3d6f-463b-96d5-7e36847cc00d']
         for match in completed_matches:
             prediction = predictions.get((player_id, match["id"]))
             details = score_prediction_details(match, prediction)
@@ -61,7 +61,7 @@ def calculate_player_stats(player_id: str) -> dict:
                 other_match_scores = []
                 for p in players:
                     other_pred = predictions.get((p["id"], match["id"]))
-                    if other_pred:
+                    if other_pred and other_pred.get('player_id', '') not in bots + [player_id]:
                         other_details = score_prediction_details(match, other_pred)
                         other_match_scores.append(int(other_details["total_points"]))
 

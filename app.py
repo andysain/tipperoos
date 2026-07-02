@@ -959,12 +959,12 @@ def leaderboard_page() -> None:
                 bt = stats['best_tip']
                 match = bt['match']
                 teams_line = f"{escape(match.get('team_a') or 'TBC')} vs {escape(match.get('team_b') or 'TBC')}"
-                st.markdown(f"**Best tip:** Match {match.get('match_number')} · {teams_line} · {bt['points']} pts (+{bt['difference']:.1f} vs avg)")
+                st.markdown(f"**Best tip:** Match {match.get('match_number')} · {teams_line} · {bt['points']} pts (+{bt['difference']:.2f} vs avg)")
             if stats['worst_tip']:
                 wt = stats['worst_tip']
                 match = wt['match']
                 teams_line = f"{escape(match.get('team_a') or 'TBC')} vs {escape(match.get('team_b') or 'TBC')}"
-                st.markdown(f"**Worst tip:** Match {match.get('match_number')} · {teams_line} · {wt['points']} pts ({wt['difference']:.1f} vs avg)")
+                st.markdown(f"**Worst tip:** Match {match.get('match_number')} · {teams_line} · {wt['points']} pts ({wt['difference']:.2f} vs avg)")
             if stats['lucky_team']:
                 st.markdown(f"**Lucky team:** {escape(stats['lucky_team'])} ({stats['lucky_team_points']:.2f} avg)")
             if stats['bogey_team']:
