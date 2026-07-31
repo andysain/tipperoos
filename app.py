@@ -871,6 +871,69 @@ def leaderboard_page() -> None:
     if completed_count == 0:
         st.info("The leaderboard will start moving once the first result is entered. Everyone is tied for now.")
 
+    st.markdown(
+        """
+        <style>
+        div[data-testid="stExpander"]:has(.tr-leader-stats-marker) {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #fbfdff;
+            margin: -0.35rem 0 0.5rem;
+            box-shadow: 0 1px 2px rgba(17, 24, 39, 0.04);
+        }
+        div[data-testid="stExpander"]:has(.tr-leader-stats-marker) summary {
+            font-weight: 750;
+            color: #475569;
+            font-size: 0.86rem;
+        }
+        div[data-testid="stExpander"]:has(.tr-leader-stats-marker) summary p {
+            font-size: 0.86rem;
+        }
+        div[class*="st-key-leaderboard_card_"] {
+            position: relative;
+            margin: 0.5rem 0 0;
+        }
+        div[class*="st-key-leaderboard_card_"] .tr-leader-row {
+            margin: 0;
+            cursor: pointer;
+            transition: box-shadow 0.12s ease, border-color 0.12s ease;
+        }
+        div[class*="st-key-leaderboard_card_"] div[data-testid="stElementContainer"]:has(div[data-testid="stButton"]) {
+            position: static;
+            width: auto;
+        }
+        div[class*="st-key-leaderboard_card_"] div[data-testid="stButton"] {
+            position: absolute;
+            inset: 0;
+            z-index: 2;
+        }
+        div[class*="st-key-leaderboard_card_"] div[data-testid="stButton"] button {
+            width: 100%;
+            height: 100%;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0;
+            margin: 0;
+            color: transparent !important;
+        }
+        div[class*="st-key-leaderboard_card_"]:hover .tr-leader-row {
+            border-color: #93c5fd;
+            box-shadow: 0 2px 6px rgba(30, 58, 138, 0.12);
+        }
+        div.tr-leader-stats-caret {
+            text-align: center;
+            color: #94a3b8;
+            font-size: 0.72rem;
+            font-weight: 700;
+            margin: -0.3rem 0 0.35rem;
+            letter-spacing: 0.02em;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     for row in visible_df.to_dict("records"):
         is_current = row["Player ID"] == current_player_id
         classes = ["tr-leader-row"]
@@ -917,74 +980,131 @@ def leaderboard_page() -> None:
             stats_html += f'<div class="tr-leader-stat"><strong>{int(row["Advancement"])}</strong><span>Advance</span></div>'
         if show_winner_bonus:
             stats_html += f'<div class="tr-leader-stat"><strong>{int(row["Winner bonus"])}</strong><span>Winner</span></div>'
+        player_id = row["Player ID"]
+        stats_key = f"leaderboard_stats_open_{player_id}"
+        stats_open = st.session_state.get(stats_key, False)
+
         html = (
+            '<div class="tr-leader-card-wrap">'
             f'<div class="{" ".join(classes)}">'
             f"{rank_html}"
             '<div class="tr-leader-player">'
             f'<div class="tr-leader-name">{name} {bot_badge} {you_badge} {streak_badge}</div>'
-            # f'<div class="tr-leader-name">{name} {bot_badge} {you_badge} {streak_badge}</div>'
             f'<div class="tr-leader-breakdown">{breakdown}</div>'
             "</div>"
             f"{stats_html}"
             f'<div class="tr-leader-total"><strong>{int(row["Total points"])}</strong><span>Total</span></div>'
             "</div>"
+            "</div>"
         )
-        st.markdown(html, unsafe_allow_html=True)
+        with st.container(key=f"leaderboard_card_{player_id}"):
+            st.markdown(html, unsafe_allow_html=True)
+            if st.button(" ", key=f"leaderboard_toggle_{player_id}"):
+                st.session_state[stats_key] = not stats_open
+                st.rerun()
+
+        if stats_open:
+            st.markdown(
+                '<div class="tr-leader-stats-caret">▲ Hide stats</div>',
+                unsafe_allow_html=True,
+            )
+            with st.expander(f"{leaderboard_player_name(row)} — Player Statistics", expanded=True):
+                st.markdown('<span class="tr-leader-stats-marker"></span>', unsafe_allow_html=True)
+                stats = calculate_player_stats(player_id)
+
+                accuracy_tiles = [
+                    ("Correct tips", stats["all_tips_count"], None),
+                    ("Exact", stats["exact_count"], "tr-stat-tile-exact"),
+                    ("Goal diff", stats["goal_diff_count"], "tr-stat-tile-goaldiff"),
+                    ("Result", stats["result_count"], "tr-stat-tile-result"),
+                ]
+                st.markdown(
+                    '<div class="tr-stats-tiles">'
+                    + "".join(
+                        f'<div class="tr-stat-tile {extra or ""}"><strong>{value}</strong><span>{label}</span></div>'
+                        for label, value, extra in accuracy_tiles
+                    )
+                    + "</div>",
+                    unsafe_allow_html=True,
+                )
+
+                highlight_cards = []
+                if stats["best_tip"]:
+                    bt = stats["best_tip"]
+                    match = bt["match"]
+                    teams_line = f"{escape(match.get('team_a') or 'TBC')} vs {escape(match.get('team_b') or 'TBC')}"
+                    highlight_cards.append((
+                        "🔥", "Best tip",
+                        f"Match {match.get('match_number')} · {teams_line}",
+                        f"{bt['points']} pts · +{bt['difference']:.2f} vs avg",
+                    ))
+                if stats["worst_tip"]:
+                    wt = stats["worst_tip"]
+                    match = wt["match"]
+                    teams_line = f"{escape(match.get('team_a') or 'TBC')} vs {escape(match.get('team_b') or 'TBC')}"
+                    highlight_cards.append((
+                        "🥶", "Worst tip",
+                        f"Match {match.get('match_number')} · {teams_line}",
+                        f"{wt['points']} pts · {wt['difference']:.2f} vs avg",
+                    ))
+                if stats["lucky_team"]:
+                    highlight_cards.append((
+                        "🍀", "Lucky team",
+                        escape(stats["lucky_team"]),
+                        f"{stats['lucky_team_points']:.2f} avg pts",
+                    ))
+                if stats["bogey_team"]:
+                    highlight_cards.append((
+                        "👻", "Bogey team",
+                        escape(stats["bogey_team"]),
+                        f"{stats['bogey_team_points']:.2f} avg pts",
+                    ))
+                if stats["winner_pick"]:
+                    highlight_cards.append(
+                        ("🏆", "Winner pick", escape(stats["winner_pick"]), None)
+                    )
+
+                if highlight_cards:
+                    st.markdown(
+                        '<div class="tr-stats-highlights">'
+                        + "".join(
+                            f'<div class="tr-stats-highlight">'
+                            f'<div class="tr-stats-highlight-icon">{icon}</div>'
+                            '<div class="tr-stats-highlight-body">'
+                            f'<span class="tr-stats-highlight-label">{label}</span>'
+                            f'<strong class="tr-stats-highlight-value">{value}</strong>'
+                            + (f'<span class="tr-stats-highlight-sub">{sub}</span>' if sub else "")
+                            + "</div></div>"
+                            for icon, label, value, sub in highlight_cards
+                        )
+                        + "</div>",
+                        unsafe_allow_html=True,
+                    )
+
+                history = calculate_player_match_history(player_id, limit=5)
+                if history:
+                    st.markdown('<div class="tr-stats-history-label">Recent tips</div>', unsafe_allow_html=True)
+                    badge_class_map = {
+                        "Exact": "tr-badge-completed",
+                        "Goal diff": "tr-badge-saved",
+                        "Result": "tr-badge-locked",
+                        "Wrong": "tr-badge-missed",
+                    }
+                    history_html = "".join(
+                        f'<div class="tr-stats-history-item">'
+                        f'<span class="tr-badge {badge_class_map.get(h["tier"], "tr-badge-tbc")}">{escape(h["tier"])}</span>'
+                        f'<span class="tr-stats-history-score">{escape(h["predicted_score"])}</span>'
+                        f'<span class="tr-stats-history-teams">{escape(h["team_a"])} vs {escape(h["team_b"])}</span>'
+                        f'<span class="tr-stats-history-points">{h["points"]} pts</span>'
+                        "</div>"
+                        for h in history
+                    )
+                    st.markdown(f'<div class="tr-stats-history">{history_html}</div>', unsafe_allow_html=True)
 
     progress_df = cumulative_human_scores()
     if not progress_df.empty:
         st.subheader("Score progression")
         render_score_progression_chart(progress_df, visible_df, current_player_id)
-
-    with st.expander("Player Statistics"):
-        detail_player_id = st.selectbox(
-            "Select player",
-            options=[""] + [row["Player ID"] for row in visible_df.to_dict("records")],
-            format_func=lambda pid: next(
-                (r["Player"] for r in visible_df.to_dict("records") if r["Player ID"] == pid), "Select a player"
-            ) if pid else "Select a player",
-            key="leaderboard_detail_player",
-            label_visibility="collapsed",
-        )
-        if detail_player_id:
-            stats = calculate_player_stats(detail_player_id)
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("Correct tips", f"{stats['all_tips_count']}")
-            c2.metric("Exact", f"{stats['exact_count']}")
-            c3.metric("Goal diff", f"{stats['goal_diff_count']}")
-            c4.metric("Result", f"{stats['result_count']}")
-            if stats['winner_pick']:
-                st.markdown(f"**Tournament winner pick:** {escape(stats['winner_pick'])}")
-            if stats['best_tip']:
-                bt = stats['best_tip']
-                match = bt['match']
-                teams_line = f"{escape(match.get('team_a') or 'TBC')} vs {escape(match.get('team_b') or 'TBC')}"
-                st.markdown(f"**Best tip:** Match {match.get('match_number')} · {teams_line} · {bt['points']} pts (+{bt['difference']:.2f} vs avg)")
-            if stats['worst_tip']:
-                wt = stats['worst_tip']
-                match = wt['match']
-                teams_line = f"{escape(match.get('team_a') or 'TBC')} vs {escape(match.get('team_b') or 'TBC')}"
-                st.markdown(f"**Worst tip:** Match {match.get('match_number')} · {teams_line} · {wt['points']} pts ({wt['difference']:.2f} vs avg)")
-            if stats['lucky_team']:
-                st.markdown(f"**Lucky team:** {escape(stats['lucky_team'])} ({stats['lucky_team_points']:.2f} avg)")
-            if stats['bogey_team']:
-                st.markdown(f"**Bogey team:** {escape(stats['bogey_team'])} ({stats['bogey_team_points']:.2f} avg)")
-            history = calculate_player_match_history(detail_player_id, limit=5)
-            if history:
-                st.caption("Recent tips")
-                for h in history:
-                    teams_line = f"{escape(h['team_a'])} vs {escape(h['team_b'])}"
-                    badge_class = {
-                        "Exact": "tr-badge-completed",
-                        "Goal diff": "tr-badge-saved",
-                        "Result": "tr-badge-locked",
-                        "Wrong": "tr-badge-missed",
-                    }.get(h["tier"], "tr-badge-tbc")
-                    st.markdown(
-                        f'<div style="margin: 0.25rem 0;"><span class="tr-badge {badge_class}">{escape(h["tier"])} · '
-                        f'{escape(h["predicted_score"])} ({h["points"]} pts) · {escape(teams_line)}</span></div>',
-                        unsafe_allow_html=True,
-                    )
 
 
 def render_score_progression_chart(progress_df: pd.DataFrame, leaderboard_df: pd.DataFrame, current_player_id: str | None) -> None:

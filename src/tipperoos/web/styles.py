@@ -582,6 +582,129 @@ def inject_styles() -> None:
             color: var(--tr-score-accent);
             font-size: 1.45rem;
         }
+        .tr-stats-tiles {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.55rem;
+            margin: 0.15rem 0 0.9rem;
+        }
+        .tr-stat-tile {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #ffffff;
+            padding: 0.6rem 0.7rem;
+            text-align: center;
+        }
+        .tr-stat-tile strong {
+            display: block;
+            font-size: 1.35rem;
+            font-weight: 850;
+            color: #111827;
+            line-height: 1.15;
+        }
+        .tr-stat-tile span {
+            display: block;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.01em;
+            color: #6b7280;
+            margin-top: 0.15rem;
+        }
+        .tr-stat-tile-exact { background: #fff7ed; border-color: #fed7aa; }
+        .tr-stat-tile-exact strong { color: #c2410c; }
+        .tr-stat-tile-goaldiff { background: #eff6ff; border-color: #bfdbfe; }
+        .tr-stat-tile-goaldiff strong { color: #1d4ed8; }
+        .tr-stat-tile-result { background: #f3f4f6; border-color: #d1d5db; }
+        .tr-stat-tile-result strong { color: #374151; }
+        .tr-stats-highlights {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.55rem;
+            margin: 0 0 0.9rem;
+        }
+        .tr-stats-highlight {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.6rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #fbfdff;
+            padding: 0.65rem 0.75rem;
+        }
+        .tr-stats-highlight-icon {
+            font-size: 1.3rem;
+            line-height: 1;
+        }
+        .tr-stats-highlight-body {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+        .tr-stats-highlight-label {
+            font-size: 0.72rem;
+            font-weight: 750;
+            text-transform: uppercase;
+            letter-spacing: 0.01em;
+            color: #6b7280;
+        }
+        .tr-stats-highlight-value {
+            font-size: 0.92rem;
+            font-weight: 800;
+            color: #111827;
+            line-height: 1.3;
+            overflow-wrap: break-word;
+        }
+        .tr-stats-highlight-sub {
+            font-size: 0.78rem;
+            color: #6b7280;
+            font-weight: 650;
+        }
+        .tr-stats-history-label {
+            font-size: 0.78rem;
+            font-weight: 750;
+            text-transform: uppercase;
+            letter-spacing: 0.01em;
+            color: #6b7280;
+            margin: 0.2rem 0 0.5rem;
+        }
+        .tr-stats-history {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+        .tr-stats-history-item {
+            display: grid;
+            grid-template-columns: 5.2rem 3.6rem minmax(0, 1fr) 4rem;
+            align-items: center;
+            gap: 0.6rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #ffffff;
+            padding: 0.45rem 0.65rem;
+        }
+        .tr-stats-history-item .tr-badge {
+            min-width: unset;
+        }
+        .tr-stats-history-score {
+            font-weight: 800;
+            color: #111827;
+            font-size: 0.9rem;
+        }
+        .tr-stats-history-teams {
+            color: #374151;
+            font-size: 0.86rem;
+            font-weight: 650;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .tr-stats-history-points {
+            text-align: right;
+            font-weight: 750;
+            color: #6b7280;
+            font-size: 0.82rem;
+        }
         .tr-centre-card {
             border: 1px solid #e5e7eb;
             border-radius: 8px;
@@ -1037,6 +1160,34 @@ def inject_styles() -> None:
             }
             .tr-compare-group-players {
                 justify-content: flex-start;
+            }
+            .tr-stats-tiles {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+            .tr-stats-highlights {
+                grid-template-columns: 1fr;
+            }
+            .tr-stats-history-item {
+                grid-template-columns: minmax(0, 1fr) auto;
+                grid-template-areas:
+                    "teams points"
+                    "badge score";
+                row-gap: 0.25rem;
+            }
+            .tr-stats-history-item .tr-badge {
+                grid-area: badge;
+                justify-self: start;
+            }
+            .tr-stats-history-score {
+                grid-area: score;
+                justify-self: start;
+            }
+            .tr-stats-history-teams {
+                grid-area: teams;
+                white-space: normal;
+            }
+            .tr-stats-history-points {
+                grid-area: points;
             }
         }
         </style>
