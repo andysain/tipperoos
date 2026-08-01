@@ -40,10 +40,10 @@ _Avoid_: Position (ambiguous — reads as "best" as easily as "worst")
 The recorded Season Total and Season Standing for every Player, captured once per Gameweek starting at Gameweek 1 — independent of whether the Picker UI has shipped yet.
 
 **Voided Match**:
-A Tipped Match postponed *after* its picks have locked. Scores nobody, permanently — no reroll, no substitute.
+A Tipped Match postponed _after_ its picks have locked. Scores nobody, permanently — no reroll, no substitute.
 
 **Skipped Slot**:
-A Match 1 or Match 2 slot left empty for a Gameweek because its Fixture was postponed *before* picks locked. No replacement Fixture is selected; that Gameweek simply runs with one Tipped Match instead of two.
+A Match 1 or Match 2 slot left empty for a Gameweek because its Fixture was postponed _before_ picks locked. No replacement Fixture is selected; that Gameweek simply runs with one Tipped Match instead of two.
 _Avoid_: Void, Voided Match (reserved for the post-lock case — the rules and player-facing meaning differ)
 
 **Player**:

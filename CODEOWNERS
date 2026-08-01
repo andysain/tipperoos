@@ -1,0 +1,11 @@
+# Requires @andysain's explicit review before these paths can merge, even
+# with auto-merge enabled for everything else. This is the one independent
+# (not-the-agent) check in the process -- see docs/standards/TESTING_STANDARD.md
+# and BUILD_PLAN.md's engineering-process decision for why these two paths
+# specifically.
+#
+# Has no effect until "Require review from Code Owners" is enabled on main's
+# branch protection (a manual, Andy-only setup step).
+
+/src/lib/ @andysain
+/.github/workflows/ @andysain

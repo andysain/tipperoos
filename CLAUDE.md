@@ -23,21 +23,23 @@ Do not build a general tournament/sports platform. Build for this specific priva
 
 ## Stack and architecture
 
-- **Next.js on Vercel**, full JS. No Python in the live app — this was a deliberate call, not an oversight; see *Explicitly out of scope* for what that ruled out.
+- **Next.js on Vercel**, full JS. No Python in the live app — this was a deliberate call, not an oversight; see _Explicitly out of scope_ for what that ruled out.
 - **Supabase Postgres** (fresh project, not the old World Cup project) as the backend, plus a **second free Supabase project as a staging environment** for the week-3 dry run and general testing, so testing never runs against the same project going live for real players. Free tier allows 2 active projects per org.
 - **Ongoing backup**: a lightweight weekly export of the live project's tables (same REST-export pattern used for the old project's one-time backup), so the new project has a rolling data safety net during the season, not just a pre-launch one-off.
 - **Three-environment mapping**, all free on Vercel's Hobby tier:
-  | Environment | Where it runs | Supabase project |
-  |---|---|---|
-  | Local dev | `next dev` on your machine | staging (`.env.local`, gitignored) |
-  | Preview | Vercel auto-deploys every branch push/PR to a unique URL | staging (Vercel env vars scoped to "Preview") |
-  | Production | Vercel deploys `main` to the real domain | production (Vercel env vars scoped to "Production") |
+
+  | Environment | Where it runs                                            | Supabase project                                    |
+  | ----------- | -------------------------------------------------------- | --------------------------------------------------- |
+  | Local dev   | `next dev` on your machine                               | staging (`.env.local`, gitignored)                  |
+  | Preview     | Vercel auto-deploys every branch push/PR to a unique URL | staging (Vercel env vars scoped to "Preview")       |
+  | Production  | Vercel deploys `main` to the real domain                 | production (Vercel env vars scoped to "Production") |
 
   Discipline this requires: apply any schema migration to staging first, confirm it, then apply the same migration to production before merging the branch that depends on it — schema drift between the two is the main failure mode.
+
 - **Auth is not Supabase Auth.** Login is application-level (email + PIN, see below), so Postgres RLS cannot key off `auth.uid()`. Consequence: **all reads and writes must go through server-side Next.js API routes** — never a direct client-side Supabase call, anywhere, ever. This is the single biggest security invariant in the app; violating it is how a technically-minded player reads other players' pre-lock picks via devtools.
 - **Fixture/result sync**: a GitHub Actions scheduled workflow is the primary mechanism (~10–15 min cadence on match days) calling a Vercel API route, which calls a free football data API (e.g. football-data.org — confirmed free tier includes the Premier League, at 10 calls/minute). All 380 season fixtures are seeded once from published data; the API is used only for deltas — kickoff-time changes and results — never to discover fixtures. Each sync cycle must be **one batched date-range call**, not one call per fixture, to stay comfortably inside the free-tier rate limit. Match on a stable external fixture ID, never team-name+date.
 - A lightweight Supabase pg_cron job runs as a secondary **health-check watchdog only** (not the sync itself): confirms a successful sync happened recently and alerts the admin if not.
-- **Email, not WhatsApp**, is the notification channel (see *Notifications*). WhatsApp is a deferred future add-on.
+- **Email, not WhatsApp**, is the notification channel (see _Notifications_). WhatsApp is a deferred future add-on.
 
 ## Identity and auth
 
@@ -49,11 +51,11 @@ Do not build a general tournament/sports platform. Build for this specific priva
 - New players self-create only with the private competition code, checked against an env var (not DB-stored — it essentially never needs to change mid-season, so admin-editability isn't worth a `settings` table).
 - **Lockout**: 5 failed PIN attempts locks the account for 15 minutes (auto-expires, no admin action needed for the common case). A successful login resets the failed-attempt counter.
 - **Forgot-PIN reset (admin-assisted, forced-reset flow)**: admin sets a temporary PIN (typed by the admin, communicated to the player directly — no delivery mechanism needed since it's in-person/by phone) and flags the account as needing a reset. The player logs in with the temp PIN and is forced to choose a real new PIN before reaching the app; the reset flag then clears, along with any lockout state.
-- One player flag is `is_admin`; admin can still play for fun but is **explicitly ineligible for the season "winner" title**, to avoid a credibility problem when the admin is also the one entering/correcting results. **Admin has exactly two elevated capabilities — entering/correcting match results and kickoff times, and resetting another player's PIN — and no elevated read visibility.** They see the app exactly as any other player would (pre-lock pick visibility rules apply to them too); there is no "admin sees everything early" bypass, and building one would be scope creep beyond what's actually decided. The very first admin account is created via a one-off seed script (same pattern as fixture seeding), not a UI flow — there's only ever one admin for now. *Deferred to future work*: a proper competition-setup flow where the first signup becomes admin automatically, a user-management screen for adding players and assigning roles, and admin-configurable competition-specific settings.
-- Bot players exist (`is_bot = true`), clearly labelled on the leaderboard (e.g. 🤖). **Bots are eligible for the season "winner" title** — only the admin is excluded, per above. Three bot types carry forward from the old app (ported logic, not reinvented); the ELO bot is dropped (see *Explicitly out of scope*):
+- One player flag is `is_admin`; admin can still play for fun but is **explicitly ineligible for the season "winner" title**, to avoid a credibility problem when the admin is also the one entering/correcting results. **Admin has exactly two elevated capabilities — entering/correcting match results and kickoff times, and resetting another player's PIN — and no elevated read visibility.** They see the app exactly as any other player would (pre-lock pick visibility rules apply to them too); there is no "admin sees everything early" bypass, and building one would be scope creep beyond what's actually decided. The very first admin account is created via a one-off seed script (same pattern as fixture seeding), not a UI flow — there's only ever one admin for now. _Deferred to future work_: a proper competition-setup flow where the first signup becomes admin automatically, a user-management screen for adding players and assigning roles, and admin-configurable competition-specific settings.
+- Bot players exist (`is_bot = true`), clearly labelled on the leaderboard (e.g. 🤖). **Bots are eligible for the season "winner" title** — only the admin is excluded, per above. Three bot types carry forward from the old app (ported logic, not reinvented); the ELO bot is dropped (see _Explicitly out of scope_):
   - **Random Bot**: predicts a random plausible scoreline for each side, independently, per match.
   - **1-1 Bot**: always predicts 1–1.
-  - **Median Bot**: predicts the rounded median of that match's human players' submitted picks. Generated only *after* the match locks (not a blind guess) — it's a "wisdom of the crowd" reference pick, not a competitive prediction.
+  - **Median Bot**: predicts the rounded median of that match's human players' submitted picks. Generated only _after_ the match locks (not a blind guess) — it's a "wisdom of the crowd" reference pick, not a competitive prediction.
 - **Late joiners**: a player who signs up (via the private competition code) after gameweek 1 has begun. They **are not eligible for the season "winner" title** (didn't compete the full season — same exclusion mechanism as the admin). They **can submit Predict the Table at any time after joining, or skip it entirely** — both optional for them, unlike the mandatory pre-season capture for players who join before gameweek 1. Gameweeks before they joined score 0, with no special-case logic needed beyond "no picks exist for those matches."
 
 ## Core weekly mechanic: two matches per gameweek
@@ -104,7 +106,7 @@ Scoring must be **idempotent**: correcting a previously-entered result and recom
 ## Notifications
 
 - **Email only**, via a free transactional provider (e.g. Resend). No business-verification gate, unlike WhatsApp — this is what makes full automation possible from early in the build rather than needing a manual workaround.
-- **Email is optional per player** (see *Identity and auth*) — sends are best-effort to whoever has an address on file. A player with no email simply doesn't receive these; there is no in-app fallback notification for them. Accepted trade-off, not a gap to close.
+- **Email is optional per player** (see _Identity and auth_) — sends are best-effort to whoever has an address on file. A player with no email simply doesn't receive these; there is no in-app fallback notification for them. Accepted trade-off, not a gap to close.
 - Two automated sends per gameweek, both considered high-value, neither to be cut casually:
   1. A pre-lock "picks due" reminder.
   2. A post-result "you scored X, you're now rank Y" push. This is the single highest-leverage retention lever identified during planning — the thing that turns "technically working" into "people keep opening the app." Do not deprioritize this relative to the reminder.
@@ -113,10 +115,10 @@ Scoring must be **idempotent**: correcting a previously-entered result and recom
 
 ## Trust, fairness, and admin integrity
 
-- No client-side Supabase access, ever (restated from *Stack* because it's the top trust risk, not just an architecture note).
+- No client-side Supabase access, ever (restated from _Stack_ because it's the top trust risk, not just an architecture note).
 - PIN security proportionate to actual stakes: hash + attempt-lockout is sufficient. The realistic risk is shared-device shoulder-surfing among family members, not remote attack — mitigate with a clear "Switch player" flow and reasonable session handling, not by making login itself heavier.
 - Session cookie: `httpOnly` + `secure` + `sameSite=Lax`. All state-changing API routes check a custom header (not present on cross-site form posts) before acting — enough CSRF protection for this threat model without a full token library, since Next.js API routes aren't naturally cross-origin-postable to begin with.
-- A player who forgets their PIN has an admin-assisted reset path (see *Identity and auth* for the forced-reset flow) — the realistic failure mode for the target age group, not a rare edge case.
+- A player who forgets their PIN has an admin-assisted reset path (see _Identity and auth_ for the forced-reset flow) — the realistic failure mode for the target age group, not a rare edge case.
 - Every match-result edit (admin corrections included) gets a timestamped audit entry (who changed what, when), visible on the Match Centre — this is the mitigation for the admin-is-also-a-player credibility problem, alongside the admin's season-winner ineligibility above.
 - Prefer resolving structural fairness questions (like the postponement rule above) with the simplest, least-disputable option, even if it's not the most "correct" — for a group this size, avoiding an argument is worth more than optimizing the edge case.
 
@@ -124,7 +126,7 @@ Scoring must be **idempotent**: correcting a previously-entered result and recom
 
 - `seasons`, `teams`
 - `gameweeks` — includes the Match-2 picker state machine (picker id, status, deadline) as DB columns, not app memory or cron-job state, so a missed cron cycle or cold start always resumes safely. Also references which fixture is Match 1 and which is Match 2 (either may be null — a Skipped Slot — if its fixture was postponed before lock).
-- `matches` — includes a stable external provider id (paired with a provider name, so a future provider swap doesn't collide ids), kickoff time, status (must represent both the post-lock Voided Match and the pre-lock Skipped Slot cases distinctly — see *Predictions*), current authoritative score.
+- `matches` — includes a stable external provider id (paired with a provider name, so a future provider swap doesn't collide ids), kickoff time, status (must represent both the post-lock Voided Match and the pre-lock Skipped Slot cases distinctly — see _Predictions_), current authoritative score.
 - `picks` — one row per `(player_id, match_id)`, home/away predicted score.
 - `scores` — idempotent points ledger, upserted per `(player_id, match_id)` on every (re)computation.
 - `table_predictions` + a full 20-team ordering per player, captured once per season.
@@ -149,4 +151,3 @@ Scoring must be **idempotent**: correcting a previously-entered result and recom
 - `CONTEXT.md` — glossary of domain terms (Fixture, Tipped Match, Admin, Season Standing, etc.).
 - `docs/adr/` — architecture decision records for hard-to-reverse, non-obvious calls.
 - `docs/standards/TESTING_STANDARD.md` — testing philosophy, validation order, and definition of done for this codebase.
-

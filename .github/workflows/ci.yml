@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history needed by critical-module-guard.mjs to diff/log
+          # against the base branch -- a shallow clone can't do that.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Vercel's own build (running on the same push/PR) already covers
+      # typecheck + lint + build for free -- see docs/standards/TESTING_STANDARD.md
+      # section 3. This job only adds what Vercel doesn't check: tests, and
+      # the golden-value/test-first discipline for src/lib/**.
+      - run: npm run test
+
+      - name: Critical-module guard (src/lib/**)
+        if: github.event_name == 'pull_request'
+        run: node scripts/ci/critical-module-guard.mjs
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}

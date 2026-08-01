@@ -10,7 +10,7 @@ export function createServerSupabaseClient() {
 
   if (!url || !serviceRoleKey) {
     throw new Error(
-      "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables."
+      "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables.",
     );
   }
 

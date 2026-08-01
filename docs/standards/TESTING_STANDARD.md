@@ -25,6 +25,41 @@ Not everything needs a test. Split by consequence:
 If behavior is important enough to write down in `CLAUDE.md` or `BUILD_PLAN.md`,
 it's important enough to have a test asserting it.
 
+### 1a) Golden-value discipline for `src/lib/**` (mechanically enforced)
+
+"A test exists and passes" doesn't prove it asserts the _right_ value —
+an agent can write implementation and test in the same pass and just assert
+on the code's own output, which passes trivially while encoding a bug. This
+happened for real in this repo's history: `CLAUDE.md` and `BUILD_PLAN.md`
+disagreed with each other on the scoring formula for a period before it was
+caught. For the five test-first modules above, living under `src/lib/`, CI
+mechanically enforces (`scripts/ci/critical-module-guard.mjs`, runs on every
+PR touching `src/lib/**`):
+
+1. Any changed `src/lib/**/*.ts` implementation file has a corresponding
+   `*.test.ts` change in the same diff.
+2. That test file contains at least 6 literal-value assertions
+   (`.toBe(<number>)` / `.toEqual(<number>)`) — not just "a test exists
+   somewhere," a table of named scenarios with specific expected numbers,
+   hand-derived from `CLAUDE.md`'s prose.
+3. The test file's first commit precedes the implementation file's first
+   commit in the PR's history — test-first, checked via git log ordering,
+   not just claimed.
+
+None of this proves correctness on its own — a determined agent can still
+hand-pick golden values that match its own bug. The part that actually
+closes the gap is human: `src/lib/**` is CODEOWNERS-gated (see `AGENTS.md`),
+so merging requires Andy to read the golden-value table in the test diff and
+spot-check it against `CLAUDE.md`'s prose — a two-minute numeric check, not
+a code review, which is what actually fits his bandwidth given he doesn't
+read the Next.js/TypeScript implementation itself.
+
+Also add at least one property/invariant test per critical module alongside
+the example-based golden values where one exists (e.g. idempotency of score
+recomputation, lockout still blocking after N+1 attempts) — invariants are
+harder to satisfy by accident with a wrong implementation than hand-picked
+examples are.
+
 ## 2) Stack
 
 - **Vitest** for unit/integration tests — fast, TypeScript-native, no native
@@ -48,6 +83,13 @@ npm run test
 npm run build
 ```
 
+`typecheck`/lint-staged/`test` run automatically on every commit via a Husky
+pre-commit hook; `build` runs on pre-push. Vercel's own build (on every
+push/PR, confirmed via `next.config.ts` having no `ignoreBuildErrors`/
+`ignoreDuringBuilds` overrides) re-covers typecheck/lint/build independently,
+so GitHub Actions CI only adds `test` and the `src/lib/**` golden-value
+check (§1a) — no redundant duplicate job.
+
 ## 4) Definition of Done
 
 A task is done only if:
@@ -65,12 +107,19 @@ One library per job. Add a row here in the same change that adds a new
 dependency for a job not yet listed — don't let a second option for an
 already-covered job creep in silently.
 
-| Job | Package |
-|---|---|
+| Job               | Package                                                                 |
+| ----------------- | ----------------------------------------------------------------------- |
 | Backend/DB client | `@supabase/supabase-js` (server-only, see `src/lib/supabase/server.ts`) |
-| Styling | Tailwind CSS |
-| PIN hashing | Node's built-in `crypto.scrypt` (no dependency) |
-| Testing | Vitest |
+| Styling           | Tailwind CSS                                                            |
+| PIN hashing       | Node's built-in `crypto.scrypt` (no dependency)                         |
+| Testing           | Vitest                                                                  |
+| Formatting        | Prettier (+ `eslint-config-prettier` to kill rule overlap)              |
+| Git hooks         | Husky + lint-staged                                                     |
+
+`.editorconfig` was considered and deliberately skipped: its value is
+cross-editor consistency for human contributors with varied IDE settings,
+which doesn't apply here — every line is written by Claude Code or Andy
+through the same tooling. Prettier already covers formatting consistency.
 
 ## 6) File layout
 

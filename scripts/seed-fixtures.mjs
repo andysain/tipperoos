@@ -26,7 +26,9 @@ async function fetchFromFootballData(path) {
     headers: { "X-Auth-Token": FOOTBALL_DATA_API_KEY },
   });
   if (!res.ok) {
-    throw new Error(`football-data.org ${path} failed: ${res.status} ${await res.text()}`);
+    throw new Error(
+      `football-data.org ${path} failed: ${res.status} ${await res.text()}`,
+    );
   }
   return res.json();
 }
@@ -65,7 +67,9 @@ async function main() {
     .select("id, provider_team_id")
     .eq("provider_name", PROVIDER_NAME);
   if (teamsFetchError) throw teamsFetchError;
-  const teamIdByProviderId = new Map(teams.map((t) => [t.provider_team_id, t.id]));
+  const teamIdByProviderId = new Map(
+    teams.map((t) => [t.provider_team_id, t.id]),
+  );
 
   const { data: seasonRow, error: seasonFetchError } = await supabase
     .from("seasons")
@@ -75,7 +79,12 @@ async function main() {
   if (seasonFetchError) throw seasonFetchError;
 
   const matchesResp = await fetchFromFootballData("/competitions/PL/matches");
-  const statusMap = { SCHEDULED: "scheduled", TIMED: "scheduled", POSTPONED: "postponed", FINISHED: "completed" };
+  const statusMap = {
+    SCHEDULED: "scheduled",
+    TIMED: "scheduled",
+    POSTPONED: "postponed",
+    FINISHED: "completed",
+  };
   const matchRows = matchesResp.matches.map((m) => ({
     season_id: seasonRow.id,
     provider_name: PROVIDER_NAME,
@@ -90,7 +99,9 @@ async function main() {
 
   const missingTeam = matchRows.find((m) => !m.team_a_id || !m.team_b_id);
   if (missingTeam) {
-    throw new Error(`Match ${missingTeam.provider_match_id} references an unknown team.`);
+    throw new Error(
+      `Match ${missingTeam.provider_match_id} references an unknown team.`,
+    );
   }
 
   const { error: matchesError } = await supabase

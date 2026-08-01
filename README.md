@@ -15,13 +15,13 @@ the `worldcup-2026-final` branch if it's ever needed again.
 
 ## Environments
 
-| Environment | Where it runs | Supabase project |
-|---|---|---|
-| Local dev | `npm run dev` on your machine | staging (`.env.local`, gitignored) |
-| Preview | Vercel auto-deploys every branch push/PR | staging |
-| Production | Vercel deploys `main` | production |
+| Environment | Where it runs                            | Supabase project                   |
+| ----------- | ---------------------------------------- | ---------------------------------- |
+| Local dev   | `npm run dev` on your machine            | staging (`.env.local`, gitignored) |
+| Preview     | Vercel auto-deploys every branch push/PR | staging                            |
+| Production  | Vercel deploys `main`                    | production                         |
 
-See `CLAUDE.md` → *Stack and architecture* for the full rationale.
+See `CLAUDE.md` → _Stack and architecture_ for the full rationale.
 
 ## Local setup
 
