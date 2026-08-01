@@ -20,8 +20,10 @@ Season opens **Friday 2026-08-21**.
 8. **Timezone** — UTC storage and all deadline/lock comparisons; Sydney (`Australia/Sydney`) for display only. No exceptions.
 9. **Old World Cup data** — full `pg_dump` (or CSV export) of the current Supabase project, done **before** any schema changes, day 1 of week 1. A git tag preserves code, not data — both are needed. *(Not performed this session — you explicitly held off on this earlier; it's now the first item in Week 1.)*
 10. **PIN auth / server-side routing** — hashed PIN, max-5-attempt lockout, nothing heavier (this is not a bank). Identity key is now **email address** (required, unique per player) rather than username, per decision 3 above; login itself is unchanged — pick your display name from a dropdown, enter your PIN. Because login isn't `auth.uid()`-based, Supabase RLS cannot gate rows — **all reads and writes must route through server-side Next.js API routes**, never a direct client→Supabase call. Universal agreement, zero dissent across all four agents; this is a correctness requirement, not a preference.
-11. **Match-2 picker edge cases** *(timing set by you, post-adjudication)* — state lives in DB columns on `gameweeks` (picker id, status, deadline), not app memory or cron state, so a missed cron cycle or cold start resumes safely. GW1 auto-randomizes Match 2 (no prior data exists yet); the real "last-place picks" mechanic switches on starting **gameweek 2**, using gameweek 1's score as the signal. Tiebreak order: (1) lowest score in the previous gameweek, (2) lowest cumulative standings position, (3) random among any still tied. Deadline window is "N hours after notification," capped so it can never overrun the earliest remaining kickoff. **Schedule consequence**: this needs to be built and tested by launch week, not eased in later — see Week 3 and Cut-if-behind below.
+11. **Match-2 picker edge cases** *(timing set by you, post-adjudication)* — state lives in DB columns on `gameweeks` (picker id, status, deadline), not app memory or cron state, so a missed cron cycle or cold start resumes safely. GW1 auto-randomizes Match 2 (no prior data exists yet); the real "last-place picks" mechanic switches on starting **gameweek 2**, using gameweek 1's score as the signal. Tiebreak order: (1) lowest score in the previous gameweek, (2) worst cumulative standing (closest to the bottom of the table — highest rank number, not lowest), (3) random among any still tied. Deadline window is "N hours after notification," capped so it can never overrun the earliest remaining kickoff. **Schedule consequence**: this needs to be built and tested by launch week, not eased in later — see Week 3 and Cut-if-behind below.
 12. **Predict-the-table storage** — store the full 20-team ordering regardless of what gets scored (cheap, and any simplified scoring view derives from it, not the reverse). Exact scoring/UI shape (full ranking vs. simplified champion/top-4/relegation) is **deliberately deferred** — your call — to be decided when this feature is actually being built (Week 3), not now.
+13. **Postponement before lock** *(gap found during domain modeling for issue #4)* — a Tipped Match postponed before its picks lock is a **Skipped Slot**: the gameweek simply runs with one Tipped Match instead of two, no auto-reselected or admin-picked replacement. Distinct from decision 7 (post-lock voiding), which was already settled. See `docs/adr/0001-skip-slot-on-pre-lock-postponement.md`.
+14. **Bot eligibility for season winner** *(gap found during domain modeling for issue #4)* — **bots are eligible to win**; only the admin is excluded (decision in *New gaps found* below, "Admin-as-player credibility risk"). No separate credibility problem for a bot winning — it doesn't control result entry.
 
 **New gaps found (folded into decisions above or here):**
 
@@ -58,7 +60,7 @@ Season opens **Friday 2026-08-21**.
 ### Week 3 — Aug 15–21: Automation, polish, dry run
 
 - Automate Match 1 random selection per gameweek.
-- **Match-2 real picker mechanic**: build and test now — it goes live gameweek 2, not gameweek 4, so there is no runway to ease into it post-launch. Uses the GW1 standings snapshot (already being recorded from Week 2) to compute lowest score → lowest cumulative position → random-among-ties.
+- **Match-2 real picker mechanic**: build and test now — it goes live gameweek 2, not gameweek 4, so there is no runway to ease into it post-launch. Uses the GW1 standings snapshot (already being recorded from Week 2) to compute lowest score → worst cumulative standing → random-among-ties.
 - Predict-the-table: ship a basic version, finalizing the exact shape (deferred decision, see above) now that it's actually being built (using the full-20-team-ordering schema) as part of onboarding, must be captured before GW1 kickoff since it's a one-time entry.
 - Admin result-edit audit trail + admin-ineligible-for-season-win flag.
 - Confirm postponement handling (void, no reroll) is wired into both the sync path and the admin manual-override path.
@@ -89,7 +91,7 @@ Season opens **Friday 2026-08-21**.
 All three items originally listed here have been resolved by you:
 
 - **Scoring formula** → additive (see Decisions made, scoring-divergence entry).
-- **Match-2 picker launch timing** → gameweek 2, lowest-score → lowest-position → random tiebreak (see decision 11).
+- **Match-2 picker launch timing** → gameweek 2, lowest-score → worst-standing → random tiebreak (see decision 11).
 - **Predict-the-table shape** → not resolved, but explicitly and deliberately deferred to Week 3, when the feature is actually being built — this is a decision (defer), not an open gap.
 
 Nothing outstanding needs your input right now. The one thing worth flagging back to you: gameweek-2 picker timing trades away the three-gameweek buffer this plan originally banked — see the Week 3 and Cut-if-behind updates above.

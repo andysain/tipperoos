@@ -1,0 +1,3 @@
+# Skip, don't replace, a Tipped Match slot postponed before lock
+
+A Fixture selected as Match 1 or Match 2 can be postponed by the Premier League before its picks lock (distinct from the already-settled post-lock case, which voids the match). We considered auto-reselecting a replacement Fixture, admin-manual replacement, and leaving the slot skipped for that Gameweek. We chose **skip, no replacement**: it needs no new reselection logic, avoids surprising players with a second late-appearing match under fresh time pressure, and a Gameweek occasionally running with one Tipped Match instead of two is a low-stakes outcome for a private competition. Revisit only if pre-lock postponements turn out to be frequent enough that skipped Gameweeks materially affect the competition.

@@ -36,7 +36,7 @@ Do not build a general tournament/sports platform. Build for this specific priva
 - Login UX is unchanged from the old app's spirit: pick your display name from a list, enter your PIN. No per-login email round-trip (ruled out OTP/magic-link login specifically because it reintroduces friction on a shared family device).
 - New players self-create only with the private competition code, matching the old model.
 - One player flag is `is_admin`; admin can still play for fun but is **explicitly ineligible for the season "winner" title**, to avoid a credibility problem when the admin is also the one entering/correcting results.
-- Bot players exist (`is_bot = true`), clearly labelled on the leaderboard (e.g. 🤖). Bot mechanics (which bot types, how they generate picks) are not yet fully re-specified for this rebuild — treat as an open design item, not carried over verbatim from the old app.
+- Bot players exist (`is_bot = true`), clearly labelled on the leaderboard (e.g. 🤖). **Bots are eligible for the season "winner" title** — only the admin is excluded, per above. Bot mechanics (which bot types, how they generate picks) are not yet fully re-specified for this rebuild — treat as an open design item, not carried over verbatim from the old app.
 
 ## Core weekly mechanic: two matches per gameweek
 
@@ -44,7 +44,7 @@ Each Premier League gameweek (~10 fixtures), exactly **two matches** are opened 
 
 - **Match 1**: randomly auto-selected each gameweek. (Curated/marquee selection is a possible future enhancement, not v1.)
 - **Match 2**: chosen by whichever player finished **last in points the previous gameweek**.
-  - Tiebreak order: (1) lowest score in the previous gameweek is the primary signal; (2) if tied on that score, lowest cumulative season standings position; (3) if still tied, random among those tied.
+  - Tiebreak order: (1) lowest score in the previous gameweek is the primary signal; (2) if tied on that score, **worst cumulative season standing** (i.e. the tied player closest to the bottom of the table — highest rank number, not lowest); (3) if still tied, random among those tied.
   - Starts **gameweek 2** — gameweek 1 has no prior-week data, so Match 2 is also auto-randomly selected for gameweek 1 only.
   - The picker has a deadline window ("N hours after being notified"), capped so it can never overrun the earliest remaining kickoff of the gameweek. If they miss it, the system auto-picks randomly on their behalf.
   - The picked match must exclude Match 1 and any match that has already kicked off.
@@ -57,6 +57,7 @@ Each Premier League gameweek (~10 fixtures), exactly **two matches** are opened 
 - Before lock: a player can see their own pick; other players' and bots' picks for that match are hidden.
 - After lock: all picks for that match become visible to everyone.
 - **Postponement of a selected match after its picks have locked: the match is voided.** No points awarded either way, no reroll, no substitute match. This was the single point of unprompted, independent agreement across every analysis of this rebuild — treat it as settled, not open for re-litigation without a strong reason.
+- **Postponement of a selected match before its picks have locked: that slot is skipped for the gameweek, not replaced.** No auto-reselection of a substitute fixture — simplest option, least code, and avoids a second wave of "new match just appeared, pick fast" pressure on players. That gameweek simply runs with one tipped match instead of two.
 - Match score is the score at the end of the match including extra time, where applicable; penalty-shootout goals never count toward the tipped score (largely inherited from the old app's rules — will rarely if ever apply in normal league play, but matters for domestic cup crossover fixtures if ever included).
 
 ## Scoring — additive
@@ -101,8 +102,8 @@ Scoring must be **idempotent**: correcting a previously-entered result and recom
 ## Data model (conceptual — not DDL; finalize schema during build)
 
 - `seasons`, `teams`
-- `gameweeks` — includes the Match-2 picker state machine (picker id, status, deadline) as DB columns, not app memory or cron-job state, so a missed cron cycle or cold start always resumes safely.
-- `matches` — includes a stable external provider id (paired with a provider name, so a future provider swap doesn't collide ids), kickoff time, status, current authoritative score.
+- `gameweeks` — includes the Match-2 picker state machine (picker id, status, deadline) as DB columns, not app memory or cron-job state, so a missed cron cycle or cold start always resumes safely. Also references which fixture is Match 1 and which is Match 2 (either may be null — a Skipped Slot — if its fixture was postponed before lock).
+- `matches` — includes a stable external provider id (paired with a provider name, so a future provider swap doesn't collide ids), kickoff time, status (must represent both the post-lock Voided Match and the pre-lock Skipped Slot cases distinctly — see *Predictions*), current authoritative score.
 - `picks` — one row per `(player_id, match_id)`, home/away predicted score.
 - `scores` — idempotent points ledger, upserted per `(player_id, match_id)` on every (re)computation.
 - `table_predictions` + a full 20-team ordering per player, captured once per season.
