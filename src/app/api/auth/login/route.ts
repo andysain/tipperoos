@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { hasCsrfHeader } from "@/app/_lib/csrf";
 import { setSessionCookie } from "@/app/_lib/session-cookie";
 import {
+  MAX_FAILED_PIN_ATTEMPTS,
   isLocked,
   recordFailedPinAttempt,
   recordSuccessfulLogin,
@@ -93,7 +94,15 @@ export async function POST(request: Request) {
         locked_until: nextState.lockedUntil,
       })
       .eq("id", player.id);
-    return invalidCredentials();
+
+    const attemptsRemaining = Math.max(
+      0,
+      MAX_FAILED_PIN_ATTEMPTS - nextState.failedPinAttempts,
+    );
+    return NextResponse.json(
+      { error: "Incorrect display name or PIN.", attemptsRemaining },
+      { status: 401 },
+    );
   }
 
   const resetState = recordSuccessfulLogin(lockoutState);
