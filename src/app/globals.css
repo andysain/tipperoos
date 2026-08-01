@@ -1,8 +1,15 @@
 @import "tailwindcss";
 
+/*
+ * Tipperoos design tokens — see docs/DESIGN_SYSTEM.md for the full spec and
+ * rationale. Component code must reference these tokens (Tailwind utilities
+ * generated below), never a raw hex value inline — that's what makes a future
+ * dark theme a token swap instead of a find-and-replace (dark values are not
+ * defined yet; v1 ships light-only, see docs/DESIGN_SYSTEM.md "Dark mode").
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f6f3ec;
+  --foreground: #123c43;
 }
 
 @theme inline {
@@ -10,17 +17,30 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-ink: #123c43;
+  --color-accent: #f0a63d;
+  --color-accent-ink: #123c43;
+  --color-success: #4c9a4a;
+  --color-danger: #d8434b;
+  --color-warning: #ebc94c;
+  --color-info: #3e7c86;
+  --color-paper: #f6f3ec;
+  --color-paper-line: #e2dbc9;
+
+  --radius-btn-sm: 11px;
+  --radius-btn: 14px;
+  --radius-card: 20px;
+  --radius-badge: 999px;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family:
+    var(--font-sans),
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    sans-serif;
 }
