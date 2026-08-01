@@ -37,3 +37,4 @@ supabase/.temp
 
 # project-local, not for version control
 backups/
+.env*
