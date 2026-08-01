@@ -107,14 +107,16 @@ One library per job. Add a row here in the same change that adds a new
 dependency for a job not yet listed — don't let a second option for an
 already-covered job creep in silently.
 
-| Job               | Package                                                                 |
-| ----------------- | ----------------------------------------------------------------------- |
-| Backend/DB client | `@supabase/supabase-js` (server-only, see `src/lib/supabase/server.ts`) |
-| Styling           | Tailwind CSS                                                            |
-| PIN hashing       | Node's built-in `crypto.scrypt` (no dependency)                         |
-| Testing           | Vitest                                                                  |
-| Formatting        | Prettier (+ `eslint-config-prettier` to kill rule overlap)              |
-| Git hooks         | Husky + lint-staged                                                     |
+| Job                | Package                                                                                                         |
+| ------------------ | --------------------------------------------------------------------------------------------------------------- |
+| Backend/DB client  | `@supabase/supabase-js` (server-only, see `src/lib/supabase/server.ts`)                                         |
+| Styling            | Tailwind CSS                                                                                                    |
+| Component variants | `tailwind-variants` — for any component with more than one visual variant, see `docs/DESIGN_SYSTEM.md`          |
+| Icons              | `lucide-react`, restyled to match the brand — never emoji for functional UI chrome, see `docs/DESIGN_SYSTEM.md` |
+| PIN hashing        | Node's built-in `crypto.scrypt` (no dependency)                                                                 |
+| Testing            | Vitest                                                                                                          |
+| Formatting         | Prettier (+ `eslint-config-prettier` to kill rule overlap)                                                      |
+| Git hooks          | Husky + lint-staged                                                                                             |
 
 `.editorconfig` was considered and deliberately skipped: its value is
 cross-editor consistency for human contributors with varied IDE settings,
