@@ -24,9 +24,10 @@ Do not build a general tournament/sports platform. Build for this specific priva
 ## Stack and architecture
 
 - **Next.js on Vercel**, full JS. No Python in the live app — this was a deliberate call, not an oversight; see *Explicitly out of scope* for what that ruled out.
-- **Supabase Postgres** (fresh project, not the old World Cup project) as the backend.
+- **Supabase Postgres** (fresh project, not the old World Cup project) as the backend, plus a **second free Supabase project as a staging environment** for the week-3 dry run and general testing, so testing never runs against the same project going live for real players. Free tier allows 2 active projects per org.
+- **Ongoing backup**: a lightweight weekly export of the live project's tables (same REST-export pattern used for the old project's one-time backup), so the new project has a rolling data safety net during the season, not just a pre-launch one-off.
 - **Auth is not Supabase Auth.** Login is application-level (email + PIN, see below), so Postgres RLS cannot key off `auth.uid()`. Consequence: **all reads and writes must go through server-side Next.js API routes** — never a direct client-side Supabase call, anywhere, ever. This is the single biggest security invariant in the app; violating it is how a technically-minded player reads other players' pre-lock picks via devtools.
-- **Fixture/result sync**: a GitHub Actions scheduled workflow is the primary mechanism (~10–15 min cadence on match days) calling a Vercel API route, which calls a free football data API (e.g. football-data.org). All 380 season fixtures are seeded once from published data; the API is used only for deltas — kickoff-time changes and results — never to discover fixtures. Match on a stable external fixture ID, never team-name+date.
+- **Fixture/result sync**: a GitHub Actions scheduled workflow is the primary mechanism (~10–15 min cadence on match days) calling a Vercel API route, which calls a free football data API (e.g. football-data.org — confirmed free tier includes the Premier League, at 10 calls/minute). All 380 season fixtures are seeded once from published data; the API is used only for deltas — kickoff-time changes and results — never to discover fixtures. Each sync cycle must be **one batched date-range call**, not one call per fixture, to stay comfortably inside the free-tier rate limit. Match on a stable external fixture ID, never team-name+date.
 - A lightweight Supabase pg_cron job runs as a secondary **health-check watchdog only** (not the sync itself): confirms a successful sync happened recently and alerts the admin if not.
 - **Email, not WhatsApp**, is the notification channel (see *Notifications*). WhatsApp is a deferred future add-on.
 
@@ -36,7 +37,11 @@ Do not build a general tournament/sports platform. Build for this specific priva
 - Login UX is unchanged from the old app's spirit: pick your display name from a list, enter your PIN. No per-login email round-trip (ruled out OTP/magic-link login specifically because it reintroduces friction on a shared family device).
 - New players self-create only with the private competition code, matching the old model.
 - One player flag is `is_admin`; admin can still play for fun but is **explicitly ineligible for the season "winner" title**, to avoid a credibility problem when the admin is also the one entering/correcting results.
-- Bot players exist (`is_bot = true`), clearly labelled on the leaderboard (e.g. 🤖). **Bots are eligible for the season "winner" title** — only the admin is excluded, per above. Bot mechanics (which bot types, how they generate picks) are not yet fully re-specified for this rebuild — treat as an open design item, not carried over verbatim from the old app.
+- Bot players exist (`is_bot = true`), clearly labelled on the leaderboard (e.g. 🤖). **Bots are eligible for the season "winner" title** — only the admin is excluded, per above. Three bot types carry forward from the old app (ported logic, not reinvented); the ELO bot is dropped (see *Explicitly out of scope*):
+  - **Random Bot**: predicts a random plausible scoreline for each side, independently, per match.
+  - **1-1 Bot**: always predicts 1–1.
+  - **Median Bot**: predicts the rounded median of that match's human players' submitted picks. Generated only *after* the match locks (not a blind guess) — it's a "wisdom of the crowd" reference pick, not a competitive prediction.
+- **Late joiners**: a player who signs up (via the private competition code) after gameweek 1 has begun. They **are not eligible for the season "winner" title** (didn't compete the full season — same exclusion mechanism as the admin). They **can submit Predict the Table at any time after joining, or skip it entirely** — both optional for them, unlike the mandatory pre-season capture for players who join before gameweek 1. Gameweeks before they joined score 0, with no special-case logic needed beyond "no picks exist for those matches."
 
 ## Core weekly mechanic: two matches per gameweek
 
@@ -96,6 +101,8 @@ Scoring must be **idempotent**: correcting a previously-entered result and recom
 
 - No client-side Supabase access, ever (restated from *Stack* because it's the top trust risk, not just an architecture note).
 - PIN security proportionate to actual stakes: hash + attempt-lockout is sufficient. The realistic risk is shared-device shoulder-surfing among family members, not remote attack — mitigate with a clear "Switch player" flow and reasonable session handling, not by making login itself heavier.
+- Session cookie: `httpOnly` + `secure` + `sameSite=Lax`. All state-changing API routes check a custom header (not present on cross-site form posts) before acting — enough CSRF protection for this threat model without a full token library, since Next.js API routes aren't naturally cross-origin-postable to begin with.
+- A player who forgets their PIN has an admin-assisted reset path (admin resets it, player sets a new one on next login) — the realistic failure mode for the target age group, not a rare edge case.
 - Every match-result edit (admin corrections included) gets a timestamped audit entry (who changed what, when), visible on the Match Centre — this is the mitigation for the admin-is-also-a-player credibility problem, alongside the admin's season-winner ineligibility above.
 - Prefer resolving structural fairness questions (like the postponement rule above) with the simplest, least-disputable option, even if it's not the most "correct" — for a group this size, avoiding an argument is worth more than optimizing the edge case.
 
