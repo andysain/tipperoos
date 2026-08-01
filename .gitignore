@@ -10,3 +10,4 @@ venv/
 *.sqlite
 *.sqlite3
 codex_mvp_handoff.md
+backups/
