@@ -26,6 +26,14 @@ Do not build a general tournament/sports platform. Build for this specific priva
 - **Next.js on Vercel**, full JS. No Python in the live app — this was a deliberate call, not an oversight; see *Explicitly out of scope* for what that ruled out.
 - **Supabase Postgres** (fresh project, not the old World Cup project) as the backend, plus a **second free Supabase project as a staging environment** for the week-3 dry run and general testing, so testing never runs against the same project going live for real players. Free tier allows 2 active projects per org.
 - **Ongoing backup**: a lightweight weekly export of the live project's tables (same REST-export pattern used for the old project's one-time backup), so the new project has a rolling data safety net during the season, not just a pre-launch one-off.
+- **Three-environment mapping**, all free on Vercel's Hobby tier:
+  | Environment | Where it runs | Supabase project |
+  |---|---|---|
+  | Local dev | `next dev` on your machine | staging (`.env.local`, gitignored) |
+  | Preview | Vercel auto-deploys every branch push/PR to a unique URL | staging (Vercel env vars scoped to "Preview") |
+  | Production | Vercel deploys `main` to the real domain | production (Vercel env vars scoped to "Production") |
+
+  Discipline this requires: apply any schema migration to staging first, confirm it, then apply the same migration to production before merging the branch that depends on it — schema drift between the two is the main failure mode.
 - **Auth is not Supabase Auth.** Login is application-level (email + PIN, see below), so Postgres RLS cannot key off `auth.uid()`. Consequence: **all reads and writes must go through server-side Next.js API routes** — never a direct client-side Supabase call, anywhere, ever. This is the single biggest security invariant in the app; violating it is how a technically-minded player reads other players' pre-lock picks via devtools.
 - **Fixture/result sync**: a GitHub Actions scheduled workflow is the primary mechanism (~10–15 min cadence on match days) calling a Vercel API route, which calls a free football data API (e.g. football-data.org — confirmed free tier includes the Premier League, at 10 calls/minute). All 380 season fixtures are seeded once from published data; the API is used only for deltas — kickoff-time changes and results — never to discover fixtures. Each sync cycle must be **one batched date-range call**, not one call per fixture, to stay comfortably inside the free-tier rate limit. Match on a stable external fixture ID, never team-name+date.
 - A lightweight Supabase pg_cron job runs as a secondary **health-check watchdog only** (not the sync itself): confirms a successful sync happened recently and alerts the admin if not.
