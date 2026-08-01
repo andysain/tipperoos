@@ -151,8 +151,48 @@ server-only data-fetching pattern, a mutating API route, a form) so later
 work copies it instead of drifting into a second, subtly different way of
 doing the same thing.
 
+Before writing the first real example of a shape, check whether an installed
+skill (`.claude/skills/`, see §9) already covers it: a Server Component or
+Route Handler → `nextjs-app-router-patterns`; a migration or schema change →
+`supabase-postgres-best-practices`; a non-trivial test → `vitest-testing`; a
+generic/utility-type-heavy module → `typescript-advanced-types`.
+
 ## 8) Commits
 
 Loose, not enforced by tooling: `<type>: <imperative summary>` — `feat`,
 `fix`, `docs`, `refactor`, `test`, `chore`. Keeps history scannable across
 sessions; not worth more ceremony than that for a solo project.
+
+## 9) Installed skills — caveats and deviations
+
+Seven Claude Code skills are installed (`.claude/skills/`, content in
+`.agents/skills/`, tracked in `skills-lock.json`) covering this stack:
+`supabase-postgres-best-practices`, `supabase-server`, `nextjs-app-router-patterns`,
+`vitest-testing`, `typescript-advanced-types`, `tailwind-css`,
+`mobile-responsiveness`. Most apply as-is. Two deliberate deviations to know
+about so a future pass doesn't "fix" them unprompted:
+
+- **Primary keys stay `uuid default gen_random_uuid()`.** The
+  `supabase-postgres-best-practices` skill (`schema-primary-keys.md`) will
+  suggest `bigint identity` or UUIDv7 for new tables, since random UUIDv4 PKs
+  cause index fragmentation at scale. At this project's scale (10–20 players,
+  380 fixtures/season) that cost is negligible, and every existing table
+  already uses `gen_random_uuid()` (see `supabase/migrations/`) — retrofitting
+  would be pure churn for no real benefit. Keep the existing convention for
+  new tables too, for consistency. Its `data-upsert.md` `ON CONFLICT` guidance
+  still applies as-is and is the intended shape for the idempotent `scores`
+  upsert required by `CLAUDE.md`.
+- **`supabase-server` mostly doesn't apply here.** That skill documents the
+  separate `@supabase/server` npm package (Edge Functions, Deno, Hono
+  adapters) — this repo uses plain `@supabase/supabase-js` directly inside
+  Next.js Route Handlers/Server Components, not that package, so most of its
+  guidance won't trigger. The one portable point: it uses the current Supabase
+  key names (`SUPABASE_PUBLISHABLE_KEY`/`SUPABASE_SECRET_KEY`), while
+  `.env.example` and `src/lib/supabase/server.ts` still use the legacy
+  `SUPABASE_SERVICE_ROLE_KEY` naming. Not urgent — the legacy keys still work
+  — but worth a rename pass next time that file is touched, if the current
+  Supabase project has the new-format keys available.
+- **`supabase-postgres-best-practices`'s RLS section doesn't apply.** This
+  repo's auth model is explicitly RLS-free by design (see `CLAUDE.md` →
+  _Explicitly out of scope_) — enforcement lives entirely in server-side
+  route logic. Ignore that skill's RLS guidance when it fires.
