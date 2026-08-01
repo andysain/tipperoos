@@ -44,7 +44,15 @@ PR touching `src/lib/**`):
    hand-derived from `CLAUDE.md`'s prose.
 3. The test file's first commit precedes the implementation file's first
    commit in the PR's history — test-first, checked via git log ordering,
-   not just claimed.
+   not just claimed. **Known limitation**: this only fails a _strict_
+   violation (implementation committed, then test committed later). A new
+   `src/lib/**` file's test can't literally predate the file it imports —
+   `tsc` won't resolve the import — so in practice both land in the same
+   commit (the local pre-commit hook requires every commit to typecheck and
+   pass tests, which rules out a red-then-green two-commit sequence without
+   hackier workarounds than this project's scale warrants). A same-commit
+   tie passes the check. This was deliberately left as-is after a real
+   attempt to tighten it hit that structural wall — see `BUILD_PLAN.md`.
 
 None of this proves correctness on its own — a determined agent can still
 hand-pick golden values that match its own bug. The part that actually
