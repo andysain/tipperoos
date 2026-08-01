@@ -1,19 +1,39 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# testing
+/coverage
+
+# misc
 .DS_Store
-__pycache__/
-*.py[cod]
-.venv/
-venv/
-.streamlit/secrets.toml
+*.pem
+*.log
+*.local.md
+
+# env files
 .env
-.env.local
-.env.*.local
+.env*.local
 .env.development
 .env.production
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# supabase
 supabase/.temp
-*.local.md
-*.log
-*.db
-*.sqlite
-*.sqlite3
-codex_mvp_handoff.md
+
+# project-local, not for version control
 backups/
