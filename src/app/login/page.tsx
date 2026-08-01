@@ -57,15 +57,13 @@ function LoginFlow() {
   const searchParams = useSearchParams();
   const wantsJoin = searchParams.get("intent") === "join";
 
-  // Computed synchronously so there's no stored code -> no setState-in-effect
-  // needed for that branch; only the actual async replay (below) sets state
-  // from an effect, which is the legitimate case for it.
-  const [step, setStep] = useState<Step>(() =>
-    typeof window !== "undefined" &&
-    window.localStorage.getItem(STORED_CODE_KEY)
-      ? "checking"
-      : "code",
-  );
+  // Always starts at "checking" on both server and client. localStorage
+  // doesn't exist during SSR, so branching on it inside this initializer
+  // (as an earlier version did) makes the server and the client's first
+  // render pass disagree -- a real hydration mismatch, not just a lint
+  // nit. The effect below (client-only, runs after hydration) is the only
+  // place that's allowed to read it.
+  const [step, setStep] = useState<Step>("checking");
   const [competitionCode, setCompetitionCode] = useState<string | null>(null);
   const [codeInput, setCodeInput] = useState("");
   const [codeError, setCodeError] = useState<string | null>(null);
@@ -94,7 +92,14 @@ function LoginFlow() {
   // competition code was rotated).
   useEffect(() => {
     const stored = window.localStorage.getItem(STORED_CODE_KEY);
-    if (!stored) return;
+    if (!stored) {
+      // Legitimate synchronous setState: this is the "sync React state from
+      // a browser-only API unavailable at SSR time" case, not the general
+      // pattern react-hooks/set-state-in-effect warns about.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setStep("code");
+      return;
+    }
 
     fetchPlayers(stored).then((loaded) => {
       if (loaded) {
