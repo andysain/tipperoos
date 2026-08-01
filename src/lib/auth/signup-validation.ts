@@ -1,5 +1,15 @@
+import { timingSafeEqual } from "node:crypto";
+
 export const DISPLAY_NAME_MIN_LENGTH = 2;
 export const DISPLAY_NAME_MAX_LENGTH = 20;
+export const PIN_LENGTH = 4;
+
+const PIN_PATTERN = /^\d{4}$/;
+
+/** Whether a PIN is exactly 4 digits, per CLAUDE.md -> Identity and auth. */
+export function validatePinFormat(pin: string): boolean {
+  return PIN_PATTERN.test(pin);
+}
 
 // Letters (unicode-aware, for names like "José"), digits, spaces,
 // apostrophes and hyphens. Emoji has its own dedicated onboarding field
@@ -43,7 +53,12 @@ export function verifyCompetitionCode(
   submitted: string,
   expected: string,
 ): boolean {
-  const normalizedExpected = expected.trim();
+  const normalizedExpected = expected.trim().toLowerCase();
   if (!normalizedExpected) return false;
-  return submitted.trim().toLowerCase() === normalizedExpected.toLowerCase();
+  const normalizedSubmitted = submitted.trim().toLowerCase();
+
+  const expectedBuf = Buffer.from(normalizedExpected, "utf8");
+  const submittedBuf = Buffer.from(normalizedSubmitted, "utf8");
+  if (expectedBuf.length !== submittedBuf.length) return false;
+  return timingSafeEqual(expectedBuf, submittedBuf);
 }

@@ -11,13 +11,23 @@ export function recordFailedPinAttempt(
   state: LockoutState,
   now: Date,
 ): LockoutState {
-  const failedPinAttempts = state.failedPinAttempts + 1;
+  // A lock that has already auto-expired grants a fresh attempt budget --
+  // otherwise a single honest mistake right after expiry would immediately
+  // re-lock the account for another 15 minutes off one attempt, not five.
+  const priorLockHasExpired =
+    state.lockedUntil !== null &&
+    now.getTime() >= new Date(state.lockedUntil).getTime();
+
+  const failedPinAttempts =
+    (priorLockHasExpired ? 0 : state.failedPinAttempts) + 1;
+
   const lockedUntil =
     failedPinAttempts >= MAX_FAILED_PIN_ATTEMPTS
       ? new Date(
           now.getTime() + LOCKOUT_DURATION_MINUTES * 60 * 1000,
         ).toISOString()
-      : state.lockedUntil;
+      : null;
+
   return { failedPinAttempts, lockedUntil };
 }
 

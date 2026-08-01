@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   DISPLAY_NAME_MAX_LENGTH,
   DISPLAY_NAME_MIN_LENGTH,
+  PIN_LENGTH,
   validateDisplayName,
+  validatePinFormat,
   verifyCompetitionCode,
 } from "./signup-validation";
 
@@ -69,6 +71,34 @@ describe("validateDisplayName", () => {
 
   it("rejects characters outside the allowed set (e.g. emoji belongs in the separate emoji field, not the name)", () => {
     expect(validateDisplayName("Andy🔥").ok).toBe(false);
+  });
+});
+
+describe("validatePinFormat", () => {
+  it("PIN length is fixed at 4", () => {
+    expect(PIN_LENGTH).toBe(4);
+  });
+
+  it("accepts a 4-digit PIN", () => {
+    expect(validatePinFormat("1234")).toBe(true);
+    expect(validatePinFormat("0000")).toBe(true);
+  });
+
+  it("rejects a 3-digit PIN", () => {
+    expect(validatePinFormat("123")).toBe(false);
+  });
+
+  it("rejects a 5-digit PIN", () => {
+    expect(validatePinFormat("12345")).toBe(false);
+  });
+
+  it("rejects non-digit characters", () => {
+    expect(validatePinFormat("12ab")).toBe(false);
+    expect(validatePinFormat("12 4")).toBe(false);
+  });
+
+  it("rejects an empty string", () => {
+    expect(validatePinFormat("")).toBe(false);
   });
 });
 

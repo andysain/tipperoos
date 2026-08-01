@@ -42,14 +42,26 @@ describe("recordFailedPinAttempt", () => {
     expect(lockedUntilMs - NOW.getTime()).toBe(900000);
   });
 
-  it("keeps re-extending the lock window on further failed attempts past the threshold", () => {
+  it("keeps re-extending the lock window on further failed attempts while still locked", () => {
+    const stillLockedUntil = new Date(NOW.getTime() + 300000).toISOString(); // 5 min remaining
     const state = recordFailedPinAttempt(
-      { failedPinAttempts: 6, lockedUntil: NOW.toISOString() },
+      { failedPinAttempts: 6, lockedUntil: stillLockedUntil },
       NOW,
     );
     expect(state.failedPinAttempts).toBe(7);
     const lockedUntilMs = new Date(state.lockedUntil as string).getTime();
     expect(lockedUntilMs - NOW.getTime()).toBe(900000);
+  });
+
+  it("grants a fresh attempt budget after a prior lock has auto-expired, instead of instantly re-locking on one mistake", () => {
+    const expiredLockedUntil = new Date(NOW.getTime() - 1000).toISOString(); // expired 1s ago
+    const state = recordFailedPinAttempt(
+      { failedPinAttempts: 5, lockedUntil: expiredLockedUntil },
+      NOW,
+    );
+    expect(state.failedPinAttempts).toBe(1);
+    expect(state.lockedUntil).toBe(null);
+    expect(isLocked(state, NOW)).toBe(false);
   });
 });
 
