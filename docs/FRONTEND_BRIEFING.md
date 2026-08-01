@@ -55,6 +55,26 @@ Worth knowing before you name components/props: **Fixture** (any of the 380 seas
 - **Testing expectations for you specifically**: per `docs/standards/TESTING_STANDARD.md`, UI/layout/styling is explicitly **not** required to have automated tests — verify by actually using the feature in a browser (and on the Preview deployment URL a PR generates) instead. Logic-heavy code (scoring, auth, etc.) is the backend agent's test-first responsibility, not yours.
 - Local dev: `npm run dev`, reads from the **staging** Supabase project via `.env.local` (already present in this checkout, gitignored — see `supabase-credentials.local.md` if you need the values again). Never point local dev at production.
 
+## Old app screenshots (`docs/screenshots/`)
+
+Three screenshots of the retired Streamlit app: `screencapture-tipperoos-streamlit-leaderboard.png`, `-match-centre.png`, `-my-predictions.png`. Useful for seeing what functionality existed and a couple of genuinely reusable interaction patterns — **not a visual/UX template to copy**. This was the World Cup version: same theme, same general player pool, but a short-tournament product, not this ongoing 38-gameweek league. A lot of what's on screen is either tournament-specific mechanics that don't exist in this rebuild, or exactly the density/clunkiness this rebuild is a reaction against.
+
+**Patterns worth actually considering:**
+
+- **My Predictions**: tap-to-select scoreline grid (a row of `0 1 2 3 4 5+` buttons per team, instead of a raw number input) — a strong candidate for a kid-friendly, mobile-friendly score entry control. Your version only ever needs 2 matches per gameweek though, not ~104, so you don't need the pagination ("Show 12 more") or heavy filtering it has.
+- Compact stat-pill summary rows (`To tip / Saved / Locked / Missed`, or `Matches / Your rank / Your score / Top score`) — a reasonable pattern for leaderboard/picks summary.
+- "Switch player" as a persistent, easy-to-find button — matches a named requirement, keep this concept.
+- Bot entries clearly badge-labelled in the leaderboard — matches a named requirement, keep this concept.
+
+**Explicitly don't carry forward:**
+
+- The Streamlit left-sidebar page-nav structure. This whole rebuild exists partly because the old app felt clunky/slow — don't reproduce its information architecture by default.
+- Match Centre's dense, cramped per-match comparison layout — likely a contributor to that "clunky" feedback, not a pattern to repeat.
+- The score-progression line chart on the leaderboard. Explicitly out of scope for this rebuild (see `CLAUDE.md` → _Explicitly out of scope_: "Full analytics/stats pages... not carried forward for relaunch").
+- **"Winner pick"** (shown locked on the My Predictions screen) and **"Advance"** columns/terminology (Match Centre, leaderboard breakdown) — both World Cup knockout-tournament concepts. There's no tournament winner pick and no advancement bonus in a league season; don't design around them. (Note: this is different from **Predict the Table**, the actual EPL season-long feature — see above — which has no old-app screenshot since it didn't exist in that version.)
+- The score-breakdown columns shown (`Exact / Goal diff / Result / Advance`) reflect the old app's actual scoring code, which `CLAUDE.md` documents as having drifted from spec — the new additive formula's categories are different (`Result +3 / Goal difference +2 / Home score +1 / Away score +1 / Exact bonus +2`, no knockout-advancement term at all). If you build a similar score-breakdown UI, use the new categories, not these.
+- **Elo Bot** and the "Starting +20" late-joiner bonus shown for one player — both dropped. Only three bot types exist now (Random, 1-1, Median — see `CLAUDE.md` → Identity and auth), and late joiners get 0 points for gameweeks before they joined, no starting bonus.
+
 ## Where to go for more
 
 - `CLAUDE.md` — full product spec, source of truth if this doc and it ever disagree.
