@@ -57,6 +57,9 @@ Season opens **Friday 2026-08-21**.
 - **Match-2 deferral bootstrapping gap** _(data-model agent, found in cross-examination)_: if the real picker mechanic is deferred to gameweek 4, it needs "who finished last" history that only exists if it was being recorded since gameweek 1. Resolved: a lightweight per-gameweek standings snapshot is recorded from GW1 onward regardless of whether the picker UI itself is live.
 - **football-data.org freshness SLA is undocumented for live matches** _(ship-it agent)_: mitigated by scope, not engineering — the app never needs live in-match data, only pre-match kickoff-time changes and final full-time results, which is a much smaller exposure window. Verify actual latency empirically in week 2 before trusting it for anything lock-adjacent.
 
+31. **Display name format rules** _(2026-08-01, made while implementing the Auth & Player Accounts logic layer — not previously specified anywhere)_ — CLAUDE.md/the grilling session established `display_name` as the unique identity key but never pinned down length/character rules. Set while writing `src/lib/auth/signup-validation.ts`: 2–20 characters after trimming, letters (unicode-aware)/numbers/spaces/apostrophes/hyphens only. Emoji is excluded here since it already has its own dedicated onboarding field. Low cost to revisit — it's a pure validation function with its own golden-value test table, not a schema constraint (the `display_name` column itself is unconstrained `text`).
+    - **Tooling fix alongside**: `eslint.config.mjs`'s custom `globalIgnores` had silently dropped `node_modules` from the default ignore list (only re-added `.next`/`out`/`build`/`next-env.d.ts`) and used unanchored patterns, so `npm run lint` was recursing into any nested worktree's `.next`/`node_modules`. Fixed by anchoring with `**/` and re-adding `node_modules`.
+
 ---
 
 ## Build plan
