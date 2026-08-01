@@ -8,6 +8,12 @@ export default defineConfig({
       // server bundles at build time; Vitest has no equivalent, so it
       // throws on import. Reproduce the no-op here instead.
       "server-only": path.resolve(__dirname, "vitest/server-only-stub.ts"),
+      // Mirrors tsconfig.json's "@/*" -> "./src/*" path mapping. tsc
+      // resolves this fine (it just typechecks), but Vitest's own
+      // resolver doesn't read tsconfig paths, so any test that imports a
+      // src/app/** file using "@/..." (as most do) fails at collection
+      // time without this.
+      "@": path.resolve(__dirname, "src"),
     },
   },
   test: {

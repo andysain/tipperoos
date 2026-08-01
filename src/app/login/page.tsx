@@ -44,13 +44,32 @@ function formatSydneyTime(iso: string): string {
   }).format(new Date(iso));
 }
 
-async function fetchPlayers(code: string): Promise<Player[] | null> {
-  const response = await fetch("/api/auth/players", {
-    headers: { "x-competition-code": code },
-  });
-  if (!response.ok) return null;
-  const data = await response.json();
-  return data.players;
+export type FetchPlayersResult =
+  | { status: "ok"; players: Player[] }
+  | { status: "invalid-code" }
+  | { status: "error" };
+
+// Never rejects -- every failure mode (network failure, a non-JSON body, a
+// transient 5xx, an actually-invalid/rotated code) resolves to a specific
+// FetchPlayersResult instead. Centralized here rather than relying on every
+// call site to remember try/catch: an earlier version left this rejecting
+// on network failure, which the mount-time silent-replay call site (below)
+// didn't catch -- the user was stuck on the initial loading screen forever.
+// It also used to return `null` for any non-ok response, which conflated a
+// genuinely invalid/rotated code (403) with a transient server error (5xx),
+// wiping a still-valid stored code from localStorage on a mere blip.
+export async function fetchPlayers(code: string): Promise<FetchPlayersResult> {
+  try {
+    const response = await fetch("/api/auth/players", {
+      headers: { "x-competition-code": code },
+    });
+    if (response.status === 403) return { status: "invalid-code" };
+    if (!response.ok) return { status: "error" };
+    const data = await response.json();
+    return { status: "ok", players: data.players };
+  } catch {
+    return { status: "error" };
+  }
 }
 
 function LoginFlow() {
@@ -101,13 +120,20 @@ function LoginFlow() {
       return;
     }
 
-    fetchPlayers(stored).then((loaded) => {
-      if (loaded) {
+    fetchPlayers(stored).then((result) => {
+      if (result.status === "ok") {
         setCompetitionCode(stored);
-        setPlayers(loaded);
+        setPlayers(result.players);
         setStep(wantsJoin ? "join" : "list");
-      } else {
+      } else if (result.status === "invalid-code") {
         window.localStorage.removeItem(STORED_CODE_KEY);
+        setStep("code");
+      } else {
+        // Transient failure, not necessarily an invalid code -- don't evict
+        // a code that might still be valid.
+        setCodeError(
+          "Couldn't reach Tipperoos. Check your connection and try again.",
+        );
         setStep("code");
       }
     });
@@ -124,19 +150,21 @@ function LoginFlow() {
 
     setCodeSubmitting(true);
     try {
-      const loaded = await fetchPlayers(trimmed);
-      if (!loaded) {
+      const result = await fetchPlayers(trimmed);
+      if (result.status === "invalid-code") {
         setCodeError("That code doesn't look right.");
+        return;
+      }
+      if (result.status === "error") {
+        setCodeError(
+          "Couldn't reach Tipperoos. Check your connection and try again.",
+        );
         return;
       }
       window.localStorage.setItem(STORED_CODE_KEY, trimmed);
       setCompetitionCode(trimmed);
-      setPlayers(loaded);
+      setPlayers(result.players);
       setStep(wantsJoin ? "join" : "list");
-    } catch {
-      setCodeError(
-        "Couldn't reach Tipperoos. Check your connection and try again.",
-      );
     } finally {
       setCodeSubmitting(false);
     }
