@@ -1,0 +1,5 @@
+# Revert identity key from email to display_name; email becomes optional
+
+Earlier in planning, the identity model switched from username+PIN to email+PIN specifically to make email notifications reliably reach every player (`email` was required and unique). During the Auth & Player Accounts grilling session (2026-08-01) this was reversed: not every player has their own email address, and siblings may need to share a parent's — which is incompatible with email being required-and-unique. `display_name` (unique, case-insensitive) becomes the identity and login key again, matching the old app's `username` role. `email` becomes optional and non-unique — multiple players may share one address — used purely as a best-effort notification-delivery field, never for login or identity.
+
+**Consequence accepted deliberately**: not every player will receive the pre-lock reminder or post-result score/rank emails. This reintroduces the exact reliability gap the original email-required decision was meant to close, for a subset of players without an email on file. Revisit only if this turns out to affect a meaningful fraction of the player base in practice.

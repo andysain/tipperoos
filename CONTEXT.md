@@ -49,5 +49,12 @@ _Avoid_: Void, Voided Match (reserved for the post-lock case — the rules and p
 **Player**:
 A competition participant. A Bot is a Player with `is_bot = true`, not a separate concept — it has picks, scores, and a Standings Snapshot like any other Player.
 
+**Admin**:
+A Player (`is_admin = true`) with exactly two elevated write capabilities — entering/correcting match results and kickoff times, and resetting another Player's PIN — and no elevated read visibility. Bound by the same pre-lock pick-hiding rules as any other Player; there is no "sees everything early" version of this role.
+_Avoid_: assuming "admin" implies broader visibility or permissions than the two listed above — it doesn't, by deliberate design.
+
 **Season Winner**:
-The Player with the highest Season Total at season end. Eligible pool excludes only the admin (`is_admin = true`); Bots are eligible to win.
+The Player with the highest Season Total at season end. Eligible pool excludes the Admin and any Late Joiner; Bots are eligible to win.
+
+**Late Joiner**:
+A Player who signs up after Gameweek 1 has begun. Not eligible for Season Winner (didn't compete the full season). May submit Predict the Table at any time after joining, or skip it — both optional, unlike the mandatory pre-season capture for on-time Players.

@@ -41,10 +41,15 @@ Do not build a general tournament/sports platform. Build for this specific priva
 
 ## Identity and auth
 
-- **Email + PIN.** Email is a required, unique field per player (not optional) — this is what makes email notifications reliable; younger players can use a parent's address. PIN is short (4–6 digit), hashed, with a max-5-attempt lockout. This is not a bank; don't add heavier auth than that.
-- Login UX is unchanged from the old app's spirit: pick your display name from a list, enter your PIN. No per-login email round-trip (ruled out OTP/magic-link login specifically because it reintroduces friction on a shared family device).
-- New players self-create only with the private competition code, matching the old model.
-- One player flag is `is_admin`; admin can still play for fun but is **explicitly ineligible for the season "winner" title**, to avoid a credibility problem when the admin is also the one entering/correcting results.
+- **Display name + PIN.** `display_name` is the required, unique (case-insensitive) identity key and login selector — reverted to this from an email-based identity model earlier in planning (see `docs/adr/0002-email-optional-display-name-identity.md`). PIN is a fixed 4 digits, hashed with Node's built-in `crypto.scrypt` (no new dependency). This is not a bank; don't add heavier auth than that.
+- **Email is optional and not unique.** Not every player has their own address; siblings may share a parent's. It exists purely as an optional notification-delivery field — never used for login or as an identity key. Consequence: not every player will receive the pre-lock reminder or post-result score/rank emails; accepted trade-off.
+- Login UX is unchanged from the old app's spirit: pick your display name from a list, enter your PIN. No per-login email round-trip (ruled out OTP/magic-link login specifically because it reintroduces friction on a shared family device, and email isn't reliably on file for every player anyway now).
+- **Session**: a stateless signed cookie (player id + HMAC signature via a server-side secret) — no DB sessions table, no expiry. Persists until the player explicitly uses "Switch player." Sufficient for the shared-device threat model; a revocable server-side session table would be solving a problem that doesn't exist here.
+- Each player may optionally set an **emoji**, shown next to their name in the login list and leaderboard — a small kid-friendly personalization touch carried forward from the old app.
+- New players self-create only with the private competition code, checked against an env var (not DB-stored — it essentially never needs to change mid-season, so admin-editability isn't worth a `settings` table).
+- **Lockout**: 5 failed PIN attempts locks the account for 15 minutes (auto-expires, no admin action needed for the common case). A successful login resets the failed-attempt counter.
+- **Forgot-PIN reset (admin-assisted, forced-reset flow)**: admin sets a temporary PIN (typed by the admin, communicated to the player directly — no delivery mechanism needed since it's in-person/by phone) and flags the account as needing a reset. The player logs in with the temp PIN and is forced to choose a real new PIN before reaching the app; the reset flag then clears, along with any lockout state.
+- One player flag is `is_admin`; admin can still play for fun but is **explicitly ineligible for the season "winner" title**, to avoid a credibility problem when the admin is also the one entering/correcting results. **Admin has exactly two elevated capabilities — entering/correcting match results and kickoff times, and resetting another player's PIN — and no elevated read visibility.** They see the app exactly as any other player would (pre-lock pick visibility rules apply to them too); there is no "admin sees everything early" bypass, and building one would be scope creep beyond what's actually decided. The very first admin account is created via a one-off seed script (same pattern as fixture seeding), not a UI flow — there's only ever one admin for now. *Deferred to future work*: a proper competition-setup flow where the first signup becomes admin automatically, a user-management screen for adding players and assigning roles, and admin-configurable competition-specific settings.
 - Bot players exist (`is_bot = true`), clearly labelled on the leaderboard (e.g. 🤖). **Bots are eligible for the season "winner" title** — only the admin is excluded, per above. Three bot types carry forward from the old app (ported logic, not reinvented); the ELO bot is dropped (see *Explicitly out of scope*):
   - **Random Bot**: predicts a random plausible scoreline for each side, independently, per match.
   - **1-1 Bot**: always predicts 1–1.
@@ -99,6 +104,7 @@ Scoring must be **idempotent**: correcting a previously-entered result and recom
 ## Notifications
 
 - **Email only**, via a free transactional provider (e.g. Resend). No business-verification gate, unlike WhatsApp — this is what makes full automation possible from early in the build rather than needing a manual workaround.
+- **Email is optional per player** (see *Identity and auth*) — sends are best-effort to whoever has an address on file. A player with no email simply doesn't receive these; there is no in-app fallback notification for them. Accepted trade-off, not a gap to close.
 - Two automated sends per gameweek, both considered high-value, neither to be cut casually:
   1. A pre-lock "picks due" reminder.
   2. A post-result "you scored X, you're now rank Y" push. This is the single highest-leverage retention lever identified during planning — the thing that turns "technically working" into "people keep opening the app." Do not deprioritize this relative to the reminder.
@@ -110,7 +116,7 @@ Scoring must be **idempotent**: correcting a previously-entered result and recom
 - No client-side Supabase access, ever (restated from *Stack* because it's the top trust risk, not just an architecture note).
 - PIN security proportionate to actual stakes: hash + attempt-lockout is sufficient. The realistic risk is shared-device shoulder-surfing among family members, not remote attack — mitigate with a clear "Switch player" flow and reasonable session handling, not by making login itself heavier.
 - Session cookie: `httpOnly` + `secure` + `sameSite=Lax`. All state-changing API routes check a custom header (not present on cross-site form posts) before acting — enough CSRF protection for this threat model without a full token library, since Next.js API routes aren't naturally cross-origin-postable to begin with.
-- A player who forgets their PIN has an admin-assisted reset path (admin resets it, player sets a new one on next login) — the realistic failure mode for the target age group, not a rare edge case.
+- A player who forgets their PIN has an admin-assisted reset path (see *Identity and auth* for the forced-reset flow) — the realistic failure mode for the target age group, not a rare edge case.
 - Every match-result edit (admin corrections included) gets a timestamped audit entry (who changed what, when), visible on the Match Centre — this is the mitigation for the admin-is-also-a-player credibility problem, alongside the admin's season-winner ineligibility above.
 - Prefer resolving structural fairness questions (like the postponement rule above) with the simplest, least-disputable option, even if it's not the most "correct" — for a group this size, avoiding an argument is worth more than optimizing the edge case.
 
@@ -122,7 +128,7 @@ Scoring must be **idempotent**: correcting a previously-entered result and recom
 - `picks` — one row per `(player_id, match_id)`, home/away predicted score.
 - `scores` — idempotent points ledger, upserted per `(player_id, match_id)` on every (re)computation.
 - `table_predictions` + a full 20-team ordering per player, captured once per season.
-- `players` — includes required unique email, PIN hash, `is_admin`, `is_bot` flags.
+- `players` — unique (case-insensitive) `display_name` as the identity key, optional non-unique email, PIN hash, `pin_reset_required` flag (forced-reset flow), optional emoji, `is_admin`/`is_bot` flags.
 - A per-gameweek **standings snapshot**, recorded starting gameweek 1 — required to compute "who finished last" for the gameweek-2 Match-2 picker; don't skip this just because the picker UI itself might ship later than the data collection.
 - `sync_log` — lightweight record of fixture/result sync attempts and outcomes, for admin visibility into the one external dependency (the football data API) that can fail silently otherwise.
 
@@ -140,4 +146,7 @@ Scoring must be **idempotent**: correcting a previously-entered result and recom
 ## Reference
 
 - `BUILD_PLAN.md` — initial-launch execution plan: week-by-week build order, explicit cut-if-behind list, the reasoning behind infrastructure choices (e.g. GitHub Actions vs. pg_cron for sync), and what would change any of those calls.
+- `CONTEXT.md` — glossary of domain terms (Fixture, Tipped Match, Admin, Season Standing, etc.).
+- `docs/adr/` — architecture decision records for hard-to-reverse, non-obvious calls.
+- `docs/standards/TESTING_STANDARD.md` — testing philosophy, validation order, and definition of done for this codebase.
 
