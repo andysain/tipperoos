@@ -1,1 +1,0 @@
-"""Tipperoos app helpers."""
