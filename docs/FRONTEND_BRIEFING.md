@@ -1,0 +1,64 @@
+# Tipperoos — Frontend/Design Agent Briefing
+
+You're working design and frontend on this project in parallel with a separate agent doing backend. This doc gives you the project-specific context you need — not a Next.js/React/design tutorial, you're assumed to already have that expertise. Read `CLAUDE.md` for the full product spec; this is a curated entry point into it, angled at what actually affects UI/UX decisions.
+
+## What this is
+
+A private Premier League tipping competition for ~10–20 family/friends across several households, ages ~10+, with a few bot players. Not a general sports platform — build for this specific private group, nothing more general. Season opens **2026-08-21** (hard deadline).
+
+## Constraints that directly shape UI decisions
+
+- **Kid-friendly.** Youngest real users are ~10. Language and interaction design need to work for a 10-year-old, not just an adult.
+- **Mobile-first, fast, responsive — a stated product requirement, not a nice-to-have.** This whole rebuild exists partly as a reaction against the old app (Streamlit) being clunky and slow. Snappy interaction matters more here than usual.
+- **No gambling language, anywhere.** Use `prediction`, `pick`, `points`, `leaderboard`, `competition`. Never `bet`, `odds`, `wager`, `stake`, `payout`, `bookie` — including in copy, button labels, empty states, error messages.
+- **No chat, comments, public profiles, or social features** beyond the leaderboard and Match Centre. Don't design toward a social-app pattern.
+- **All times display in `Australia/Sydney`**, even though kickoffs are UK time and everything is stored in UTC. Never show raw UTC to a user.
+- **No client-side Supabase access, ever.** This is a backend architecture rule, but it affects you directly: any data a page needs comes from a Server Component or an API route the backend agent builds — never a browser-side DB call. Design your data-fetching patterns around that (Server Components pulling data server-side, or `fetch`ing your own API routes), not a client SDK.
+
+## Design system status
+
+Deliberately not built yet — this is likely your first real piece of work. Current UI is plain Tailwind defaults from the `create-next-app` scaffold (see `src/app/page.tsx`, `src/app/layout.tsx`, `src/app/globals.css`). Nothing to preserve or work around; you're starting close to a blank slate on the visual side.
+
+## The screens/flows that will need to exist
+
+Not necessarily in build order — check with the backend agent/Andy on sequencing, since backend routes need to exist before a screen can be real (vs. a design mockup with placeholder data).
+
+- **Login**: pick your display name from a list, enter a 4-digit PIN. A "Switch player" affordance for shared-device use (tap to log out and return to the name list) — this is a named trust mitigation in the product spec, not optional polish.
+- **Signup**: private competition code (gate), display name (unique, this is the identity key — not email), PIN, optional email, optional emoji.
+- **Picks entry**: each gameweek, exactly **two** matches are open for tipping (not a full round). Player enters a full scoreline (home/away) for each, not just a result. Locks 5 minutes before kickoff. Before lock: only your own pick is visible. After lock: everyone's picks for that match become visible. Design needs a clear locked-vs-open visual state.
+- **Match-2 Picker flow**: starting gameweek 2, whoever finished last the previous gameweek picks Match 2 themselves (from a deadline window, notified, with an auto-random fallback if they miss it). This is a distinct, occasional flow — needs its own notification/prompt UI, not just folded into normal picks entry.
+- **Leaderboard**: ranked by season total points. Bots clearly labelled (🤖). Admin's standing shown but visually distinguished as ineligible for the season "winner" title (see Admin below).
+- **Match Centre**: shows fixtures/results, and every admin result correction with a timestamped audit entry (who changed what, when) — this is a trust feature, needs to be visible, not buried.
+- **Predict the Table**: season-long feature, captured once near season start (full 20-team ranking). Exact UI shape (full drag-reorder ranking vs. a simplified champion/top-4/relegation picker) is **still an open product decision** — flag before building, don't assume.
+- **Admin screens** (small, admin-only): match result/kickoff-time correction, admin-assisted PIN reset (a "forced reset" flow — admin sets a temp PIN, player is then forced to set a real one on next login).
+
+## Things that look like they'd need a UI decision but don't
+
+- **Admin has no special view of anything besides the two actions above.** No "admin sees all picks early" mode — bound by the same pre-lock hiding rules as everyone else. Don't design an admin dashboard that implies broader visibility.
+- **No settings/config screens** — competition code, lock timing (fixed 5 minutes), etc. are not admin-editable via UI right now.
+
+## Domain vocabulary (read `CONTEXT.md` for the full glossary)
+
+Worth knowing before you name components/props: **Fixture** (any of the 380 season matches) vs. **Tipped Match** (one of the 2 open for picks that gameweek) are different things. **Voided Match** (postponed after lock, no points) vs. **Skipped Slot** (postponed before lock, that gameweek just runs with 1 match instead of 2) are different, both need distinct empty/explained states in the UI, not a generic "match cancelled."
+
+## Current backend state (as of 2026-08-01)
+
+- Schema exists (Supabase Postgres, two environments — staging and production, see below), seeded with real season fixtures/teams.
+- Auth/player-account **decisions** are made (display-name+PIN identity, session model, etc. — see `CLAUDE.md` → Identity and auth) but the actual signup/login/session **code doesn't exist yet** — the backend agent is starting there now.
+- No API routes exist yet beyond a trivial server-side Supabase connectivity check on the home page.
+- **Practical implication**: you can start on layout, navigation shell, the design system/component library, and screen mockups against placeholder/mock data immediately. Real data integration will follow as backend routes land — coordinate with the backend agent rather than assuming a route exists.
+
+## How your work and backend work coexist
+
+- Repo: Next.js App Router, TypeScript, Tailwind. `src/app/` = routes/pages, `src/lib/` = server-only backend logic (**not yours to edit** — CODEOWNERS-gated, requires Andy's explicit review to merge). Put shared UI components somewhere like `src/components/` (not yet created — your call on structure, you have the frontend expertise here).
+- **Workflow**: branch → PR → CI must pass → most things auto-merge instantly, no waiting on a human. Only `src/lib/**` and `.github/workflows/**` need explicit sign-off. Your work should auto-merge freely.
+- **Testing expectations for you specifically**: per `docs/standards/TESTING_STANDARD.md`, UI/layout/styling is explicitly **not** required to have automated tests — verify by actually using the feature in a browser (and on the Preview deployment URL a PR generates) instead. Logic-heavy code (scoring, auth, etc.) is the backend agent's test-first responsibility, not yours.
+- Local dev: `npm run dev`, reads from the **staging** Supabase project via `.env.local` (already present in this checkout, gitignored — see `supabase-credentials.local.md` if you need the values again). Never point local dev at production.
+
+## Where to go for more
+
+- `CLAUDE.md` — full product spec, source of truth if this doc and it ever disagree.
+- `CONTEXT.md` — domain glossary.
+- `BUILD_PLAN.md` — decisions log, including why things are built this way.
+- `AGENTS.md` — engineering process router (branch/PR flow, non-negotiables).
+- `docs/standards/TESTING_STANDARD.md` — testing/validation expectations.

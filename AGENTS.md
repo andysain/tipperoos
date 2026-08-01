@@ -22,6 +22,7 @@ This file is a router, not a rulebook — the linked docs own their rules; don't
 | Domain vocabulary (is this a Fixture or a Tipped Match? what does "Admin" actually mean here?) | `CONTEXT.md`                                                  |
 | A hard-to-reverse architectural call — why does something work this way                        | `docs/adr/`                                                   |
 | GitHub issue backlog / what's done vs. open                                                    | `gh issue list -R andysain/tipperoos --state all --limit 100` |
+| Frontend/design/UI work                                                                        | `docs/FRONTEND_BRIEFING.md`                                   |
 
 ## Non-negotiables (see CLAUDE.md for full detail)
 
