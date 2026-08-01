@@ -99,14 +99,18 @@ so GitHub Actions CI only adds `test` and the `src/lib/**` golden-value
 check (§1a) — no redundant duplicate job.
 
 None of the above proves the change is _correct_, only that it's
-technically valid — a fourth required check, `PR review`
-(`.github/workflows/pr-review.yml`, see `.github/claude/review/`), runs
+technically valid — a further `pre-push` Husky step
+(`scripts/review/local-pr-review.mjs`, see `.github/claude/review/`) runs
 three low-cost Sonnet agent passes (correctness, security invariants, spec
-conformance) against every PR before it can merge, and can push a fix
-commit directly to the branch if it finds something it can safely fix. This
-is what actually closes the gap left by decision 30 in `BUILD_PLAN.md`:
-without it, everything outside `src/lib/**` merges with no human or agent
-review at all.
+conformance) against the diff vs. `main` before every push, and can commit
+a fix locally if it finds something it can safely fix (the push is then
+aborted, since git already resolved what to push before the hook ran —
+just push again to include the fix). This is what actually closes the gap
+left by decision 30 in `BUILD_PLAN.md`: without it, everything outside
+`src/lib/**` merges with no human or agent review at all. It's a local
+hook, not a server-side required check (see `BUILD_PLAN.md` decision 36 for
+why, and the trade-off that implies — bypassable with `--no-verify`, unlike
+`verify`/`Vercel` above).
 
 ## 4) Definition of Done
 

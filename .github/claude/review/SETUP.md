@@ -1,4 +1,15 @@
-# PR review automation — one-time setup
+# PR review automation — GitHub Actions variant (not currently adopted)
+
+**Not the active setup.** The adopted design is the local `pre-push` hook
+(`scripts/review/local-pr-review.mjs`) — see `BUILD_PLAN.md` decision 36.
+This file documents the stronger, server-side-blocking alternative kept in
+reserve in case the local hook ever proves too weak (it's bypassable with
+`--no-verify` and only runs on a machine that has it installed). It needs
+one thing the local version doesn't: a way to authenticate Claude Code
+inside GitHub Actions. Below assumes a billed `ANTHROPIC_API_KEY`; if you'd
+rather use your existing subscription instead, generate a long-lived token
+with `claude setup-token` and pass it as `CLAUDE_CODE_OAUTH_TOKEN` in place
+of `ANTHROPIC_API_KEY` throughout.
 
 `.github/workflows/pr-review.yml` was drafted by an agent but deliberately
 not committed or pushed by it — `AGENTS.md` requires changes under
