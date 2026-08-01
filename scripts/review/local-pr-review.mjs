@@ -91,7 +91,6 @@ for (const lane of LANES) {
       "low",
       "--max-turns",
       "12",
-      "--bare",
       "--permission-mode",
       "acceptEdits",
       "--allowedTools",

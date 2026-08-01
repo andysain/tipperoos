@@ -79,7 +79,7 @@ Season opens **Friday 2026-08-21**.
     - **Trade-off accepted, deliberately**: this is weaker than the GitHub Actions design — bypassable with `git push --no-verify`, and only protects pushes made from a machine that has the hook installed (via `npm ci`'s `prepare` script). For a solo-builder-via-agents workflow where hooks are already the enforcement mechanism for typecheck/lint/test/build, and agents are instructed never to skip hooks unprompted, this was judged an acceptable trade for "no separate API key, ships today."
     - **Mechanically different from the Actions draft**: a pre-push hook can't include a same-run fix in the push it's currently gating (git has already resolved the SHA to push before invoking the hook), so a lane that commits a fix still aborts the current push and asks for a plain `git push` again, rather than the Actions draft's single end-of-job push.
     - **Not cached across pushes**: iterating with several small pushes to the same branch re-reviews the accumulated diff each time. Accepted for now; revisit if it gets annoying at this project's scale.
-    - See `.github/claude/review/SETUP.md` for the exact setup steps (two secrets, the workflow file, the ruleset change).
+    - The local hook needs no setup beyond `npm ci` (which installs the Husky hooks) and being logged into Claude Code on the machine doing the push — nothing to configure. `.github/claude/review/SETUP.md` documents the reserve GitHub Actions path instead (two secrets, the workflow file, the ruleset change), not the adopted one.
 
 ---
 
