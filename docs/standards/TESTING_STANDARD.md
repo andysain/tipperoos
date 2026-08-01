@@ -98,6 +98,16 @@ push/PR, confirmed via `next.config.ts` having no `ignoreBuildErrors`/
 so GitHub Actions CI only adds `test` and the `src/lib/**` golden-value
 check (§1a) — no redundant duplicate job.
 
+None of the above proves the change is _correct_, only that it's
+technically valid — a fourth required check, `PR review`
+(`.github/workflows/pr-review.yml`, see `.github/claude/review/`), runs
+three low-cost Sonnet agent passes (correctness, security invariants, spec
+conformance) against every PR before it can merge, and can push a fix
+commit directly to the branch if it finds something it can safely fix. This
+is what actually closes the gap left by decision 30 in `BUILD_PLAN.md`:
+without it, everything outside `src/lib/**` merges with no human or agent
+review at all.
+
 ## 4) Definition of Done
 
 A task is done only if:
