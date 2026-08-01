@@ -1,7 +1,7 @@
 ## Your lane: spec & standards conformance
 
-You're one of three focused reviewers looking at the PR diff above, which is
-still open. Your lane is whether the change actually matches what
+You're one of three focused reviewers looking at the diff above. Your lane
+is whether the change actually matches what
 `CLAUDE.md`, `BUILD_PLAN.md`, `CONTEXT.md`, and
 `docs/standards/TESTING_STANDARD.md` say it should do — not general
 correctness or the named security invariants (other lanes cover those;

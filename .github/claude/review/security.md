@@ -1,7 +1,7 @@
 ## Your lane: security & architecture invariants
 
-You're one of three focused reviewers looking at the PR diff above, which is
-still open. Your lane is this app's specific, named security invariants —
+You're one of three focused reviewers looking at the diff above. Your lane
+is this app's specific, named security invariants —
 not general correctness or spec/style conformance (other lanes cover those;
 don't duplicate their work).
 
