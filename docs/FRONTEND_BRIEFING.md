@@ -37,6 +37,16 @@ Two skills are installed for the mechanical Tailwind/mobile rules — `.claude/s
 - Use `tailwind-variants` (installed) for any component with more than one visual variant — see `docs/DESIGN_SYSTEM.md` "Component build order."
 - Functional UI icons are `lucide-react` (installed), restyled to match the brand — not emoji. Emoji stay the personalization layer (bot, player emoji, flags) only.
 
+Two skills are installed for exactly this work — `.claude/skills/tailwind-css` and `.claude/skills/mobile-responsiveness` — read them before the first component, not a tutorial recap but worth internalizing since there's no existing pattern yet to copy instead:
+
+- **Mobile-first breakpoints, no exceptions.** Unprefixed classes are the mobile base; `md:`/`lg:` layer on top. Never use `sm:` to mean "mobile" — it's a common mistake and this app is mobile-first by hard requirement.
+- **`min-h-dvh`, never `min-h-screen`** — `min-h-screen` is buggy on mobile Safari, which is a real device in this player base.
+- **`gap-*` for flex/grid spacing, not `space-x-*`/`space-y-*`** — the latter breaks with `flex-wrap`.
+- **Opacity modifiers (`bg-black/50`), not `bg-opacity-*`** — the old opacity utilities are removed in Tailwind v4.
+- **No `@apply`** — use CSS variables or extract a component instead.
+- **Safe-area insets on any fixed bottom nav/bar** (`env(safe-area-inset-bottom)`) — this is a shared-family-phone app, notch/home-indicator overlap is a real annoyance to design around, not a nice-to-have.
+- **`size-*` over separate `w-*`/`h-*`** when a dimension is equal on both axes.
+
 ## The screens/flows that will need to exist
 
 Not necessarily in build order — check with the backend agent/Andy on sequencing, since backend routes need to exist before a screen can be real (vs. a design mockup with placeholder data).
