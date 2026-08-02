@@ -1,0 +1,13 @@
+# Predict the Table: band-sort capture UI, band-distance scoring, standalone from Season Total
+
+Issue #25 deferred the Predict the Table capture/scoring shape until build time, flagging that a full 20-item mobile drag-reorder is meaningfully harder to build than the alternative. Three divergent capture concepts were prototyped in a grilling session (tap-efficient default-and-bucket editor, delight-focused card-swipe draft, zero-drag sequential single-pick draft) and synthesized: players freely sort all 20 teams into 7 fixed Table Bands (Champion, Champions League, Europe, Mid Table, Lower Table, Relegation Battle, Relegated) via a single-card swipe/tap gesture against static Band targets. Sorting is free-form — a Band may be temporarily over- or under-filled — with any mismatched Band flagged and corrected via a tap-team → move-to-Band action before submission. No drag-and-drop reordering exists anywhere in this feature.
+
+Because scoring only ever depends on Band placement, not fine position, the order within a Band is incidental (whatever order the player assigned it in) rather than a genuine ranking signal — "full 20-team ordering" is captured in name (per the storage principle already established), but only the Band-membership portion carries predictive meaning today.
+
+Scoring is additive per team: `(7 − band_distance) − 1` (range 0–6, `band_distance` = number of Bands between predicted and actual — self-limiting to a 0 floor since the max possible distance is 6, no explicit clamp needed), plus a +10 Band Bonus per Band for exactly matching its full membership, except the Champion Band, which is worth +20 (a single-team Band, and deliberately the highest-value single pick). Maximum score: 200. Ground truth comes from football-data.org's `/v4/competitions/{id}/standings` endpoint. The score is recomputed continuously through the season against live standings, and is kept standalone from Season Total / Season Winner — an easily-reversible choice, since the full order is always captured regardless of how it's scored.
+
+## Considered and rejected
+
+- **Full 1–20 drag-and-drop reorder** — highest engineering risk on mobile (touch-drag physics, scroll conflicts, accessibility); explicitly what issue #25 flagged as worth avoiding.
+- **Pure sequential "who's 1st, who's 2nd..." single-pick draft** — safest to build and fully robust to interruption (each pick persists immediately), but tedious: 20 forced discrete decisions with no way to move quickly past teams the player has no opinion on.
+- **Pre-filled smart default** (seed with last season's table, edit only what you disagree with) — fastest path to a valid submission for a disengaged player, but dropped in favor of the more ceremonial, engaging card-sort experience.

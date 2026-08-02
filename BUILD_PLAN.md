@@ -140,7 +140,7 @@ All three items originally listed here have been resolved by you:
 
 - **Scoring formula** → additive (see Decisions made, scoring-divergence entry).
 - **Match-2 picker launch timing** → gameweek 2, lowest-score → worst-standing → random tiebreak (see decision 11).
-- **Predict-the-table shape** → not resolved, but explicitly and deliberately deferred to Week 3, when the feature is actually being built — this is a decision (defer), not an open gap.
+- **Predict-the-table shape** → resolved (band-sort capture UI, band-distance additive scoring, standalone from Season Total — see CLAUDE.md and `docs/adr/0003-predict-the-table-shape.md`).
 
 Nothing outstanding needs your input right now. The one thing worth flagging back to you: gameweek-2 picker timing trades away the three-gameweek buffer this plan originally banked — see the Week 3 and Cut-if-behind updates above.
 
