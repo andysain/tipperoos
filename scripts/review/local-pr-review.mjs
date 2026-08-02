@@ -23,6 +23,12 @@
 // actual git operations based on its verdict, deliberately -- an LLM never
 // gets `git reset --hard` in its own tool allowlist.
 //
+// Also skipped outright when every changed file is a *.md doc -- low
+// enough stakes (nothing here can break the app) that the extra pass isn't
+// worth paying for. Lanes still run against docs-only diffs (they've
+// caught real issues, e.g. a stale cross-reference), just without the
+// second-guessing step; a lane's block/fix is trusted directly in that case.
+//
 // Skips entirely on `main` or when there's no diff against it -- fast
 // no-op for the common case. Not cached across pushes: iterating with
 // several small pushes to the same branch re-reviews the accumulated diff
@@ -121,6 +127,16 @@ if (!diff.trim()) {
   process.exit(0);
 }
 
+const changedFiles = run(`git diff --name-only ${base}...HEAD`)
+  .split("\n")
+  .filter(Boolean);
+const docsOnly = changedFiles.every((file) => file.endsWith(".md"));
+if (docsOnly) {
+  console.log(
+    "local-pr-review: docs-only diff -- lanes still run, verify pass skipped.",
+  );
+}
+
 const workDir = mkdtempSync(join(tmpdir(), "tipperoos-review-"));
 const sharedContext = [
   readFileSync("CLAUDE.md", "utf8"),
@@ -172,32 +188,42 @@ for (const lane of LANES) {
   // used to mean a co-occurring fix silently skipped verification whenever
   // a block was also present.
   if (laneBlocked) {
-    console.log(`\n--- verifying ${lane} lane's block ---`);
-    const finding = `The ${lane} lane flagged a blocking issue it could not safely fix:\n\n${readFileSync(blockFile, "utf8")}`;
-    const verdict = parseVerdict(verify(sharedContext, finding), "CONFIRMED");
-    if (verdict === "CONFIRMED") {
-      console.log(`  verify: ${lane}'s block confirmed.`);
+    if (docsOnly) {
+      console.log(`  ${lane}'s block trusted as-is (docs-only diff).`);
       blocked = true;
     } else {
-      console.log(
-        `  verify: ${lane}'s block rejected on independent review -- not blocking the push on it.`,
-      );
-      unlinkSync(blockFile);
+      console.log(`\n--- verifying ${lane} lane's block ---`);
+      const finding = `The ${lane} lane flagged a blocking issue it could not safely fix:\n\n${readFileSync(blockFile, "utf8")}`;
+      const verdict = parseVerdict(verify(sharedContext, finding), "CONFIRMED");
+      if (verdict === "CONFIRMED") {
+        console.log(`  verify: ${lane}'s block confirmed.`);
+        blocked = true;
+      } else {
+        console.log(
+          `  verify: ${lane}'s block rejected on independent review -- not blocking the push on it.`,
+        );
+        unlinkSync(blockFile);
+      }
     }
   }
 
   if (laneCommitted) {
-    console.log(`\n--- verifying ${lane} lane's fix ---`);
-    const finding = `The ${lane} lane committed the following fix:\n\n\`\`\`\n${run("git show HEAD")}\n\`\`\``;
-    const verdict = parseVerdict(verify(sharedContext, finding), "REJECTED");
-    if (verdict === "CONFIRMED") {
-      console.log(`  verify: ${lane}'s fix confirmed.`);
+    if (docsOnly) {
+      console.log(`  ${lane}'s fix trusted as-is (docs-only diff).`);
       fixed = true;
     } else {
-      console.log(
-        `  verify: ${lane}'s fix rejected on independent review -- reverting it.`,
-      );
-      run(`git reset --hard ${headBefore}`);
+      console.log(`\n--- verifying ${lane} lane's fix ---`);
+      const finding = `The ${lane} lane committed the following fix:\n\n\`\`\`\n${run("git show HEAD")}\n\`\`\``;
+      const verdict = parseVerdict(verify(sharedContext, finding), "REJECTED");
+      if (verdict === "CONFIRMED") {
+        console.log(`  verify: ${lane}'s fix confirmed.`);
+        fixed = true;
+      } else {
+        console.log(
+          `  verify: ${lane}'s fix rejected on independent review -- reverting it.`,
+        );
+        run(`git reset --hard ${headBefore}`);
+      }
     }
   }
 }
