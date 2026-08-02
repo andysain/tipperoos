@@ -115,9 +115,12 @@ why, and the trade-off that implies — bypassable with `--no-verify`, unlike
 A lane's block/fix isn't trusted on its own — when one flags something, a
 separate read-only verify pass (`.github/claude/review/verify.md`) independently
 re-checks it before the script actually blocks the push or keeps the fix
-commit, only running when there's something to verify. See `BUILD_PLAN.md`
-decision 36's verify-pass entry for why (a real, observed case of the same
-lane giving different answers on two runs against the same diff).
+commit, only running when there's something to verify — and skipped
+outright for a docs-only diff (every changed file a `*.md`), where a
+lane's finding is trusted directly. See `BUILD_PLAN.md` decision 36's
+verify-pass entries for why (a real, observed case of the same lane giving
+different answers on two runs against the same diff; and why docs-only
+diffs don't pay for the extra pass).
 
 ## 4) Definition of Done
 
