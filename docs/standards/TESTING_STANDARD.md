@@ -112,6 +112,13 @@ hook, not a server-side required check (see `BUILD_PLAN.md` decision 36 for
 why, and the trade-off that implies — bypassable with `--no-verify`, unlike
 `verify`/`Vercel` above).
 
+A lane's block/fix isn't trusted on its own — when one flags something, a
+separate read-only verify pass (`.github/claude/review/verify.md`) independently
+re-checks it before the script actually blocks the push or keeps the fix
+commit, only running when there's something to verify. See `BUILD_PLAN.md`
+decision 36's verify-pass entry for why (a real, observed case of the same
+lane giving different answers on two runs against the same diff).
+
 ## 4) Definition of Done
 
 A task is done only if:
