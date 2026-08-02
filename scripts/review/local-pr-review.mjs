@@ -166,15 +166,15 @@ for (const lane of LANES) {
     continue;
   }
 
-  console.log(`\n--- verifying ${lane} lane's finding ---`);
-  const finding = laneBlocked
-    ? `The ${lane} lane flagged a blocking issue it could not safely fix:\n\n${readFileSync(blockFile, "utf8")}`
-    : `The ${lane} lane committed the following fix:\n\n\`\`\`\n${run("git show HEAD")}\n\`\`\``;
-
-  const output = verify(sharedContext, finding);
-  const verdict = parseVerdict(output, laneBlocked ? "CONFIRMED" : "REJECTED");
-
+  // Verified independently, not as mutually exclusive cases -- a lane can
+  // legitimately both fix one thing and block on a separate thing it
+  // couldn't safely fix in the same run. Treating them as either/or here
+  // used to mean a co-occurring fix silently skipped verification whenever
+  // a block was also present.
   if (laneBlocked) {
+    console.log(`\n--- verifying ${lane} lane's block ---`);
+    const finding = `The ${lane} lane flagged a blocking issue it could not safely fix:\n\n${readFileSync(blockFile, "utf8")}`;
+    const verdict = parseVerdict(verify(sharedContext, finding), "CONFIRMED");
     if (verdict === "CONFIRMED") {
       console.log(`  verify: ${lane}'s block confirmed.`);
       blocked = true;
@@ -184,7 +184,12 @@ for (const lane of LANES) {
       );
       unlinkSync(blockFile);
     }
-  } else {
+  }
+
+  if (laneCommitted) {
+    console.log(`\n--- verifying ${lane} lane's fix ---`);
+    const finding = `The ${lane} lane committed the following fix:\n\n\`\`\`\n${run("git show HEAD")}\n\`\`\``;
+    const verdict = parseVerdict(verify(sharedContext, finding), "REJECTED");
     if (verdict === "CONFIRMED") {
       console.log(`  verify: ${lane}'s fix confirmed.`);
       fixed = true;
