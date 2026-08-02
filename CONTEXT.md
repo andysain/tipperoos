@@ -58,3 +58,13 @@ The Player with the highest Season Total at season end. Eligible pool excludes t
 
 **Late Joiner**:
 A Player who signs up after Gameweek 1 has begun. Not eligible for Season Winner (didn't compete the full season). May submit Predict the Table at any time after joining, or skip it — both optional, unlike the mandatory pre-season capture for on-time Players.
+
+**Table Prediction**:
+A Player's full 20-team finishing-order prediction for the season, captured by sorting teams into Table Bands. Submitted once during onboarding, re-submittable any number of times until Gameweek 1's first kickoff, then locked. Optional for a Late Joiner.
+
+**Table Band**:
+One of 7 fixed groupings of final Premier League position, used to score a Table Prediction: Champion (1), Champions League (2–5), Europe (6–8), Mid Table (9–11), Lower Table (12–14), Relegation Battle (15–17), Relegated (18–20). A team's predicted Table Band is compared against its actual Table Band to score points; the order of teams within a Band carries no scoring weight.
+
+**Table Prediction Score**:
+A standalone points total (max 200) earned from a Table Prediction, recomputed continuously against current Premier League standings. Distinct from Season Total — does not affect Season Winner.
+_Avoid_: assuming this contributes to Season Total — it deliberately doesn't, for now.
