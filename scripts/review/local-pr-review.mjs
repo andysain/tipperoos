@@ -14,6 +14,15 @@
 // commits a fix, this still aborts the current push; the fix commit is
 // there on the next `git push`.
 //
+// Verify pass: a lane's raw output isn't trusted on its own -- running the
+// same lane twice against the same diff has produced different answers in
+// practice (low-effort, "plausible"-confidence findings aren't fully
+// deterministic). Only runs when a lane actually flags something (a block
+// file or a fix commit), so the common case (nothing found) pays nothing
+// extra. The verify pass is read-only and only judges; this script does the
+// actual git operations based on its verdict, deliberately -- an LLM never
+// gets `git reset --hard` in its own tool allowlist.
+//
 // Skips entirely on `main` or when there's no diff against it -- fast
 // no-op for the common case. Not cached across pushes: iterating with
 // several small pushes to the same branch re-reviews the accumulated diff
@@ -21,15 +30,74 @@
 // annoying.
 
 import { execSync, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const LANES = ["correctness", "security", "spec-conformance"];
 const REVIEW_DIR = ".github/claude/review";
+const READ_ONLY_TOOLS =
+  "Read,Grep,Glob,Bash(git show *),Bash(git diff *),Bash(git log *)";
+const LANE_TOOLS =
+  "Read,Grep,Glob,Edit,Write,Bash(git add *),Bash(git commit *),Bash(git diff *),Bash(git log *),Bash(git status),Bash(npm run typecheck),Bash(npm run lint),Bash(npm run test),Bash(npm run build)";
 
 function run(cmd) {
   return execSync(cmd, { encoding: "utf8" }).trim();
+}
+
+// Lane calls stream live (stdio: inherit) so a push isn't silent for
+// however long a lane takes. The verify call captures instead, since its
+// final line has to be parsed for a verdict.
+function callClaude(prompt, allowedTools, { capture = false } = {}) {
+  const args = [
+    "-p",
+    "--model",
+    "claude-sonnet-5",
+    "--effort",
+    "low",
+    "--max-turns",
+    "12",
+    "--permission-mode",
+    "acceptEdits",
+    "--allowedTools",
+    allowedTools,
+  ];
+  return capture
+    ? spawnSync("claude", args, { input: prompt, encoding: "utf8" })
+    : spawnSync("claude", args, {
+        input: prompt,
+        encoding: "utf8",
+        stdio: ["pipe", "inherit", "inherit"],
+      });
+}
+
+// Defaults to whichever outcome is safer to assume on a malformed/missing
+// verdict: REJECTED for a fix (don't trust an unverified code change),
+// CONFIRMED for a block (don't silently let an unverified finding through).
+function parseVerdict(output, fallback) {
+  const matches = [...output.matchAll(/VERDICT:\s*(CONFIRMED|REJECTED)/gi)];
+  if (matches.length === 0) return fallback;
+  return matches[matches.length - 1][1].toUpperCase();
+}
+
+function verify(sharedContext, findingDescription) {
+  const prompt = [
+    sharedContext,
+    readFileSync(join(REVIEW_DIR, "verify.md"), "utf8"),
+    findingDescription,
+  ].join("\n\n");
+
+  console.log("  (verifying...)");
+  const result = callClaude(prompt, READ_ONLY_TOOLS, { capture: true });
+  if (result.status !== 0) {
+    console.error(
+      `  verify: claude invocation itself failed (exit ${result.status}) -- treating as unverified.`,
+    );
+    return "";
+  }
+  const output = result.stdout ?? "";
+  console.log(output.trim());
+  return output;
 }
 
 const branch = run("git rev-parse --abbrev-ref HEAD");
@@ -81,23 +149,7 @@ for (const lane of LANES) {
   const headBefore = run("git rev-parse HEAD");
 
   console.log(`\n--- ${lane} lane ---`);
-  const result = spawnSync(
-    "claude",
-    [
-      "-p",
-      "--model",
-      "claude-sonnet-5",
-      "--effort",
-      "low",
-      "--max-turns",
-      "12",
-      "--permission-mode",
-      "acceptEdits",
-      "--allowedTools",
-      "Read,Grep,Glob,Edit,Write,Bash(git add *),Bash(git commit *),Bash(git diff *),Bash(git log *),Bash(git status),Bash(npm run typecheck),Bash(npm run lint),Bash(npm run test),Bash(npm run build)",
-    ],
-    { input: prompt, encoding: "utf8", stdio: ["pipe", "inherit", "inherit"] },
-  );
+  const result = callClaude(prompt, LANE_TOOLS);
 
   if (result.status !== 0) {
     console.error(
@@ -106,24 +158,55 @@ for (const lane of LANES) {
     continue;
   }
 
-  if (existsSync(blockFile)) {
-    blocked = true;
+  const headAfter = run("git rev-parse HEAD");
+  const laneCommitted = headAfter !== headBefore;
+  const laneBlocked = existsSync(blockFile);
+
+  if (!laneCommitted && !laneBlocked) {
+    continue;
   }
-  if (run("git rev-parse HEAD") !== headBefore) {
-    fixed = true;
+
+  console.log(`\n--- verifying ${lane} lane's finding ---`);
+  const finding = laneBlocked
+    ? `The ${lane} lane flagged a blocking issue it could not safely fix:\n\n${readFileSync(blockFile, "utf8")}`
+    : `The ${lane} lane committed the following fix:\n\n\`\`\`\n${run("git show HEAD")}\n\`\`\``;
+
+  const output = verify(sharedContext, finding);
+  const verdict = parseVerdict(output, laneBlocked ? "CONFIRMED" : "REJECTED");
+
+  if (laneBlocked) {
+    if (verdict === "CONFIRMED") {
+      console.log(`  verify: ${lane}'s block confirmed.`);
+      blocked = true;
+    } else {
+      console.log(
+        `  verify: ${lane}'s block rejected on independent review -- not blocking the push on it.`,
+      );
+      unlinkSync(blockFile);
+    }
+  } else {
+    if (verdict === "CONFIRMED") {
+      console.log(`  verify: ${lane}'s fix confirmed.`);
+      fixed = true;
+    } else {
+      console.log(
+        `  verify: ${lane}'s fix rejected on independent review -- reverting it.`,
+      );
+      run(`git reset --hard ${headBefore}`);
+    }
   }
 }
 
 if (blocked) {
   console.error(
-    "\nlocal-pr-review: one or more lanes flagged a blocking issue. Push aborted -- see output above.",
+    "\nlocal-pr-review: one or more lanes flagged a blocking issue, confirmed on independent review. Push aborted -- see output above.",
   );
   process.exit(1);
 }
 
 if (fixed) {
   console.error(
-    "\nlocal-pr-review: a lane committed a fix locally. Push aborted so the fix is included -- run `git push` again.",
+    "\nlocal-pr-review: a lane committed a fix, confirmed on independent review. Push aborted so the fix is included -- run `git push` again.",
   );
   process.exit(1);
 }
