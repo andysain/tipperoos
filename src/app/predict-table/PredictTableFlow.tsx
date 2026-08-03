@@ -518,12 +518,15 @@ export function PredictTableFlow({
   const [justSealed, setJustSealed] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
-  // The team currently in the Picker because a player explicitly tapped it
-  // to reconsider -- takes priority over the next-to-call team below.
-  const [manualPickTeamId, setManualPickTeamId] = useState<string | null>(null);
-  // When the chosen Band is already at its target, this holds that Band
-  // while the Picker shows "swap with" instead of the Band list.
-  const [pendingSwapBand, setPendingSwapBand] = useState<BandKey | null>(null);
+  // The team currently in the Picker because a player explicitly tapped an
+  // already-placed team to reconsider it -- takes priority over the
+  // next-to-call team from the queue below. Drives whether the Picker opens
+  // for "reconsider an existing pick" vs. "call the next uncalled team".
+  const [reconsiderTeamId, setReconsiderTeamId] = useState<string | null>(null);
+  // When the chosen Band is already at its target, this names that Band and
+  // switches the Picker's body from the Band list to <SwapChooser> --
+  // "which of this Band's current occupants do you want to swap with?".
+  const [swapChooserBand, setSwapChooserBand] = useState<BandKey | null>(null);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60_000);
@@ -564,48 +567,68 @@ export function PredictTableFlow({
   // unique-constraint error on the server.
   const [busyTeamId, setBusyTeamId] = useState<string | null>(null);
 
+  // Shared shape for every board mutation below (assign/unassign/clear):
+  // apply the optimistic local change, fire the request(s), and roll the
+  // change back if any request failed. Each call site decides exactly what
+  // `apply`/`rollback` touch, since assign/unassign/clear each mutate a
+  // different combination of `assignments`/`queueOrder`.
+  async function saveOptimistically(
+    apply: () => void,
+    rollback: () => void,
+    requests: Promise<{ ok: boolean; data: { error?: string } }>[],
+    fallbackError: string,
+  ) {
+    setSaveError(null);
+    apply();
+    const results = await Promise.all(requests);
+    const failed = results.find((result) => !result.ok);
+    if (failed) {
+      rollback();
+      setSaveError(failed.data.error ?? fallbackError);
+    }
+    return results;
+  }
+
   async function assignTeam(teamId: string, band: BandKey) {
     if (busyTeamId === teamId) return;
     setBusyTeamId(teamId);
-    setSaveError(null);
     const previous = assignments;
-    setAssignments((prev) => ({ ...prev, [teamId]: band }));
-    setIsSkipped(false);
-
-    const { ok, data } = await postJson("/api/table-predictions/assign", {
-      teamId,
-      band,
-    });
-    if (!ok) {
-      setAssignments(previous);
-      setSaveError(data.error ?? "Couldn't save that move -- try again.");
-    }
+    await saveOptimistically(
+      () => {
+        setAssignments((prev) => ({ ...prev, [teamId]: band }));
+        setIsSkipped(false);
+      },
+      () => setAssignments(previous),
+      [postJson("/api/table-predictions/assign", { teamId, band })],
+      "Couldn't save that move -- try again.",
+    );
     setBusyTeamId(null);
   }
 
   async function unassignTeam(teamId: string, requeue: boolean) {
     if (busyTeamId === teamId) return;
     setBusyTeamId(teamId);
-    setSaveError(null);
     const previous = assignments;
-    setAssignments((prev) => {
-      const next = { ...prev };
-      delete next[teamId];
-      return next;
-    });
-    if (requeue) {
-      // Removed teams go straight back to the front of the queue -- an
-      // immediate "call it again" rather than losing their place entirely.
-      setQueueOrder((prev) => [teamId, ...prev.filter((id) => id !== teamId)]);
-    }
-
-    const { ok, data } = await postJson("/api/table-predictions/unassign", {
-      teamId,
-    });
-    if (!ok) {
-      setAssignments(previous);
-      setSaveError(data.error ?? "Couldn't remove that team -- try again.");
-    }
+    await saveOptimistically(
+      () => {
+        setAssignments((prev) => {
+          const next = { ...prev };
+          delete next[teamId];
+          return next;
+        });
+        if (requeue) {
+          // Removed teams go straight back to the front of the queue -- an
+          // immediate "call it again" rather than losing their place entirely.
+          setQueueOrder((prev) => [
+            teamId,
+            ...prev.filter((id) => id !== teamId),
+          ]);
+        }
+      },
+      () => setAssignments(previous),
+      [postJson("/api/table-predictions/unassign", { teamId })],
+      "Couldn't remove that team -- try again.",
+    );
     setBusyTeamId(null);
   }
 
@@ -617,30 +640,30 @@ export function PredictTableFlow({
   async function clearTeams(teamIds: string[]) {
     if (teamIds.length === 0 || bulkClearing) return;
     setBulkClearing(true);
-    setSaveError(null);
     const previousAssignments = assignments;
     const previousQueue = queueOrder;
     const clearSet = new Set(teamIds);
-    setAssignments((prev) => {
-      const next = { ...prev };
-      for (const id of teamIds) delete next[id];
-      return next;
-    });
-    setQueueOrder((prev) => [
-      ...teamIds,
-      ...prev.filter((id) => !clearSet.has(id)),
-    ]);
-
-    const results = await Promise.all(
+    await saveOptimistically(
+      () => {
+        setAssignments((prev) => {
+          const next = { ...prev };
+          for (const id of teamIds) delete next[id];
+          return next;
+        });
+        setQueueOrder((prev) => [
+          ...teamIds,
+          ...prev.filter((id) => !clearSet.has(id)),
+        ]);
+      },
+      () => {
+        setAssignments(previousAssignments);
+        setQueueOrder(previousQueue);
+      },
       teamIds.map((teamId) =>
         postJson("/api/table-predictions/unassign", { teamId }),
       ),
+      "Couldn't clear those teams -- try again.",
     );
-    if (results.some((result) => !result.ok)) {
-      setAssignments(previousAssignments);
-      setQueueOrder(previousQueue);
-      setSaveError("Couldn't clear those teams -- try again.");
-    }
     setBulkClearing(false);
   }
 
@@ -710,7 +733,7 @@ export function PredictTableFlow({
     }, 160);
   }
 
-  const activePickTeamId = manualPickTeamId ?? unsortedQueue[0] ?? null;
+  const activePickTeamId = reconsiderTeamId ?? unsortedQueue[0] ?? null;
   const activePickTeam = activePickTeamId
     ? teamsById.get(activePickTeamId)
     : undefined;
@@ -719,13 +742,13 @@ export function PredictTableFlow({
     : null;
 
   function openPickerFor(teamId: string) {
-    setPendingSwapBand(null);
-    setManualPickTeamId(teamId);
+    setSwapChooserBand(null);
+    setReconsiderTeamId(teamId);
   }
 
   function closePicker() {
-    setManualPickTeamId(null);
-    setPendingSwapBand(null);
+    setReconsiderTeamId(null);
+    setSwapChooserBand(null);
   }
 
   function chooseBand(band: BandKey) {
@@ -737,7 +760,7 @@ export function PredictTableFlow({
     const target = TABLE_BANDS.find((b) => b.key === band);
     const currentCount = teamsInBand(assignments, band).length;
     if (target && currentCount >= target.target) {
-      setPendingSwapBand(band);
+      setSwapChooserBand(band);
       return;
     }
     assignTeam(activePickTeamId, band);
@@ -745,17 +768,17 @@ export function PredictTableFlow({
   }
 
   function chooseSwapOccupant(occupantId: string) {
-    if (!activePickTeamId || !pendingSwapBand) return;
+    if (!activePickTeamId || !swapChooserBand) return;
     if (activePickFromBand) {
       // A genuine swap: both teams already had a Band, so they trade places.
-      assignTeam(activePickTeamId, pendingSwapBand);
+      assignTeam(activePickTeamId, swapChooserBand);
       assignTeam(occupantId, activePickFromBand);
     } else {
       // The active pick is a fresh, never-placed team -- the bumped
       // occupant has nowhere reciprocal to go, so it heads back to the
       // queue to be called again, same as a manual remove.
       unassignTeam(occupantId, true);
-      assignTeam(activePickTeamId, pendingSwapBand);
+      assignTeam(activePickTeamId, swapChooserBand);
     }
     closePicker();
   }
@@ -933,12 +956,12 @@ export function PredictTableFlow({
                   team={activePickTeam}
                   fromBand={activePickFromBand}
                   disabled={busyTeamId === activePickTeam.id}
-                  pendingSwapBand={pendingSwapBand}
+                  swapChooserBand={swapChooserBand}
                   assignments={assignments}
                   teamsById={teamsById}
                   onChooseBand={chooseBand}
                   onChooseSwapOccupant={chooseSwapOccupant}
-                  onCancelSwap={() => setPendingSwapBand(null)}
+                  onCancelSwap={() => setSwapChooserBand(null)}
                   onLater={
                     !activePickFromBand && unsortedQueue.length > 1
                       ? handleLater
@@ -1136,7 +1159,7 @@ function Picker({
   team,
   fromBand,
   disabled,
-  pendingSwapBand,
+  swapChooserBand,
   assignments,
   teamsById,
   onChooseBand,
@@ -1148,7 +1171,7 @@ function Picker({
   team: Team;
   fromBand: BandKey | null;
   disabled: boolean;
-  pendingSwapBand: BandKey | null;
+  swapChooserBand: BandKey | null;
   assignments: Record<string, BandKey>;
   teamsById: Map<string, Team>;
   onChooseBand: (band: BandKey) => void;
@@ -1202,9 +1225,9 @@ function Picker({
           which is what silently broke scrolling in earlier attempts here. */}
       <div className="relative min-h-0">
         <div className="h-full overflow-y-auto px-3.5 py-2 md:px-4 md:py-3">
-          {pendingSwapBand ? (
+          {swapChooserBand ? (
             <SwapChooser
-              band={pendingSwapBand}
+              band={swapChooserBand}
               assignments={assignments}
               teamsById={teamsById}
               onChoose={onChooseSwapOccupant}
@@ -1261,7 +1284,7 @@ function Picker({
         />
       </div>
 
-      {!pendingSwapBand ? (
+      {!swapChooserBand ? (
         <div className="px-3.5 pb-2.5 md:px-4 md:pb-3.5">
           {!isReconsider && onLater ? (
             <button
