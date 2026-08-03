@@ -92,37 +92,53 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data: existingRanks, error: ranksError } = await supabase
-    .from("table_prediction_ranks")
-    .select("id, team_id")
-    .eq("table_prediction_id", prediction.id);
-  if (ranksError) {
-    return NextResponse.json(
+  const genericSaveError = () =>
+    NextResponse.json(
       {
         error: "That move didn't save -- check your connection and try again.",
       },
       { status: 500 },
     );
-  }
 
-  const existing = existingRanks?.find((rank) => rank.team_id === teamId);
-
-  if (existing) {
-    const { error: updateError } = await supabase
+  // Retries the select-max-rank -> insert cycle a few times, so a losing
+  // side of a race (two requests reading the same "current ranks" snapshot
+  // before either writes) recomputes against fresh data instead of
+  // silently giving up. Two distinct races land here:
+  //  1. The same team, twice (a fast double-tap) -> the second attempt's
+  //     insert 23505s on team_id; once we see the row exists, we're done.
+  //  2. Two different teams whose computed predicted_rank happened to
+  //     collide -> the insert 23505s on predicted_rank instead; the losing
+  //     request just needs to recompute a fresh rank and retry its own
+  //     insert, since its own team_id row still doesn't exist yet.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { data: existingRanks, error: ranksError } = await supabase
       .from("table_prediction_ranks")
-      .update({ band })
-      .eq("id", existing.id);
-    if (updateError) {
-      return NextResponse.json(
-        {
-          error:
-            "That move didn't save -- check your connection and try again.",
-        },
-        { status: 500 },
-      );
+      .select("id, team_id, predicted_rank")
+      .eq("table_prediction_id", prediction.id);
+    if (ranksError) return genericSaveError();
+
+    const existing = existingRanks?.find((rank) => rank.team_id === teamId);
+    if (existing) {
+      const { error: updateError } = await supabase
+        .from("table_prediction_ranks")
+        .update({ band })
+        .eq("id", existing.id);
+      if (updateError) return genericSaveError();
+      return NextResponse.json({ ok: true });
     }
-  } else {
-    const nextRank = (existingRanks?.length ?? 0) + 1;
+
+    // The smallest rank 1-20 not currently in use -- not "max + 1". Ranks
+    // are never renumbered when a row is deleted (unassign), so always
+    // incrementing would eventually walk past 20 and start failing the
+    // `predicted_rank between 1 and 20` check constraint after enough
+    // remove-then-recall cycles. There are at most 19 other rows at this
+    // point (this team doesn't have one yet), so a free slot in 1-20
+    // always exists.
+    const usedRanks = new Set(
+      (existingRanks ?? []).map((rank) => rank.predicted_rank),
+    );
+    let nextRank = 1;
+    while (usedRanks.has(nextRank)) nextRank++;
     const { error: insertError } = await supabase
       .from("table_prediction_ranks")
       .insert({
@@ -131,16 +147,24 @@ export async function POST(request: Request) {
         band,
         predicted_rank: nextRank,
       });
-    if (insertError) {
+    if (!insertError) return NextResponse.json({ ok: true });
+
+    if (insertError.code === "23503") {
       // Foreign-key violation -> the given teamId doesn't exist.
-      const status = insertError.code === "23503" ? 400 : 500;
-      const message =
-        status === 400
-          ? "That doesn't look like a real team -- try refreshing the page."
-          : "That move didn't save -- check your connection and try again.";
-      return NextResponse.json({ error: message }, { status });
+      return NextResponse.json(
+        {
+          error:
+            "That doesn't look like a real team -- try refreshing the page.",
+        },
+        { status: 400 },
+      );
     }
+    if (insertError.code !== "23505") return genericSaveError();
+    // 23505 (unique violation) -> loop and recheck: either our own team_id
+    // now has a row (case 1, handled by the `existing` branch above on the
+    // next pass) or the rank collided with a different team (case 2,
+    // resolved by recomputing nextRank on the next pass).
   }
 
-  return NextResponse.json({ ok: true });
+  return genericSaveError();
 }

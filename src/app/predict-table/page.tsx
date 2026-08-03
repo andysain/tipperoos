@@ -39,7 +39,7 @@ export default async function PredictTablePage() {
     await Promise.all([
       supabase
         .from("teams")
-        .select("id, name, short_code")
+        .select("id, name, short_code, previous_season_position")
         .eq("active", true)
         .order("name", { ascending: true }),
       getGameweekOneKickoff(supabase),
@@ -84,12 +84,14 @@ export default async function PredictTablePage() {
         id: team.id,
         name: team.name,
         shortCode: team.short_code,
+        previousSeasonPosition: team.previous_season_position,
       }))}
       initialAssignments={assignments}
       isLateJoiner={editability.isLateJoiner}
       locked={editability.locked}
       initialIsSkipped={prediction?.is_skipped ?? false}
       initialSubmittedAt={prediction?.submitted_at ?? null}
+      gameweekOneKickoff={gameweekOneKickoff?.toISOString() ?? null}
     />
   );
 }

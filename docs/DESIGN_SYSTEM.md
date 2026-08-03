@@ -38,6 +38,13 @@ player's own predicted scoreline. Restraint everywhere else is what makes those 
 No other colors. Rank-movement indicators reuse `success`/`danger` rather than introducing a separate palette,
 so color meaning stays consistent everywhere in the app, not just on the leaderboard.
 
+**One deliberate, scoped exception**: Predict the Table's team cards (issue #26) show each club's real kit
+colors as a two-tone stripe, at the product owner's explicit request after comparing options directly — real
+club colors read clearer and pack more identity into less space than a flat code pill, and make each Band's
+membership scannable as a group. This is presentation only (no crests — that trademark constraint is
+unchanged) and is scoped to that one feature; it doesn't open the palette back up generally. See
+`docs/adr/0003-predict-the-table-shape.md`'s build-log addendum.
+
 ## Typography
 
 Geist only (already wired via `next/font/google` in `layout.tsx`) — no second typeface. Hierarchy comes from

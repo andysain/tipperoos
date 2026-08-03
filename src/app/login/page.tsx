@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
@@ -303,11 +304,19 @@ function LoginFlow() {
               You&apos;ll need to set a new PIN before you can keep going.
             </p>
           ) : (
-            <p className="mt-2 text-ink/70">
-              {success.kind === "join"
-                ? "You're all set and logged in — the pitch is waiting."
-                : "You're logged in."}
-            </p>
+            <>
+              <p className="mt-2 text-ink/70">
+                {success.kind === "join"
+                  ? "You're all set and logged in — the pitch is waiting."
+                  : "You're logged in."}
+              </p>
+              <Link
+                href="/predict-table"
+                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-btn bg-accent px-5 py-3 text-[1.0625rem] font-bold text-accent-ink transition hover:brightness-105"
+              >
+                Predict the Table
+              </Link>
+            </>
           )}
         </Card>
       </main>
