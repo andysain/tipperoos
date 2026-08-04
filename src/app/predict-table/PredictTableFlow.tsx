@@ -949,9 +949,9 @@ export function PredictTableFlow({
                 onClick={closePicker}
                 aria-hidden
                 tabIndex={-1}
-                className="fixed inset-0 z-10 bg-ink/20 md:hidden"
+                className="fixed inset-0 z-20 bg-ink/20 md:hidden"
               />
-              <div className="fixed inset-x-0 bottom-0 z-20 md:sticky md:top-4 md:z-auto md:w-80 md:shrink-0 md:self-start">
+              <div className="fixed inset-x-0 bottom-0 z-30 md:sticky md:top-4 md:z-auto md:w-80 md:shrink-0 md:self-start">
                 <Picker
                   team={activePickTeam}
                   fromBand={activePickFromBand}
