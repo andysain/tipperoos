@@ -1,0 +1,2 @@
+# gitignored files to copy (not symlink) into each new worktree
+.env.local
