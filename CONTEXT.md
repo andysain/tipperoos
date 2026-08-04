@@ -46,15 +46,21 @@ A Tipped Match postponed _after_ its picks have locked. Scores nobody, permanent
 A Match 1 or Match 2 slot left empty for a Gameweek because its Fixture was postponed _before_ picks locked. No replacement Fixture is selected; that Gameweek simply runs with one Tipped Match instead of two.
 _Avoid_: Void, Voided Match (reserved for the post-lock case — the rules and player-facing meaning differ)
 
-**Player**:
-A competition participant. A Bot is a Player with `is_bot = true`, not a separate concept — it has picks, scores, and a Standings Snapshot like any other Player.
+**Competition**:
+A private group of Players tipping independently against each other on the same real Premier League season. Two Competitions may tip the same Fixtures/Gameweeks (they share the same underlying football facts) but never share Players, Picks, Scores, or a Season Winner. Exactly one exists today; see `docs/adr/0004-multi-competition-foundational-scope.md` for the foundational schema work enabling a second.
 
-**Admin**:
-A Player (`is_admin = true`) with exactly two elevated write capabilities — entering/correcting match results and kickoff times, and resetting another Player's PIN — and no elevated read visibility. Bound by the same pre-lock pick-hiding rules as any other Player; there is no "sees everything early" version of this role.
-_Avoid_: assuming "admin" implies broader visibility or permissions than the two listed above — it doesn't, by deliberate design.
+**Player**:
+A participant in exactly one Competition. A Bot is a Player with `is_bot = true`, not a separate concept — it has picks, scores, and a Standings Snapshot like any other Player.
+
+**Competition Admin**:
+A Player (`is_admin = true`) with exactly one elevated write capability, scoped to their own Competition: resetting another Player's PIN (and, once they exist, administering that Competition's settings — e.g. a lockout duration). No elevated read visibility — bound by the same pre-lock pick-hiding rules as any other Player. Unlike the old single-tier "Admin" concept, does **not** correct match results or kickoff times (see Superadmin) — and is therefore eligible for their own Competition's Season Winner, since PIN resets can't influence scoring. Exactly one per Competition, assigned when the Competition is created.
+_Avoid_: Admin alone (ambiguous now that the role is split — always say Competition Admin or Superadmin).
+
+**Superadmin**:
+A documented role, deliberately not built yet: a Player with cross-Competition match-result/kickoff-time correction rights — the only capability that would ever span every Competition, since Fixtures/Matches are shared, global facts with no Competition of their own. Would never partake in any Competition's gameplay (a pure administrative role) and would be excluded from every Competition's login roster via a separate gate. Not needed while one person administers every Competition that exists — see `docs/adr/0004-multi-competition-foundational-scope.md` decision 6. Match-result correction is, for now, a development-team database action, not an in-app capability at all.
 
 **Season Winner**:
-The Player with the highest Season Total at season end. Eligible pool excludes the Admin and any Late Joiner; Bots are eligible to win.
+The Player with the highest Season Total at season end, within one Competition. Eligible pool excludes any Late Joiner and (if it's ever built) a Superadmin; a Competition Admin **is** eligible. Bots are eligible to win.
 
 **Late Joiner**:
 A Player who signs up after Gameweek 1 has begun. Not eligible for Season Winner (didn't compete the full season). May submit Predict the Table at any time after joining, or skip it — both optional, unlike the mandatory pre-season capture for on-time Players.
