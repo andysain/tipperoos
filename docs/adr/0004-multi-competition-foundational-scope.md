@@ -12,6 +12,13 @@ mixing real family-competition data. This ADR is not a decision to build the ful
 feature now — it's the answer to "what foundational groundwork, if any, is worth doing now so that
 building it later (or running a lightweight test cohort now) doesn't require an expensive retrofit."
 
+**Status: grilled and resolved (2026-08-04).** The 4-agent synthesis below left three things
+genuinely open — the isolation-goal question, match-edit authority, and (once that discussion
+opened it up) a role model beyond a single flat `is_admin`. All three were walked through in a
+`/grilling` session with Andy afterward; the outcomes are folded into the decisions below rather
+than kept as a separate changelog, since they supersede rather than append to the original
+synthesis.
+
 ## Decision
 
 1. **Add a `competitions` table, plus `competition_id` on `players` and `gameweeks` only, now** —
@@ -52,12 +59,21 @@ building it later (or running a lightweight test cohort now) doesn't require an 
    live data, in the tightest part of the build schedule. This is the one place "build it now" is
    cheaper than "build it later," and it's the whole justification for #1.
 
-3. **No route-contract changes ship yet.** `POST /api/auth/login`, `POST /api/auth/signup`,
-   `GET /api/auth/players` keep their current queries — no `competition_id` filters added now, no
-   change to `verifyCompetitionCode`, no change to the login request shape. These all ship **in the
-   same PR that actually creates the second `competitions` row**, never as an independently
-   mergeable "foundational" follow-up. Reasoning, converged on independently by three of the four
-   agents:
+3. **Route-contract changes ship now, not deferred.** `POST /api/auth/login`, `POST /api/auth/signup`,
+   `GET /api/auth/players` all get their `competition_id`-aware rework immediately, ahead of the
+   four not-yet-built modules in decision 2 — **grilled outcome, overriding the original
+   synthesis's recommendation.** The 4-agent process below argued for deferring this to the same PR
+   that actually creates a second competition, on the reasoning that stayed correct right up until
+   Andy resolved the isolation-goal question: he needs **genuine funnel isolation** — actually
+   exercising the competition-code-gated login flow itself, not just keeping fabricated scores off
+   the real leaderboard — because that's what actually motivated this ADR (real, broken
+   competition-code behavior he hit personally on Preview and Production, not a leaderboard-hygiene
+   worry). Data-hygiene isolation alone would have let this stay deferred indefinitely; funnel
+   isolation only exists once a second competition and its route enforcement are both real, so he
+   chose to accept the schedule-collision risk (this work landing in the same window as the four
+   not-yet-built modules, CODEOWNERS-gated review on `signup-validation.ts` sooner than ideal)
+   rather than wait. That risk is real and was flagged, not waved away — see the original reasoning
+   below, which still explains _why_ it would ordinarily be worth deferring:
    - With exactly one `competitions` row in existence, a forgotten `.eq("competition_id", ...)`
      predicate is a no-op — there's nothing to leak across yet. That window is safe.
    - Enforcement code merged and sitting inert while only one competition exists is untested in the
@@ -115,25 +131,49 @@ building it later (or running a lightweight test cohort now) doesn't require an 
    CODEOWNERS-gated code on its own, and removes the dependency on every future contributor
    (including a future agent session with no memory of this ADR) independently rediscovering #4.
 
-6. **Match-result/kickoff-time edit authority needs an explicit decision before any second admin
-   identity of any kind exists** — this ADR does not make that call. `players.is_admin` is a plain
-   boolean with no competition dimension, which is fine for `players`-scoped admin actions
-   (a future PIN-reset route can and should check the acting admin's `competition_id` matches the
-   target player's), but **does not even type-check** for match-result edits, since `matches`
-   correctly has no competition scope at all (#1). Two honest options, not resolved here:
-   - Match-edit authority is **not** competition-scoped — any admin, in any competition, can
-     correct any shared match's result, because a wrong score is an objective fact and correction
-     isn't a competition-scoped privilege. (Leaning option, given CLAUDE.md's implicit framing of
-     match results as objective facts throughout the postponement/audit rules — but this is a
-     product/trust-model call, not a security one, and Andy should make it explicitly.)
-   - Match-editing stays restricted to a single designated admin, sidestepping the question by
-     never having more than one admin identity with this specific capability.
+6. **Resolved role model — Competition Admin, in-app; Superadmin, documented but not built; match
+   editing, not an in-app capability at all.** The original synthesis correctly found that
+   `players.is_admin` as a plain boolean doesn't even type-check for match-result edits once
+   `matches` has no competition scope (#1) — that forced a real decision, and grilling it with Andy
+   surfaced a cleaner shape than either of the two options originally posed:
+   - **Competition Admin** (`is_admin = true`, scoped to the Competition their own `players` row
+     belongs to): resets that Competition's players' PINs, and — once competition-level settings
+     exist at all (e.g. a lockout duration) — administers those too. A future PIN-reset/settings
+     route should check the acting admin's `competition_id` matches the target's, exactly as the
+     original synthesis proposed. **Eligible for their own Competition's Season Winner** — the
+     existing exclusion rule exists specifically because an admin who can also correct results has
+     a credibility conflict with winning; a Competition Admin who can't touch match results at all
+     doesn't have that conflict, so the letter of the old rule doesn't survive its own
+     justification here.
+   - **Match-result/kickoff-time correction is not an in-app capability at all, for now** —
+     handled directly by the development team via database/script access, exactly matching today's
+     actual state (no admin route of any kind exists in the codebase yet regardless). This
+     sidesteps the original either/or entirely: nobody needs "authority" over a shared `matches`
+     row inside the app because nothing in the app grants that authority yet.
+   - **Superadmin** — a cross-Competition role with match-edit rights, a `players.is_superadmin`
+     flag, and a login mechanism that keeps them out of any Competition's visible roster (a secret
+     `competitions` row flagged e.g. `is_superadmin_gate = true`, whose roster query returns
+     `where is_superadmin = true` instead of a real Competition's players) — is a **documented
+     design, deliberately not built.** It solves a problem that doesn't exist yet (arbitrating a
+     shared match fact across two genuinely different human Competition Admins); with one person
+     administering both the real and any test Competition, "development team fixes it directly"
+     already covers the actual near-term need. Build this only once a second human Competition
+     Admin is real, not speculatively now — this is the same call the original synthesis made
+     for a competition-management UI, applied one layer further in.
 
-   No new column is needed for `match_result_audit` either way — the existing `changed_by` →
-   `players.competition_id` chain already answers "which competition was this admin acting under"
-   for accountability purposes, the same transitive-scoping pattern as `picks`/`scores`. A dedicated
-   `competition_id` column on the audit row would overspecify something that doesn't have a single
-   true value once (6) is decided either way.
+   No new column is needed for `match_result_audit` — the existing `changed_by` →
+   `players.competition_id` chain already answers "which Competition was this action taken under"
+   for accountability, the same transitive-scoping pattern as `picks`/`scores`. Moot in practice
+   while match-editing stays outside the app entirely, but holds regardless of when/whether
+   Superadmin is ever built.
+
+7. **Exactly one Competition Admin per Competition, assigned atomically when the Competition is
+   created.** Matches the existing "there is, and will only ever be, one admin for now" philosophy
+   (`BUILD_PLAN.md` decision 25) rather than introducing multiple-admins-per-competition as a new
+   hypothetical. Creating the row and its admin together, in one script/transaction, closes the
+   partial-bootstrap failure mode the red-team agent flagged (a competition live with no admin able
+   to fix anything). No self-serve competition-creation UI now — a manual script, mirroring
+   `scripts/seed-fixtures.mjs`'s existing pattern, is sufficient until a real need for one exists.
 
 ## Rejected
 
@@ -154,29 +194,12 @@ building it later (or running a lightweight test cohort now) doesn't require an 
   attack/bug surface (every fixture-sync write, every result-entry action, every match-status
   transition would need a competition check) for zero confidentiality benefit, since match results
   are public sporting facts, not private competition data.
-- **Route-contract changes and the login-ambiguity fix shipping now, independently of a second
-  competition actually existing.** See decision 3 — deferred, not rejected, but explicitly not part
-  of "foundational now."
 - **A full competition-management UI, self-serve competition creation, or cross-competition
   admin/reporting views.** Not asked for, not part of this ADR's scope. A manual script, mirroring
   `scripts/seed-fixtures.mjs`'s existing one-off pattern, is sufficient for creating a first second
   competition, provided `competitions.code` has a real `unique` constraint from its first migration
   so the script can't silently collide two competitions onto the same code.
-
-## Open question for Andy
-
-What does "safe test competition in production" actually need to verify? Two readings that this
-ADR's decision 3 (defer route contracts) treats differently:
-
-- **Data-hygiene isolation** — keep fabricated scores/standings out of the real leaderboard. Fully
-  satisfied once decision 3's route contracts ship, whenever competition #2 is actually created.
-- **Genuine funnel isolation** — also exercise the competition-code-gated signup/login flow itself
-  (today's biggest untested surface: `POST /api/auth/login` doesn't check the competition code at
-  all, confirmed by reading `src/app/api/auth/login/route.ts` and `src/app/login/page.tsx` — it
-  relies entirely on the roster route's gate having already run). This reading requires decision 3's
-  work to actually ship before it's testable, not just the schema in decision 1.
-
-Neither the schema decision (1) nor the module-scoping decision (2) depends on which reading is
-correct — both cost the same either way. But it determines when decision 3's deferred route work
-actually needs to land, and whether "a test competition in production" is meaningfully available
-before then. Worth answering before treating this ADR as fully closed.
+- **Building Superadmin now** (the `is_superadmin` flag, the secret gate-code, the admin-gate
+  pseudo-competition) — see decision 6. Deliberately deferred, not rejected outright: the design is
+  worth keeping on record for whenever a second human Competition Admin makes it a real need, but
+  building it now would be solving a problem that doesn't exist yet.
