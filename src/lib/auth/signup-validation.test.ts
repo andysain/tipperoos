@@ -5,7 +5,6 @@ import {
   PIN_LENGTH,
   validateDisplayName,
   validatePinFormat,
-  verifyCompetitionCode,
 } from "./signup-validation";
 
 // Golden values hand-derived from CLAUDE.md -> Identity and auth's
@@ -99,28 +98,5 @@ describe("validatePinFormat", () => {
 
   it("rejects an empty string", () => {
     expect(validatePinFormat("")).toBe(false);
-  });
-});
-
-describe("verifyCompetitionCode", () => {
-  it("accepts an exact match", () => {
-    expect(verifyCompetitionCode("TIPPEROOS26", "TIPPEROOS26")).toBe(true);
-  });
-
-  it("is case-insensitive", () => {
-    expect(verifyCompetitionCode("tipperoos26", "TIPPEROOS26")).toBe(true);
-  });
-
-  it("tolerates surrounding whitespace from copy/paste", () => {
-    expect(verifyCompetitionCode("  TIPPEROOS26  ", "TIPPEROOS26")).toBe(true);
-  });
-
-  it("rejects an incorrect code", () => {
-    expect(verifyCompetitionCode("WRONGCODE", "TIPPEROOS26")).toBe(false);
-  });
-
-  it("rejects any input when the expected code is misconfigured as empty", () => {
-    expect(verifyCompetitionCode("", "")).toBe(false);
-    expect(verifyCompetitionCode("anything", "")).toBe(false);
   });
 });

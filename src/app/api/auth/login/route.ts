@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { hasCsrfHeader } from "@/app/_lib/csrf";
 import { setSessionCookie } from "@/app/_lib/session-cookie";
+import { resolveCompetitionByCode } from "@/lib/auth/competitions";
 import {
   MAX_FAILED_PIN_ATTEMPTS,
   isLocked,
@@ -8,10 +9,11 @@ import {
   recordSuccessfulLogin,
   type LockoutState,
 } from "@/lib/auth/lockout";
-import { verifyPin } from "@/lib/auth/pin";
+import { verifySecret } from "@/lib/auth/scrypt-secret";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 interface LoginBody {
+  competitionCode?: unknown;
   displayName?: unknown;
   pin?: unknown;
 }
@@ -31,6 +33,8 @@ export async function POST(request: Request) {
     );
   }
 
+  const competitionCode =
+    typeof body.competitionCode === "string" ? body.competitionCode : "";
   const displayName =
     typeof body.displayName === "string" ? body.displayName.trim() : "";
   const pin = typeof body.pin === "string" ? body.pin : "";
@@ -43,11 +47,28 @@ export async function POST(request: Request) {
   }
 
   const supabase = createServerSupabaseClient();
+
+  // Client sends the code it already holds; the server re-derives
+  // competitionId itself -- never trust a client-asserted competitionId
+  // directly (see docs/adr/0004-multi-competition-foundational-scope.md
+  // decision 3, the login-ambiguity fix).
+  const competitionId = await resolveCompetitionByCode(
+    supabase,
+    competitionCode,
+  );
+  if (!competitionId) {
+    return NextResponse.json(
+      { error: "Invalid competition code." },
+      { status: 403 },
+    );
+  }
+
   const { data: player, error: lookupError } = await supabase
     .from("players")
     .select(
       "id, display_name, emoji, pin_hash, failed_pin_attempts, locked_until, pin_reset_required",
     )
+    .eq("competition_id", competitionId)
     .ilike("display_name", displayName)
     .maybeSingle();
 
@@ -83,7 +104,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const pinIsCorrect = await verifyPin(pin, player.pin_hash);
+  const pinIsCorrect = await verifySecret(pin, player.pin_hash);
 
   if (!pinIsCorrect) {
     const nextState = recordFailedPinAttempt(lockoutState, now);

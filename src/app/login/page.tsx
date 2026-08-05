@@ -182,7 +182,11 @@ function LoginFlow() {
           "Content-Type": "application/json",
           "x-tipperoos-client": "1",
         },
-        body: JSON.stringify({ displayName: selected.displayName, pin }),
+        body: JSON.stringify({
+          competitionCode,
+          displayName: selected.displayName,
+          pin,
+        }),
       });
       const data = await response.json();
 

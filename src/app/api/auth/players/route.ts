@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyCompetitionCode } from "@/lib/auth/signup-validation";
+import { resolveCompetitionByCode } from "@/lib/auth/competitions";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 // Backs the login screen's "pick your display name from a list" UX
@@ -9,19 +9,21 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 // excluded: nobody logs in as one.
 export async function GET(request: Request) {
   const submittedCode = request.headers.get("x-competition-code") ?? "";
-  const expectedCode = process.env.COMPETITION_CODE;
 
-  if (!expectedCode || !verifyCompetitionCode(submittedCode, expectedCode)) {
+  const supabase = createServerSupabaseClient();
+  const competitionId = await resolveCompetitionByCode(supabase, submittedCode);
+
+  if (!competitionId) {
     return NextResponse.json(
       { error: "Invalid competition code." },
       { status: 403 },
     );
   }
 
-  const supabase = createServerSupabaseClient();
   const { data: players, error } = await supabase
     .from("players")
     .select("display_name, emoji")
+    .eq("competition_id", competitionId)
     .eq("is_bot", false)
     .order("display_name", { ascending: true });
 

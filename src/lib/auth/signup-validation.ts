@@ -1,5 +1,3 @@
-import { timingSafeEqual } from "node:crypto";
-
 export const DISPLAY_NAME_MIN_LENGTH = 2;
 export const DISPLAY_NAME_MAX_LENGTH = 20;
 export const PIN_LENGTH = 4;
@@ -46,19 +44,4 @@ export function validateDisplayName(
   }
 
   return { ok: true, normalized };
-}
-
-/** Verifies a submitted private competition code against the configured one. */
-export function verifyCompetitionCode(
-  submitted: string,
-  expected: string,
-): boolean {
-  const normalizedExpected = expected.trim().toLowerCase();
-  if (!normalizedExpected) return false;
-  const normalizedSubmitted = submitted.trim().toLowerCase();
-
-  const expectedBuf = Buffer.from(normalizedExpected, "utf8");
-  const submittedBuf = Buffer.from(normalizedSubmitted, "utf8");
-  if (expectedBuf.length !== submittedBuf.length) return false;
-  return timingSafeEqual(expectedBuf, submittedBuf);
 }

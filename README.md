@@ -42,3 +42,20 @@ latest migrations to a linked project:
 supabase link --project-ref <ref>
 supabase db push
 ```
+
+## Setting a competition's code
+
+Competition codes are stored hashed (`competitions.code_hash`), never in a migration file or
+anywhere in git history. After the `#68` migration lands in an environment, that environment's
+single `competitions` row starts with an inert placeholder hash that matches nothing — set the
+real code with:
+
+```bash
+SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node scripts/set-competition-code.mjs
+```
+
+Point the env vars at the target environment's Supabase project (staging or production — see
+_Environments_ above). It prompts interactively for the plaintext code with hidden input (not
+echoed to the terminal, never taken as a CLI argument, so it never lands in shell history). Run it
+once per environment; staging and production should use **different** codes, so a leaked staging
+code can't be reused to log into the real competition.
