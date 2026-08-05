@@ -1,6 +1,26 @@
 import { describe, expect, it } from "vitest";
 import { hashSecret } from "./scrypt-secret";
-import { matchCompetitionByCode } from "./competitions";
+import {
+  matchCompetitionByCode,
+  normalizeCompetitionCode,
+} from "./competitions";
+
+describe("normalizeCompetitionCode", () => {
+  it("trims surrounding whitespace without altering interior length", () => {
+    expect(normalizeCompetitionCode("forza").length).toBe(5);
+    expect(normalizeCompetitionCode("  forza  ").length).toBe(5);
+    expect(normalizeCompetitionCode("FORZA").length).toBe(5);
+  });
+
+  it("collapses empty/whitespace-only input to zero length", () => {
+    expect(normalizeCompetitionCode("").length).toBe(0);
+    expect(normalizeCompetitionCode("   ").length).toBe(0);
+  });
+
+  it("preserves length for a multi-word code", () => {
+    expect(normalizeCompetitionCode("Test Cohort").length).toBe(11);
+  });
+});
 
 describe("matchCompetitionByCode", () => {
   it("returns the id of the row whose code matches", async () => {
