@@ -46,7 +46,10 @@ export async function resolveCompetitionByCode(
   supabase: SupabaseClient,
   submittedCode: string,
 ): Promise<string | null> {
-  const { data } = await supabase.from("competitions").select("id, code_hash");
+  const { data, error } = await supabase
+    .from("competitions")
+    .select("id, code_hash");
+  if (error) throw error;
   return matchCompetitionByCode(
     (data ?? []).map((row) => ({ id: row.id, codeHash: row.code_hash })),
     submittedCode,
