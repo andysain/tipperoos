@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { hasCsrfHeader } from "@/app/_lib/csrf";
 import { setSessionCookie } from "@/app/_lib/session-cookie";
-import { hashPin } from "@/lib/auth/pin";
+import { resolveCompetitionByCode } from "@/lib/auth/competitions";
+import { hashSecret } from "@/lib/auth/scrypt-secret";
 import {
   validateDisplayName,
   validatePinFormat,
-  verifyCompetitionCode,
 } from "@/lib/auth/signup-validation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -40,11 +40,12 @@ export async function POST(request: Request) {
   const email = typeof body.email === "string" ? body.email.trim() : "";
   const emoji = typeof body.emoji === "string" ? body.emoji.trim() : "";
 
-  const expectedCompetitionCode = process.env.COMPETITION_CODE;
-  if (
-    !expectedCompetitionCode ||
-    !verifyCompetitionCode(competitionCode, expectedCompetitionCode)
-  ) {
+  const supabase = createServerSupabaseClient();
+  const competitionId = await resolveCompetitionByCode(
+    supabase,
+    competitionCode,
+  );
+  if (!competitionId) {
     return NextResponse.json(
       { error: "Invalid competition code." },
       { status: 403 },
@@ -66,11 +67,10 @@ export async function POST(request: Request) {
     );
   }
 
-  const supabase = createServerSupabaseClient();
-
   const { data: existing, error: lookupError } = await supabase
     .from("players")
     .select("id")
+    .eq("competition_id", competitionId)
     .ilike("display_name", displayNameResult.normalized)
     .maybeSingle();
 
@@ -87,11 +87,12 @@ export async function POST(request: Request) {
     );
   }
 
-  const pinHash = await hashPin(pin);
+  const pinHash = await hashSecret(pin);
 
   const { data: player, error: insertError } = await supabase
     .from("players")
     .insert({
+      competition_id: competitionId,
       display_name: displayNameResult.normalized,
       pin_hash: pinHash,
       email: email || null,
