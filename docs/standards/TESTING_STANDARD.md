@@ -68,6 +68,28 @@ recomputation, lockout still blocking after N+1 attempts) — invariants are
 harder to satisfy by accident with a wrong implementation than hand-picked
 examples are.
 
+### 1b) Scripted simulation — the multi-step-scenario category
+
+A **scripted simulation** is a third check category, distinct from both the
+committed Vitest tests above and a one-off manual staging check: an ad hoc
+script (not necessarily a `*.test.ts` file, doesn't need to live under
+`src/lib/**`, and isn't subject to the golden-value guard) that drives a
+scenario end-to-end across several modules — e.g. pick → lock → result →
+score → corrected result → rescore, asserting totals don't drift. Canonical
+exemplar: issue #22 / the Week 2 gameweek-simulation script named in
+`BUILD_PLAN.md`.
+
+Reach for it when a check genuinely spans multiple modules and neither a
+unit test (too narrow — it'd just re-test each module in isolation, missing
+the integration seam) nor a one-off manual staging check (not repeatable,
+and the scenario has too many steps to trust by hand) fits. It isn't a
+permanent CI gate by default — run it manually before trusting a pipeline
+against real data (per `BUILD_PLAN.md`'s Week 2 usage) — but keep it as a
+committed script under `scripts/` if it's likely to be rerun (e.g. once per
+season, not just once at launch). `docs/standards/ISSUE_STANDARD.md` §3/§6
+point here when an issue's done-when needs this verification method — don't
+redefine the category there.
+
 ## 2) Stack
 
 - **Vitest** for unit/integration tests — fast, TypeScript-native, no native
