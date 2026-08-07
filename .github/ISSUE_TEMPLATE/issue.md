@@ -7,7 +7,10 @@ labels: ""
 
 <!-- Context: why this exists. Link the ADR/CLAUDE.md section it's derived
      from. If it depends on a prior issue, state what that issue already
-     delivered so this one doesn't re-describe or re-do it. -->
+     delivered so this one doesn't re-describe or re-do it. If Scope or
+     Done-when below needs a numeric/enumerated spec value (a formula, a
+     threshold, an ordering), cite the section here and derive the value
+     from it there — never restate the value inline (§3). -->
 
 Per `docs/adr/000X-....md` decision N. Depends on #N (already delivers: ...).
 
@@ -41,7 +44,8 @@ simulation — name which>.
 <!--
 Before filing, run docs/standards/ISSUE_STANDARD.md §3's checklist:
 current-state check, self-contained done-when (watch for "once #N exists"
-hedges), verification method stated, cross-references validated, milestone
-& labels set, size check, assumption check (foundational issues only), and
-cold-read check (foundational issues / milestone kickoffs only).
+hedges), verification method stated, cross-references validated, no
+restated spec values (cite instead), milestone & labels set, size check,
+assumption check (foundational issues only), and cold-read check
+(foundational issues / milestone kickoffs only).
 -->
