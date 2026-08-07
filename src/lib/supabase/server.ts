@@ -18,8 +18,3 @@ export function createServerSupabaseClient() {
     auth: { persistSession: false },
   });
 }
-
-// Shared return type -- import this instead of re-deriving
-// `ReturnType<typeof createServerSupabaseClient>` locally in each module
-// that takes a client as a parameter.
-export type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;

@@ -1,5 +1,7 @@
 import "server-only";
-import type { SupabaseClient } from "@/lib/supabase/server";
+import type { createServerSupabaseClient } from "@/lib/supabase/server";
+
+type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
 /**
  * Shared query-helper backstop for match_id-keyed data (issue #71).
