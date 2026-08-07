@@ -69,7 +69,7 @@ export async function POST(request: Request) {
       "id, display_name, emoji, pin_hash, failed_pin_attempts, locked_until, pin_reset_required",
     )
     .eq("competition_id", competitionId)
-    .ilike("display_name", displayName)
+    .ilike("display_name", displayName.replace(/[%_]/g, "\\$&"))
     .maybeSingle();
 
   const invalidCredentials = () =>
@@ -88,59 +88,97 @@ export async function POST(request: Request) {
     return invalidCredentials();
   }
 
-  const now = new Date();
-  const lockoutState: LockoutState = {
+  const pinIsCorrect = await verifySecret(pin, player.pin_hash);
+
+  // Concurrent wrong-PIN guesses must not all read-then-write the same
+  // stale counter (that would defeat the 5-attempt lockout). Each retry
+  // re-reads the current row and applies its conditional update only if
+  // no other request has changed it since -- an optimistic-concurrency
+  // loop instead of a blind read-then-write.
+  let currentState: LockoutState = {
     failedPinAttempts: player.failed_pin_attempts,
     lockedUntil: player.locked_until,
   };
+  const MAX_RETRIES = 5;
 
-  if (isLocked(lockoutState, now)) {
-    return NextResponse.json(
-      {
-        error: "Too many incorrect PIN attempts. Try again later.",
-        lockedUntil: lockoutState.lockedUntil,
-      },
-      { status: 423 },
-    );
-  }
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const now = new Date();
 
-  const pinIsCorrect = await verifySecret(pin, player.pin_hash);
+    if (isLocked(currentState, now)) {
+      return NextResponse.json(
+        {
+          error: "Too many incorrect PIN attempts. Try again later.",
+          lockedUntil: currentState.lockedUntil,
+        },
+        { status: 423 },
+      );
+    }
 
-  if (!pinIsCorrect) {
-    const nextState = recordFailedPinAttempt(lockoutState, now);
-    await supabase
+    const nextState = pinIsCorrect
+      ? recordSuccessfulLogin(currentState)
+      : recordFailedPinAttempt(currentState, now);
+
+    const { data: updated, error: updateError } = await supabase
       .from("players")
       .update({
         failed_pin_attempts: nextState.failedPinAttempts,
         locked_until: nextState.lockedUntil,
       })
-      .eq("id", player.id);
+      .eq("id", player.id)
+      .eq("failed_pin_attempts", currentState.failedPinAttempts)
+      .select("failed_pin_attempts, locked_until")
+      .maybeSingle();
 
-    const attemptsRemaining = Math.max(
-      0,
-      MAX_FAILED_PIN_ATTEMPTS - nextState.failedPinAttempts,
-    );
-    return NextResponse.json(
-      { error: "Incorrect display name or PIN.", attemptsRemaining },
-      { status: 401 },
-    );
+    if (updateError) {
+      return NextResponse.json(
+        { error: "Could not update login state." },
+        { status: 500 },
+      );
+    }
+
+    if (!updated) {
+      // Another concurrent request updated the row first -- re-read and retry.
+      const { data: refreshed, error: refetchError } = await supabase
+        .from("players")
+        .select("failed_pin_attempts, locked_until")
+        .eq("id", player.id)
+        .single();
+      if (refetchError) {
+        return NextResponse.json(
+          { error: "Could not update login state." },
+          { status: 500 },
+        );
+      }
+      currentState = {
+        failedPinAttempts: refreshed.failed_pin_attempts,
+        lockedUntil: refreshed.locked_until,
+      };
+      continue;
+    }
+
+    if (!pinIsCorrect) {
+      const attemptsRemaining = Math.max(
+        0,
+        MAX_FAILED_PIN_ATTEMPTS - nextState.failedPinAttempts,
+      );
+      return NextResponse.json(
+        { error: "Incorrect display name or PIN.", attemptsRemaining },
+        { status: 401 },
+      );
+    }
+
+    await setSessionCookie(player.id);
+
+    return NextResponse.json({
+      id: player.id,
+      displayName: player.display_name,
+      emoji: player.emoji,
+      pinResetRequired: player.pin_reset_required,
+    });
   }
 
-  const resetState = recordSuccessfulLogin(lockoutState);
-  await supabase
-    .from("players")
-    .update({
-      failed_pin_attempts: resetState.failedPinAttempts,
-      locked_until: resetState.lockedUntil,
-    })
-    .eq("id", player.id);
-
-  await setSessionCookie(player.id);
-
-  return NextResponse.json({
-    id: player.id,
-    displayName: player.display_name,
-    emoji: player.emoji,
-    pinResetRequired: player.pin_reset_required,
-  });
+  return NextResponse.json(
+    { error: "Too many concurrent login attempts. Please try again." },
+    { status: 429 },
+  );
 }
