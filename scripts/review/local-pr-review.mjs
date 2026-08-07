@@ -121,10 +121,6 @@ const branch = run("git rev-parse --abbrev-ref HEAD");
 let fetchOk = true;
 try {
   run("git fetch origin main --quiet");
-} catch {
-  fetchOk = false;
-}
-if (fetchOk) {
   const behind = Number(run("git rev-list --count HEAD..origin/main"));
   if (behind > 0) {
     const who = branch === "main" ? "main" : "this branch";
@@ -136,6 +132,11 @@ if (fetchOk) {
       `local-pr-review: ${who} is ${behind} commit${behind === 1 ? "" : "s"} behind origin/main -- ${advice}.`,
     );
   }
+} catch {
+  // Fetch or rev-list failed (shallow clone, unrelated histories, offline)
+  // -- skip the warning silently rather than crashing the hook over it;
+  // the merge-base/diff logic below handles the same failure the same way.
+  fetchOk = false;
 }
 
 if (branch === "main") {
