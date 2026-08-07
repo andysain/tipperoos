@@ -1,8 +1,6 @@
 import "server-only";
-import type { createServerSupabaseClient } from "@/lib/supabase/server";
+import type { SupabaseClient } from "@/lib/supabase/server";
 import { verifySecret } from "./scrypt-secret";
-
-type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
 
 /**
  * Case-insensitive, whitespace-tolerant (copy/paste from a text/email),
