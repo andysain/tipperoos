@@ -19,10 +19,10 @@ that produced it. If a claim in the issue depends on something "we discussed"
 that isn't written down, it isn't actually in the issue. Assume the reader
 has the codebase and the referenced ADR/CLAUDE.md sections, and nothing else.
 
-## 2) The five failure modes this fixes
+## 2) The six failure modes this fixes
 
-Real examples from #69, kept here so the pattern is recognizable next time,
-not just abstract advice:
+Real examples from #69 and the milestone audit that followed it, kept here
+so the pattern is recognizable next time, not just abstract advice:
 
 1. **Stale state** — the issue described work as needed that a prior issue
    had already done as a side effect (`gameweeks.competition_id` already
@@ -42,6 +42,17 @@ not just abstract advice:
 5. **Buried conceptual seams** — a design decision (identity vs. membership
    fields conflated in one table) that only surfaced under deliberate
    scrutiny, not from a normal read-through.
+6. **Restated spec values silently drifting from source** — #21 restated the
+   scoring formula inline ("exact scoreline bonus +5, max 12") instead of
+   citing `CLAUDE.md`'s _Scoring_ section. That exact number had already
+   drifted and been corrected once before, in `BUILD_PLAN.md` on 2026-08-01
+   — the issue had the old, already-known-wrong value baked back in. Two
+   structural passes over this issue (labels, dependencies, verification
+   method) both missed it, because neither checked issue content against
+   `CLAUDE.md`'s actual numbers — only structure. The fix wasn't adding a
+   citation next to the restated value; it was removing the restatement
+   entirely and citing the source instead, so there's only one place the
+   number can live (see §3's citation bullet).
 
 ## 3) Drafting checklist
 
@@ -69,6 +80,16 @@ Run this before filing an issue, or a milestone's worth of issues:
       (a shared helper it should use, a pattern to follow), open that issue
       and confirm it's the right target before writing the number down. A
       remembered issue number is a guess until checked.
+- [ ] **No restated spec values — cite instead.** If a criterion depends on
+      a numeric or enumerated value from `CLAUDE.md`/`BUILD_PLAN.md`/an ADR
+      (a formula, a threshold, an ordering), don't copy the value into the
+      issue — cite the section and let the implementer derive it from
+      source. This is a second, independent trigger for adding a citation
+      alongside "Context is otherwise too thin to locate the spec section"
+      (§5's template). If you find a value already restated inline, remove
+      the restatement rather than just appending a citation next to it —
+      one source of truth, not two kept in sync by hand (see failure mode 6
+      in §2).
 - [ ] **Milestone & labels set.** Assign the issue to its milestone at
       filing time. Apply `launch-critical` if it's on `BUILD_PLAN.md`'s
       critical path. Apply `status: blocked` the moment this issue gets a
@@ -110,7 +131,10 @@ the issue, not a footnote to work around silently; fix it in place per §7.
 ```markdown
 <!-- Context: why this exists. Link the ADR/CLAUDE.md section it's derived
      from. If it depends on a prior issue, state what that issue already
-     delivered so this one doesn't re-describe or re-do it. -->
+     delivered so this one doesn't re-describe or re-do it. If Scope or
+     Done-when below needs a numeric/enumerated spec value (a formula, a
+     threshold, an ordering), cite the section here and derive the value
+     from it there — never restate the value inline (§3). -->
 
 Per `docs/adr/000X-....md` decision N. Depends on #N (already delivers: ...).
 
