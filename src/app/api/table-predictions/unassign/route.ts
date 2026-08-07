@@ -97,5 +97,12 @@ export async function POST(request: Request) {
     );
   }
 
+  // "Submitted" means this exact board state was confirmed -- rearranging
+  // afterwards un-confirms it until the player re-submits.
+  await supabase
+    .from("table_predictions")
+    .update({ submitted_at: null })
+    .eq("id", prediction.id);
+
   return NextResponse.json({ ok: true });
 }

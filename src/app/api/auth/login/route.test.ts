@@ -7,8 +7,12 @@ const lookupChain = {
   ilike: vi.fn().mockReturnThis(),
   maybeSingle: vi.fn(),
 };
-const updateEqMock = vi.fn();
-const updateMock = vi.fn(() => ({ eq: updateEqMock }));
+const updateChain = {
+  eq: vi.fn().mockReturnThis(),
+  select: vi.fn().mockReturnThis(),
+  maybeSingle: vi.fn(),
+};
+const updateMock = vi.fn(() => updateChain);
 
 vi.mock("@/lib/supabase/server", () => ({
   createServerSupabaseClient: () => ({
@@ -49,6 +53,8 @@ describe("POST /api/auth/login", () => {
     vi.clearAllMocks();
     lookupChain.eq.mockReturnThis();
     lookupChain.ilike.mockReturnThis();
+    updateChain.eq.mockReturnThis();
+    updateChain.select.mockReturnThis();
   });
 
   it("returns 403 (not a generic 401) when the competition code doesn't resolve, without ever looking up a player", async () => {
@@ -87,7 +93,10 @@ describe("POST /api/auth/login", () => {
       },
       error: null,
     });
-    updateEqMock.mockResolvedValue({ error: null });
+    updateChain.maybeSingle.mockResolvedValue({
+      data: { failed_pin_attempts: 0, locked_until: null },
+      error: null,
+    });
 
     const response = await POST(
       request({
