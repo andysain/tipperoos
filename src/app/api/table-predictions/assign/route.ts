@@ -75,10 +75,12 @@ export async function POST(request: Request) {
     );
   }
 
+  // "Submitted" means this exact board state was confirmed -- assigning a
+  // team afterwards un-confirms it until the player re-submits.
   const { data: prediction, error: predictionError } = await supabase
     .from("table_predictions")
     .upsert(
-      { player_id: playerId, is_skipped: false },
+      { player_id: playerId, is_skipped: false, submitted_at: null },
       { onConflict: "player_id" },
     )
     .select("id")
