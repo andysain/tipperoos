@@ -150,7 +150,15 @@ if (!fetchOk) {
   process.exit(0);
 }
 
-const base = run("git merge-base origin/main HEAD");
+let base;
+try {
+  base = run("git merge-base origin/main HEAD");
+} catch {
+  console.log(
+    "local-pr-review: couldn't fetch/diff against origin/main, skipping.",
+  );
+  process.exit(0);
+}
 
 const diff = run(`git diff ${base}...HEAD`);
 if (!diff.trim()) {
