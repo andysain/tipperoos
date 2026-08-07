@@ -107,20 +107,49 @@ function verify(sharedContext, findingDescription) {
 }
 
 const branch = run("git rev-parse --abbrev-ref HEAD");
+
+// Best-effort staleness warning -- catches a checkout (including `main`
+// itself) that's fallen behind origin/main just from sitting there, not
+// only from new commits landing on it. Runs for every branch, before either
+// early-exit below, since a stale primary checkout is exactly as dangerous
+// as a stale feature branch (a real incident, not hypothetical -- a review
+// session once nearly re-flagged two bugs that a same-day merged PR had
+// already fixed, because this checkout hadn't pulled). Warn-only, never
+// blocks: a git hook can't detect "time passed and nobody pulled," only
+// "a push is happening right now," so this is a courtesy nudge at the one
+// moment this script already talks to git, not a guarantee.
+let fetchOk = true;
+try {
+  run("git fetch origin main --quiet");
+} catch {
+  fetchOk = false;
+}
+if (fetchOk) {
+  const behind = Number(run("git rev-list --count HEAD..origin/main"));
+  if (behind > 0) {
+    const who = branch === "main" ? "main" : "this branch";
+    const advice =
+      branch === "main"
+        ? "pull before starting new work here"
+        : "consider rebasing before opening/updating the PR";
+    console.warn(
+      `local-pr-review: ${who} is ${behind} commit${behind === 1 ? "" : "s"} behind origin/main -- ${advice}.`,
+    );
+  }
+}
+
 if (branch === "main") {
   process.exit(0);
 }
 
-let base;
-try {
-  run("git fetch origin main --quiet");
-  base = run("git merge-base origin/main HEAD");
-} catch {
+if (!fetchOk) {
   console.log(
     "local-pr-review: couldn't fetch/diff against origin/main, skipping.",
   );
   process.exit(0);
 }
+
+const base = run("git merge-base origin/main HEAD");
 
 const diff = run(`git diff ${base}...HEAD`);
 if (!diff.trim()) {

@@ -45,3 +45,12 @@ Every change goes through a branch and a PR (see `BUILD_PLAN.md`'s engineering-p
 3. If it touches `src/lib/**` (the consequence-critical modules — scoring, lock enforcement, Match-2 picker, postponement, PIN/lockout) or `.github/workflows/**`: CODEOWNERS requires Andy's explicit approval before it can merge, even with CI green. This is the one place an independent human check exists in the process, deliberately kept narrow so it doesn't tax everyday UI/config/docs work.
 
 **The agent's own credentials must never be able to modify branch protection, CODEOWNERS, or force-push `main`.** That capability is Andy's alone, permanently — not just at initial setup. If a change to protection rules or `.github/workflows/**` ever seems warranted, the deliverable is the command for Andy to run himself, not the agent running it.
+
+## Worktrees
+
+Parallel agent work happens across git worktrees (Orca), each with its own branch, files, and terminal. Orca shares gitignored build state (`orca.yaml`'s `sharedDirectories`) and copies gitignored per-worktree files (`.worktreeinclude`) automatically — don't hand-roll either. It does **not** auto-fetch, auto-rebase, or warn about staleness during a task; that's on whoever's working the tree.
+
+- New worktrees start from `origin/main` (fetch first) — not a stale local `main`, and not another feature branch unless deliberately stacking work.
+- One worktree per task/branch. Delete it (directory + branch together, one Orca action) the moment its PR merges — don't let merged worktrees accumulate.
+- For anything long-running, or touching `supabase/migrations/**` (parallel migrations landing out of order is the real failure mode) or the shared docs (`CLAUDE.md`/`BUILD_PLAN.md`/`CONTEXT.md`), `git fetch && git rebase origin/main` before opening the PR.
+- **The primary checkout is not special — treat it like any other worktree.** Before starting work in it, `git fetch && git status`, and pull if behind. A stale primary checkout is how a review or a new feature branch quietly gets built against schema/routes that already changed upstream — this happened for real once (see `scripts/review/local-pr-review.mjs`'s staleness warning, which now catches it on every push, `main` included).
