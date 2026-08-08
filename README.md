@@ -43,6 +43,21 @@ supabase link --project-ref <ref>
 supabase db push
 ```
 
+## Creating a competition and its admin
+
+A new competition — and its exactly-one Competition Admin — is created atomically with:
+
+```bash
+SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node scripts/bootstrap-competition.mjs
+```
+
+It prompts interactively for the competition name, the plaintext competition code (hidden
+input), the admin's display name, their PIN (entered twice), and an optional emoji, then creates
+both rows in one atomic call. The admin can log in immediately — no forced-PIN-reset flag is set,
+since at bootstrap the operator and the account holder are the same person at the same keyboard.
+Refuses to create a competition whose code is already used by another competition in the same
+environment.
+
 ## Setting a competition's code
 
 Competition codes are stored hashed (`competitions.code_hash`), never in a migration file or
@@ -60,6 +75,6 @@ echoed to the terminal, never taken as a CLI argument, so it never lands in shel
 once per environment; staging and production should use **different** codes, so a leaked staging
 code can't be reused to log into the real competition.
 
-If an environment has more than one competition (once the #70 bootstrap script exists), the script
-lists them and prompts for which one to set — and refuses to set a code that another competition in
-that environment already uses, since the login flow could not then tell them apart.
+If an environment has more than one competition, the script lists them and prompts for which one
+to set — and refuses to set a code that another competition in that environment already uses,
+since the login flow could not then tell them apart.
