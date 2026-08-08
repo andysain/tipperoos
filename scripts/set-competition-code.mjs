@@ -67,7 +67,7 @@ async function main() {
     throw new Error("Code cannot be empty.");
   }
 
-  const codeHash = hashSecret(normalized);
+  const codeHash = await hashSecret(normalized);
 
   const { error: updateError } = await supabase
     .from("competitions")
