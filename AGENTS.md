@@ -41,7 +41,7 @@ For every implementation task: confirm scope -> make small verifiable changes ->
 
 Every change goes through a branch and a PR (see `BUILD_PLAN.md`'s engineering-process decision for the full reasoning) — but most changes merge themselves the instant CI goes green, no waiting on a human:
 
-1. Branch, commit, push, `gh pr create`, `gh pr merge --auto --squash`.
+1. Branch, commit, push, `gh pr create`, `gh pr merge --auto --squash`. Every PR body starts with a **TL;DR**: one or two sentences, plain language, no jargon, explaining what changed and why it matters — written for a reader who isn't going to read the code (see `.github/pull_request_template.md`). This isn't optional flavour text: it's Andy's actual way of following what agents are shipping without reading the Next.js/TypeScript implementation himself (same reasoning as `docs/standards/TESTING_STANDARD.md` §1a's golden-value spot-check).
 2. If the PR doesn't touch `src/lib/**` or `.github/workflows/**`: auto-merges as soon as CI passes. No review needed, no extra step.
 3. If it touches `src/lib/**` (the consequence-critical modules — scoring, lock enforcement, Match-2 picker, postponement, PIN/lockout) or `.github/workflows/**`: CODEOWNERS requires Andy's explicit approval before it can merge, even with CI green. This is the one place an independent human check exists in the process, deliberately kept narrow so it doesn't tax everyday UI/config/docs work.
 
