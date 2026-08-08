@@ -31,6 +31,7 @@ This file is a router, not a rulebook — the linked docs own their rules; don't
 - Store timestamps in UTC; render in `Australia/Sydney` only.
 - Kid-friendly language: `prediction`/`pick`/`points`/`leaderboard`/`competition` — never `bet`/`odds`/`wager`/`stake`/`payout`/`bookie`.
 - `matches`/`teams`/`seasons` are global by design and carry no `competition_id`. Any query that filters or joins on `match_id` alone does **not** carry competition scope — it must additionally join through `players.competition_id` (for `picks`/`scores`) or `gameweeks.competition_id` (for gameweek-level aggregates). This applies identically to player-facing reads (the leaderboard, Match Centre pick-reveal) and to admin actions. See `docs/adr/0004-multi-competition-foundational-scope.md`.
+- Never select a row without an explicit `.order()`. Any query that picks one row from a set — `limit 1`, a first-match loop, a numbered operator prompt — must specify a deterministic order. Postgres row order is arbitrary; "whichever came back first" has already produced three latent bugs here (`matchCompetitionByCode` in `src/lib/auth/competitions.ts`, the #68 migration's backfills, `scripts/set-competition-code.mjs`'s competition selector).
 
 ## Required workflow
 
