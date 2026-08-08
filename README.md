@@ -47,7 +47,7 @@ supabase db push
 
 Competition codes are stored hashed (`competitions.code_hash`), never in a migration file or
 anywhere in git history. After the `#68` migration lands in an environment, that environment's
-single `competitions` row starts with an inert placeholder hash that matches nothing — set the
+initial `competitions` row starts with an inert placeholder hash that matches nothing — set the
 real code with:
 
 ```bash
@@ -59,3 +59,7 @@ _Environments_ above). It prompts interactively for the plaintext code with hidd
 echoed to the terminal, never taken as a CLI argument, so it never lands in shell history). Run it
 once per environment; staging and production should use **different** codes, so a leaked staging
 code can't be reused to log into the real competition.
+
+If an environment has more than one competition (once the #70 bootstrap script exists), the script
+lists them and prompts for which one to set — and refuses to set a code that another competition in
+that environment already uses, since the login flow could not then tell them apart.
