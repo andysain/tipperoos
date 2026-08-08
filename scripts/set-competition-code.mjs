@@ -1,7 +1,7 @@
-// One-off script for issue #68: sets the real, hashed competition code for
-// the one competitions row in this environment's Supabase project. Run
-// manually, once per environment (local/staging/production), same pattern
-// as seed-fixtures.mjs.
+// One-off script for issue #68 (extended by #70 for the multi-competition
+// case): sets the real, hashed competition code for a competitions row in
+// this environment's Supabase project. Run manually, once per environment
+// (local/staging/production), same pattern as seed-fixtures.mjs.
 //
 // Usage:
 //   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node scripts/set-competition-code.mjs
@@ -20,8 +20,11 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { hashSecret } from "./lib/scrypt-secret.mjs";
-import { normalizeCompetitionCode } from "./lib/competitions.mjs";
-import { promptHidden } from "./lib/prompt.mjs";
+import {
+  normalizeCompetitionCode,
+  findCollidingCompetition,
+} from "./lib/competitions.mjs";
+import { prompt, promptHidden } from "./lib/prompt.mjs";
 
 function requireEnv(name) {
   const value = process.env[name];
@@ -39,10 +42,35 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 });
 
+// Postgres row order is arbitrary -- an unordered numbered list could mean
+// a different competition between two runs with nothing on screen to
+// reveal it (AGENTS.md's .order() non-negotiable, which names this
+// script's selector as a site to fix).
+async function selectCompetition(competitions) {
+  if (competitions.length === 1) {
+    return competitions[0];
+  }
+
+  console.log("Multiple competitions found:");
+  competitions.forEach((c, i) => {
+    console.log(`  ${i + 1}. ${c.name} (${c.id.slice(0, 8)})`);
+  });
+
+  const answer = await prompt(
+    `Choose a competition (1-${competitions.length}): `,
+  );
+  const index = Number.parseInt(answer, 10) - 1;
+  if (!Number.isInteger(index) || index < 0 || index >= competitions.length) {
+    throw new Error(`Invalid choice: "${answer}".`);
+  }
+  return competitions[index];
+}
+
 async function main() {
   const { data: competitions, error } = await supabase
     .from("competitions")
-    .select("id, name");
+    .select("id, name, code_hash")
+    .order("created_at");
   if (error) throw error;
 
   if (competitions.length === 0) {
@@ -50,21 +78,41 @@ async function main() {
       "No competitions row found -- run the #68 migration first.",
     );
   }
-  if (competitions.length > 1) {
-    throw new Error(
-      `Expected exactly one competitions row, found ${competitions.length}. ` +
-        "This script only supports the single-competition case -- update it " +
-        "by hand if you're intentionally setting a second one.",
-    );
-  }
 
-  const competition = competitions[0];
+  const competition = await selectCompetition(competitions);
   console.log(`Setting the code for competition "${competition.name}".`);
 
   const rawCode = await promptHidden("Enter the new competition code: ");
   const normalized = normalizeCompetitionCode(rawCode);
   if (!normalized) {
     throw new Error("Code cannot be empty.");
+  }
+
+  // Rotate-collision guard: two competitions sharing a plaintext code is an
+  // unresolvable routing ambiguity for matchCompetitionByCode, not a config
+  // choice -- so a match on another competition aborts, not just warns. A
+  // match on the target competition itself is a no-op (also avoids a
+  // pointless code_hash re-salt, which buys nothing since the hash is only
+  // useful to someone who already has the plaintext).
+  const colliding = await findCollidingCompetition(
+    competitions.map((c) => ({
+      id: c.id,
+      name: c.name,
+      codeHash: c.code_hash,
+    })),
+    normalized,
+  );
+  if (colliding && colliding.id === competition.id) {
+    console.log(
+      `Code unchanged for "${competition.name}" -- already set to this value.`,
+    );
+    return;
+  }
+  if (colliding) {
+    throw new Error(
+      `That code is already in use by competition "${colliding.name}". ` +
+        "Choose a different code.",
+    );
   }
 
   const codeHash = await hashSecret(normalized);

@@ -205,6 +205,17 @@ Route Handler → `nextjs-app-router-patterns`; a migration or schema change →
 `supabase-postgres-best-practices`; a non-trivial test → `vitest-testing`; a
 generic/utility-type-heavy module → `typescript-advanced-types`.
 
+- **Postgres function / RPC call** (multi-statement atomicity `@supabase/supabase-js`
+  can't get via PostgREST alone): `create_competition_with_admin()` in
+  `supabase/migrations/20260808000000_create_competition_with_admin.sql`,
+  called from `scripts/bootstrap-competition.mjs` (issue #70). Copy its
+  discipline for the next one: `security invoker` (never `definer` — the
+  default PUBLIC execute grant plus `definer` is the worst combination),
+  `set search_path = ''` with schema-qualified table names, and an explicit
+  `revoke ... from public` / `grant ... to service_role` pair, since Postgres
+  grants EXECUTE to PUBLIC by default and PostgREST exposes anything
+  callable in `public` as an RPC endpoint.
+
 ## 8) Commits
 
 Loose, not enforced by tooling: `<type>: <imperative summary>` — `feat`,
