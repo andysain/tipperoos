@@ -1,3 +1,8 @@
+## TL;DR
+
+<!-- One or two sentences, plain language, no jargon -- written for a reader
+who doesn't read the code, explaining what this changes and why it matters. -->
+
 ## What changed
 
 <!-- One or two sentences. -->
