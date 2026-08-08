@@ -38,6 +38,19 @@ player's own predicted scoreline. Restraint everywhere else is what makes those 
 No other colors. Rank-movement indicators reuse `success`/`danger` rather than introducing a separate palette,
 so color meaning stays consistent everywhere in the app, not just on the leaderboard.
 
+**Amended 2026-08-09**: the kit-colour exception below now also covers the **Tipped Match card** on the home
+pick board, where club colour carries the three-letter badge and a bar beside each digit row — see
+`docs/adr/0007-home-surface-and-pick-entry.md`. Two rules make that safe and are **mandatory wherever real kit
+colours are rendered**, including Predict the Table:
+
+- **Clash rule** — when both clubs' primary colours are too close to tell apart, the away side falls back to its
+  secondary, then to `ink`. Deterministic, no per-fixture curation.
+- **Contrast floor** — any kit whose luminance falls outside a readable band is mixed toward `paper` or `ink`,
+  hue preserved, until it clears every ground it will be drawn on. Without this, black kits disappear against an
+  ink surface and white kits disappear against a white one; both cases are real (Newcastle, Fulham).
+
+Kit colours remain scoped to these two features. This does not reopen the palette generally.
+
 **One deliberate, scoped exception**: Predict the Table's team cards (issue #26) show each club's real kit
 colors as a two-tone stripe, at the product owner's explicit request after comparing options directly — real
 club colors read clearer and pack more identity into less space than a flat code pill, and make each Band's
@@ -116,9 +129,17 @@ Never contradicts the kid-friendly language rules already in `CLAUDE.md` (`predi
 
 ## Team display in fixtures
 
-**Two-letter initials badge** (e.g. `ARS` vs `CHE`) next to the team name — no crests or logos anywhere (not
+**Three-letter initials badge** (e.g. `ARS` vs `CHE`) next to the team name — no crests or logos anywhere (not
 just a style call: official club crests are trademarked, so this is a hard constraint, not a preference).
 Scannable at a glance in a dense list; more designed than plain text alone.
+
+On the Tipped Match card the badge is filled with the club's kit colour (per the Palette amendment above,
+subject to the clash rule and contrast floor), with its text colour flipped to `ink` or `paper` by measured
+luminance rather than hardcoded per club. Elsewhere the badge stays `ink` on `paper`.
+
+**Home and away are stated, not implied.** Order alone is a convention adults read fluently and ten-year-olds
+don't, so the home side carries an explicit `home` label, and any rendered scoreline is flanked by both badges
+so `2–1` can't be read backwards.
 
 ## Match Centre structure
 
