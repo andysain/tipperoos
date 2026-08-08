@@ -5,10 +5,16 @@
 // against) and asserting each competition's read only ever sees its own
 // players' rows.
 //
-// Runs against a local Supabase stack (`supabase start`), not staging --
-// disposable, no seeded junk in a shared project, no credentials to hand to
-// CI. Not a CI gate; run manually before trusting src/lib/competitions/scope.ts
-// against real data, and again after any change to it.
+// This repo has no local Docker/Postgres stack -- per CLAUDE.md's
+// three-environment mapping (and BUILD_PLAN.md decision 33), local dev and
+// Vercel Preview both point at the real **staging** Supabase project
+// directly. So this runs against staging too, same as every other manual
+// verification pass in this codebase. Not a CI gate (never point this at
+// production); run manually before trusting src/lib/competitions/scope.ts
+// against real data, and again after any change to it. It's disposable-safe:
+// every row it inserts (competitions, players, matches, teams, seasons) is
+// deleted again in a `finally` block, so it doesn't leave junk behind in the
+// shared staging project even if an assertion fails mid-run.
 //
 // This re-implements the same query shapes as scope.ts rather than
 // importing it directly, because scope.ts is guarded by `import
@@ -16,9 +22,8 @@
 // constraint and precedent as scripts/set-competition-code.mjs.
 //
 // Usage:
-//   supabase start
-//   SUPABASE_URL=http://127.0.0.1:54321 \
-//   SUPABASE_SERVICE_ROLE_KEY=<local service_role key from `supabase status`> \
+//   SUPABASE_URL=<staging project URL> \
+//   SUPABASE_SERVICE_ROLE_KEY=<staging service_role key> \
 //   node scripts/verify-competition-scope-isolation.mjs
 
 import { createClient } from "@supabase/supabase-js";
