@@ -13,14 +13,22 @@ A Fixture selected for player predictions in a given Gameweek. Exactly two per G
 _Avoid_: Open Match, Selected Match
 
 **Match 1**:
-The Tipped Match auto-selected at random each Gameweek.
+The Tipped Match auto-selected each Gameweek as the **Top Matchup** — the Fixture whose two clubs have the best average league position (see `docs/adr/0006-auto-selected-tipped-matches.md` for the rule and its tiebreaks).
+_Avoid_: Marquee match (fine casually; Top Matchup is the term shown to players)
 
 **Match 2**:
-The Tipped Match chosen by that Gameweek's Picker (or auto-selected, for Gameweek 1 only).
+The Tipped Match auto-selected as the **Random Pick** — an equal-chance draw from the Gameweek's remaining Fixtures.
+
+**Top Matchup** / **Random Pick**:
+The player-facing names for how each slot was chosen, shown on the Tipped Match card. They exist because nothing is player-chosen any more, so the card has to answer "why these two fixtures?" itself.
 
 **Picker**:
-The Player responsible for choosing Match 2 in a given Gameweek, determined by the previous Gameweek's Standings Snapshot (see tiebreak order in CLAUDE.md).
+_Deferred, not in the current product._ The Player who would choose Match 2, determined by the previous Gameweek's Standings Snapshot. Superseded for the initial launch by auto-selection (`docs/adr/0006-auto-selected-tipped-matches.md`); the term is retained because the mechanic and its `gameweeks` columns are reserved for a possible return.
 _Avoid_: Loser, Last place (fine in casual conversation, but Picker is the domain term)
+
+**Pick Board**:
+The app's home surface at `/` — the two Tipped Match cards for the current Gameweek, plus the Player's own standing and last week's outcome. The Pick Board _is_ home; there is no hub in front of it (`docs/adr/0007-home-surface-and-pick-entry.md`).
+_Avoid_: Dashboard, Home screen (Pick Board says what it's for)
 
 **Gameweek**:
 A round of the Premier League season. The unit against which exactly two Tipped Matches and one Standings Snapshot are attached.
@@ -33,11 +41,11 @@ The points a Player earned in one specific Gameweek, from that Gameweek's Tipped
 A Player's cumulative points across all Gameweeks played so far.
 
 **Season Standing**:
-A Player's rank among all Players by Season Total, as of a given Gameweek. Worst standing = highest rank number (closest to the bottom of the table), not lowest — this is the Picker tiebreak's second signal.
+A Player's rank among all Players by Season Total, as of a given Gameweek. Worst standing = highest rank number (closest to the bottom of the table), not lowest — this was the Picker tiebreak's second signal, and remains the leaderboard's ordering.
 _Avoid_: Position (ambiguous — reads as "best" as easily as "worst")
 
 **Standings Snapshot**:
-The recorded Season Total and Season Standing for every Player, captured once per Gameweek starting at Gameweek 1 — independent of whether the Picker UI has shipped yet.
+The recorded Season Total and Season Standing for every Player, captured once per Gameweek starting at Gameweek 1. No longer a prerequisite for opening a Gameweek now that the Picker is deferred, but still required for the leaderboard and for the Pick Board's own standing display.
 
 **Voided Match**:
 A Tipped Match postponed _after_ its picks have locked. Scores nobody, permanently — no reroll, no substitute.

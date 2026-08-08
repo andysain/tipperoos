@@ -63,13 +63,13 @@ Do not build a general tournament/sports platform. Build for this specific priva
 
 Each Premier League gameweek (~10 fixtures), exactly **two matches** are opened for tipping — not the full round.
 
-- **Match 1**: randomly auto-selected each gameweek. (Curated/marquee selection is a possible future enhancement, not v1.)
-- **Match 2**: chosen by whichever player finished **last in points the previous gameweek**.
-  - Tiebreak order: (1) lowest score in the previous gameweek is the primary signal; (2) if tied on that score, **worst cumulative season standing** (i.e. the tied player closest to the bottom of the table — highest rank number, not lowest); (3) if still tied, random among those tied.
-  - Starts **gameweek 2** — gameweek 1 has no prior-week data, so Match 2 is also auto-randomly selected for gameweek 1 only.
-  - The picker has a deadline window ("N hours after being notified"), capped so it can never overrun the earliest remaining kickoff of the gameweek. If they miss it, the system auto-picks randomly on their behalf.
-  - The picked match must exclude Match 1 and any match that has already kicked off.
-  - No anti-gaming guardrail is built for this (e.g. detecting deliberate tanking to control the pick) — considered and explicitly rejected as low-value engineering for a low-stakes exploit.
+**Both matches are auto-selected; no player chooses anything.** See `docs/adr/0006-auto-selected-tipped-matches.md` for the full reasoning, the rejected alternatives, and what this costs. That ADR supersedes the two rules this section previously carried (Match 1 random with marquee selection deferred; Match 2 chosen by the previous gameweek's last-placed player).
+
+- **Match 1 — the top-ranked matchup**: the gameweek's fixture with the lowest average league position across its two clubs. Tiebreak: the matchup containing the single highest-ranked club, then a deterministic final tiebreak. Excludes any club that was in the previous gameweek's Match 1, so no club is the marquee two gameweeks running. Rank source is phased — last season's final table until every club has played ten matches of the current season, then live standings, falling back to last season's if standings are stale. A promoted club (no previous-season position) counts as position 21.
+- **Match 2 — uniform random**: an equal-chance draw from the gameweek's remaining fixtures, excluding Match 1 and anything already kicked off.
+- **When selection runs**: as soon as the previous gameweek's tipped matches are complete (~4–5 days' notice), on the existing sync cadence. Gameweek 1 is selected once by a seed script, since it has no previous gameweek. Chosen fixture ids are written to the `gameweeks` row and never re-rolled.
+- **No anti-gaming guardrail** is built (e.g. detecting deliberate tanking) — considered and explicitly rejected as low-value engineering for a low-stakes exploit, and moot for now since nothing is player-controlled.
+- **The last-place-picker mechanic is deferred, not dropped** — it remains the documented design to return to once the season is running and there's appetite for a mechanic players can steer. The `gameweeks` picker columns are retained, unused, as reserved space for it.
 
 ## Predictions
 
@@ -80,6 +80,17 @@ Each Premier League gameweek (~10 fixtures), exactly **two matches** are opened 
 - **Postponement of a selected match after its picks have locked: the match is voided.** No points awarded either way, no reroll, no substitute match. This was the single point of unprompted, independent agreement across every analysis of this rebuild — treat it as settled, not open for re-litigation without a strong reason.
 - **Postponement of a selected match before its picks have locked: that slot is skipped for the gameweek, not replaced.** No auto-reselection of a substitute fixture — simplest option, least code, and avoids a second wave of "new match just appeared, pick fast" pressure on players. That gameweek simply runs with one tipped match instead of two.
 - Match score is the score at the end of the match including extra time, where applicable; penalty-shootout goals never count toward the tipped score (largely inherited from the old app's rules — will rarely if ever apply in normal league play, but matters for domestic cup crossover fixtures if ever included).
+
+## Home surface — the pick board
+
+The app's landing route `/` **is** the pick board; there is no hub or dashboard in front of it. See `docs/adr/0007-home-surface-and-pick-entry.md` for the full shape, its states, the entry mechanic, and the prototyped alternatives that were rejected.
+
+- **The current gameweek is derived per request** (lowest-numbered gameweek in this season and competition with any tipped match not yet locked; else the highest-numbered gameweek that has tipped matches) — never an `is_current` column, so a missed job can't leave it wrong.
+- **Two slots in fixed order**, Match 1 above Match 2, in every state, all season. Both open slots show their entry controls immediately — nothing needs opening first.
+- **A settled slot** (filed, locked, live or finished) collapses to a dark plate carrying the scoreline and the player's own points. **Comparing against other players lives in the Match Centre, not here** — home shows a player their own pick and their own outcome only, which is also how the pre-lock visibility rule above is upheld by construction.
+- **Nothing is pre-filled.** No provisional or suggested scoreline is stored or shown; a player who never interacts has no pick row and scores nothing.
+- **Current league position is shown per club**, rendered only when standings data exists so the feature degrades to absent rather than to zeroes. Note this can disagree with the Match 1 selection rule early in the season, which ranks on last season's table — see `docs/adr/0006-auto-selected-tipped-matches.md`.
+- **Day one has its own variants**: before any gameweek is scored, the stats strip drops rank and points and the season-stats block is hidden. Both revert automatically once scores exist.
 
 ## Scoring — additive
 
@@ -149,7 +160,9 @@ Scoring must be **idempotent**: correcting a previously-entered result and recom
 - **Full raw-payload event-sourcing audit log** of every provider API response — a simple `sync_log` is enough; don't over-build forensic replay tooling that isn't needed yet.
 - **Anti-gaming guardrails** for the last-place-picker mechanic.
 - **Admin CSV export/backup tooling** beyond a one-time database export when the old project is retired.
-- **Curated/marquee Match-1 selection** — random selection only, for now.
+- **The last-place-picker mechanic itself** — deferred per `docs/adr/0006-auto-selected-tipped-matches.md`; both tipped matches are auto-selected instead. Its `gameweeks` columns are retained as reserved space.
+- **Hand-picked or overridden marquee selection** — Match 1's ranking rule is a mechanical proxy for "the big game"; no human override exists.
+- **Offline/retry states for pick filing, and the ambient countdown treatment** — both deferred in `docs/adr/0007-home-surface-and-pick-entry.md`, the first with a note that it constrains the route contract rather than being purely cosmetic.
 - **Row-level security policies** — moot given the auth model above; enforcement lives entirely in server-side route logic instead.
 
 ## Reference
