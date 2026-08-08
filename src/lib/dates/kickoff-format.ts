@@ -58,6 +58,28 @@ export function formatKickoffInTimeZone(
 
 const MS_PER_MINUTE = 60_000;
 
+export interface CountdownParts {
+  days: number;
+  hours: number;
+  minutes: number;
+}
+
+/**
+ * Breaks a duration down into days/hours/minutes for the countdown's
+ * coarsening logic. Split out from `formatCountdown` so the boundary math
+ * itself (rollover at exactly 24h, clamping a past target to zero) can be
+ * golden-value tested on its own numbers, not just the string it feeds.
+ * Never negative; a past target decomposes to all zeros.
+ */
+export function decomposeCountdown(msRemaining: number): CountdownParts {
+  const totalMinutes = Math.max(0, Math.floor(msRemaining / MS_PER_MINUTE));
+  return {
+    days: Math.floor(totalMinutes / (60 * 24)),
+    hours: Math.floor((totalMinutes % (60 * 24)) / 60),
+    minutes: totalMinutes % 60,
+  };
+}
+
 /**
  * Relative countdown to a UTC instant, coarsening with distance: "2d 4h",
  * "3h 12m", then explicit minutes once inside the last hour (no seconds --
@@ -69,10 +91,7 @@ export function formatCountdown(
   nowUtcMs: number,
 ): string {
   const msRemaining = new Date(targetUtcIso).getTime() - nowUtcMs;
-  const totalMinutes = Math.max(0, Math.floor(msRemaining / MS_PER_MINUTE));
-  const days = Math.floor(totalMinutes / (60 * 24));
-  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
-  const minutes = totalMinutes % 60;
+  const { days, hours, minutes } = decomposeCountdown(msRemaining);
 
   if (days > 0) return `${days}d ${hours}h`;
   if (hours > 0) return `${hours}h ${minutes}m`;

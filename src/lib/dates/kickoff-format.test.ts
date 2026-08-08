@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { formatCountdown, formatKickoffInTimeZone } from "./kickoff-format";
+import {
+  decomposeCountdown,
+  formatCountdown,
+  formatKickoffInTimeZone,
+} from "./kickoff-format";
 
 // Golden values hand-derived per docs/adr/0007-home-surface-and-pick-entry.md
 // ("Sun 12:00am (Sat night)" is the ADR's own literal example) and verified
@@ -44,6 +48,36 @@ describe("formatKickoffInTimeZone", () => {
     expect(formatKickoffInTimeZone(kickoff, "Australia/Sydney")).toBe(
       "Sun 4:30am (Sat night)",
     );
+  });
+});
+
+describe("decomposeCountdown", () => {
+  it("decomposes a multi-day duration", () => {
+    const result = decomposeCountdown(2 * 86_400_000 + 4 * 3_600_000);
+    expect(result.days).toBe(2);
+    expect(result.hours).toBe(4);
+    expect(result.minutes).toBe(0);
+  });
+
+  it("decomposes an hours+minutes duration under a day", () => {
+    const result = decomposeCountdown(3 * 3_600_000 + 12 * 60_000);
+    expect(result.days).toBe(0);
+    expect(result.hours).toBe(3);
+    expect(result.minutes).toBe(12);
+  });
+
+  it("clamps a past target (negative remaining ms) to all zeros", () => {
+    const result = decomposeCountdown(-5 * 60_000);
+    expect(result.days).toBe(0);
+    expect(result.hours).toBe(0);
+    expect(result.minutes).toBe(0);
+  });
+
+  it("rolls hours over into days at exactly 24h", () => {
+    const result = decomposeCountdown(24 * 3_600_000);
+    expect(result.days).toBe(1);
+    expect(result.hours).toBe(0);
+    expect(result.minutes).toBe(0);
   });
 });
 
