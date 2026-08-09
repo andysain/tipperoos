@@ -285,7 +285,7 @@ function Seam({ homeFill, awayFill }: { homeFill: string; awayFill: string }) {
 }
 
 const digitCell = tv({
-  base: "flex size-9 items-center justify-center rounded-btn-sm border border-paper-line bg-white text-base font-bold tabular-nums text-ink transition active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-50",
+  base: "flex h-11 flex-1 items-center justify-center rounded-btn-sm border border-paper-line bg-white text-base font-bold tabular-nums text-ink transition active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-50",
   variants: {
     selected: {
       true: "border-accent bg-accent text-accent-ink",
@@ -334,7 +334,7 @@ function DigitRow({
             {homeAwayLabel}
           </span>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex items-center gap-1.5">
           {primaryDigits.map((digit) => (
             <button
               key={digit}
@@ -351,7 +351,7 @@ function DigitRow({
             <button
               type="button"
               disabled={disabled}
-              className="flex h-9 items-center justify-center rounded-btn-sm border border-dashed border-paper-line px-2 text-xs font-bold text-ink/55 transition hover:border-accent/60 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex h-11 flex-1 items-center justify-center rounded-btn-sm border border-dashed border-paper-line text-xs font-bold text-ink/55 transition hover:border-accent/60 disabled:cursor-not-allowed disabled:opacity-50"
               onClick={onExpand}
             >
               5+
@@ -359,7 +359,7 @@ function DigitRow({
           ) : null}
         </div>
         {showExtra ? (
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex items-center gap-1.5">
             {extraDigits.map((digit) => (
               <button
                 key={digit}

@@ -75,7 +75,10 @@ export default async function PickBoardPage() {
     // pr-14 clears SwitchPlayerButton (fixed top-3 right-3, size-10) -- it's
     // fixed-positioned so it reserves no space on its own, and without this
     // GameweekHeader's right-aligned "Locks from…" text renders underneath it.
-    <main className="flex flex-col gap-4 bg-paper p-4 pr-14">
+    // md:max-w-4xl mx-auto matches predict-table's mobile/desktop pivot
+    // (PredictTableFlow.tsx) -- one column on phone, room for two slot
+    // cards side by side once there's a tablet/desktop-width viewport.
+    <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4 pr-14">
       <StatsStrip stats={seasonStats} />
       <LastWeekStrip summary={lastWeek} />
       {showTablePredictionPrompt ? <TablePredictionPrompt /> : null}
@@ -87,7 +90,7 @@ export default async function PickBoardPage() {
             earliestOpenKickoffUtcIso={gameweek.earliestOpenKickoffUtcIso}
             timeZone={TIME_ZONE}
           />
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 md:grid md:grid-cols-2 md:items-start md:gap-4">
             {gameweek.slots.map((slot, index) => (
               <PickBoardSlotCard
                 key={index}
