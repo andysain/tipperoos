@@ -9,6 +9,11 @@ import {
   validatePinFormat as validatePinFormatJs,
 } from "./signup-validation.mjs";
 import {
+  selectTopMatchup as selectTopMatchupJs,
+  selectMatch2 as selectMatch2Js,
+  chooseRankSource as chooseRankSourceJs,
+} from "./match-selection.mjs";
+import {
   hashSecret as hashSecretTs,
   verifySecret as verifySecretTs,
 } from "@/lib/auth/scrypt-secret";
@@ -17,6 +22,11 @@ import {
   validateDisplayName as validateDisplayNameTs,
   validatePinFormat as validatePinFormatTs,
 } from "@/lib/auth/signup-validation";
+import {
+  selectTopMatchup as selectTopMatchupTs,
+  selectMatch2 as selectMatch2Ts,
+  chooseRankSource as chooseRankSourceTs,
+} from "@/lib/match-selection/rules";
 
 // scripts/lib/*.mjs is a dependency-free mirror of src/lib/auth/* (see
 // issue #79 -- those modules are `import "server-only"`-guarded and can't
@@ -84,5 +94,83 @@ describe("hashSecret / verifySecret cross-implementation invariant", () => {
   it("the .ts side rejects a wrong secret against a .mjs-produced hash", async () => {
     const stored = await hashSecretJs("swordfish");
     await expect(verifySecretTs("wrong", stored)).resolves.toBe(false);
+  });
+});
+
+describe("selectTopMatchup / selectMatch2 / chooseRankSource parity", () => {
+  function fixture(
+    id: string,
+    teamAId: string,
+    teamBId: string,
+    kickoffTime: string,
+    providerMatchId: string,
+  ) {
+    return {
+      id,
+      teamAId,
+      teamBId,
+      kickoffTime: new Date(kickoffTime),
+      providerMatchId,
+    };
+  }
+
+  const fixtures = [
+    fixture("m1", "arsenal", "spurs", "2026-08-16T14:00:00Z", "101"),
+    fixture("m2", "villa", "everton", "2026-08-16T14:00:00Z", "102"),
+    fixture("m3", "promoted-a", "promoted-b", "2026-08-16T11:30:00Z", "103"),
+  ];
+  const positions = [
+    { teamId: "arsenal", position: 1 },
+    { teamId: "spurs", position: 5 },
+    { teamId: "villa", position: 4 },
+    { teamId: "everton", position: 12 },
+    { teamId: "promoted-a", position: null },
+    { teamId: "promoted-b", position: null },
+  ];
+
+  it("selectTopMatchup agrees", () => {
+    const params = { fixtures, positions, previousMatch1TeamIds: [] };
+    expect(selectTopMatchupJs(params)?.id).toBe(selectTopMatchupTs(params)?.id);
+  });
+
+  it("selectTopMatchup agrees with a club excluded", () => {
+    const params = {
+      fixtures,
+      positions,
+      previousMatch1TeamIds: ["arsenal"],
+    };
+    expect(selectTopMatchupJs(params)?.id).toBe(selectTopMatchupTs(params)?.id);
+  });
+
+  it("selectMatch2 agrees given the same random draw", () => {
+    const random = () => 0.5;
+    const params = {
+      fixtures,
+      match1FixtureId: "m1",
+      now: new Date("2026-08-15T00:00:00Z"),
+      random,
+    };
+    expect(selectMatch2Js(params)?.id).toBe(selectMatch2Ts(params)?.id);
+  });
+
+  it("chooseRankSource agrees", () => {
+    const cases = [
+      { playedCounts: [], liveStandingsAvailable: false },
+      {
+        playedCounts: [{ teamId: "arsenal", played: 10 }],
+        liveStandingsAvailable: true,
+      },
+      {
+        playedCounts: [{ teamId: "arsenal", played: 9 }],
+        liveStandingsAvailable: true,
+      },
+      {
+        playedCounts: [{ teamId: "arsenal", played: 10 }],
+        liveStandingsAvailable: false,
+      },
+    ];
+    for (const params of cases) {
+      expect(chooseRankSourceJs(params)).toBe(chooseRankSourceTs(params));
+    }
   });
 });
