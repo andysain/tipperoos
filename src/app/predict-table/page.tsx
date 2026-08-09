@@ -3,6 +3,7 @@ import { getSessionPlayerId } from "@/app/_lib/session-cookie";
 import {
   getGameweekOneKickoff,
   getPlayerForTablePrediction,
+  getTablePredictionRecord,
 } from "@/app/_lib/table-prediction-access";
 import {
   type BandKey,
@@ -61,11 +62,7 @@ export default async function PredictTablePage() {
     gameweekOneKickoff,
   });
 
-  const { data: prediction } = await supabase
-    .from("table_predictions")
-    .select("id, is_skipped, submitted_at")
-    .eq("player_id", playerId)
-    .maybeSingle();
+  const prediction = await getTablePredictionRecord(supabase, playerId);
 
   let assignments: Record<string, BandKey> = {};
   if (prediction) {
@@ -89,8 +86,8 @@ export default async function PredictTablePage() {
       initialAssignments={assignments}
       isLateJoiner={editability.isLateJoiner}
       locked={editability.locked}
-      initialIsSkipped={prediction?.is_skipped ?? false}
-      initialSubmittedAt={prediction?.submitted_at ?? null}
+      initialIsSkipped={prediction?.skipped ?? false}
+      initialSubmittedAt={prediction?.submittedAt ?? null}
       gameweekOneKickoff={gameweekOneKickoff?.toISOString() ?? null}
     />
   );
