@@ -6,32 +6,17 @@
 //   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... FOOTBALL_DATA_API_KEY=... node scripts/seed-fixtures.mjs
 
 import { createClient } from "@supabase/supabase-js";
+import {
+  requireEnv,
+  createFootballDataClient,
+} from "./lib/football-data-client.mjs";
 
 const FOOTBALL_DATA_API_KEY = requireEnv("FOOTBALL_DATA_API_KEY");
 const SUPABASE_URL = requireEnv("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
 const PROVIDER_NAME = "football-data.org";
 
-function requireEnv(name) {
-  const value = process.env[name];
-  if (!value) {
-    console.error(`Missing required env var: ${name}`);
-    process.exit(1);
-  }
-  return value;
-}
-
-async function fetchFromFootballData(path) {
-  const res = await fetch(`https://api.football-data.org/v4${path}`, {
-    headers: { "X-Auth-Token": FOOTBALL_DATA_API_KEY },
-  });
-  if (!res.ok) {
-    throw new Error(
-      `football-data.org ${path} failed: ${res.status} ${await res.text()}`,
-    );
-  }
-  return res.json();
-}
+const fetchFromFootballData = createFootballDataClient(FOOTBALL_DATA_API_KEY);
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
