@@ -127,6 +127,43 @@ function isBetterMatchup(
   );
 }
 
+export interface SelectMatch2Params {
+  fixtures: readonly SelectionFixture[];
+  // The chosen Match 1 fixture's id, excluded from the draw -- null when no
+  // Match 1 was selected (e.g. an empty gameweek).
+  match1FixtureId: string | null;
+  // Compared against each fixture's kickoffTime; a fixture kicking off at or
+  // before `now` is already kicked off and excluded from the draw.
+  now: Date;
+  // Returns a value in [0, 1); injected so tests can pin the draw
+  // deterministically. Defaults to Math.random.
+  random?: () => number;
+}
+
+/**
+ * Chooses the Match 2 fixture: a uniform random draw over the gameweek's
+ * fixtures, excluding Match 1 and anything already kicked off. Returns null
+ * (a Skipped Slot, per docs/adr/0001-skip-slot-on-pre-lock-postponement.md)
+ * when the pool is empty rather than falling back to an excluded fixture --
+ * unlike selectTopMatchup, there is no degenerate case here that warrants
+ * papering over an empty pool.
+ */
+export function selectMatch2(
+  params: SelectMatch2Params,
+): SelectionFixture | null {
+  const random = params.random ?? Math.random;
+  const nowMs = params.now.getTime();
+
+  const pool = params.fixtures.filter(
+    (f) => f.id !== params.match1FixtureId && f.kickoffTime.getTime() > nowMs,
+  );
+
+  if (pool.length === 0) return null;
+
+  const index = Math.floor(random() * pool.length);
+  return pool[index];
+}
+
 export type RankSource = "previous_season" | "live";
 
 export interface ClubPlayedCount {
