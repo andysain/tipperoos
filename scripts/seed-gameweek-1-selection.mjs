@@ -14,6 +14,10 @@
 import { createClient } from "@supabase/supabase-js";
 import { prompt } from "./lib/prompt.mjs";
 import {
+  requireEnv,
+  createFootballDataClient,
+} from "./lib/football-data-client.mjs";
+import {
   selectTopMatchup,
   selectMatch2,
   chooseRankSource,
@@ -25,26 +29,7 @@ const SUPABASE_SERVICE_ROLE_KEY = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
 const PROVIDER_NAME = "football-data.org";
 const GAMEWEEK_NUMBER = 1;
 
-function requireEnv(name) {
-  const value = process.env[name];
-  if (!value) {
-    console.error(`Missing required env var: ${name}`);
-    process.exit(1);
-  }
-  return value;
-}
-
-async function fetchFromFootballData(path) {
-  const res = await fetch(`https://api.football-data.org/v4${path}`, {
-    headers: { "X-Auth-Token": FOOTBALL_DATA_API_KEY },
-  });
-  if (!res.ok) {
-    throw new Error(
-      `football-data.org ${path} failed: ${res.status} ${await res.text()}`,
-    );
-  }
-  return res.json();
-}
+const fetchFromFootballData = createFootballDataClient(FOOTBALL_DATA_API_KEY);
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
@@ -110,6 +95,16 @@ async function main() {
       `Gameweek 1 already selected for "${competition.name}" (gameweek id: ${existing.id}) -- nothing to do.`,
     );
     return;
+  }
+  // A row with only one slot set is unexpected -- nothing else writes to
+  // `gameweeks` before this script runs. Refuse to guess rather than
+  // silently recomputing and overwriting whatever produced that state.
+  if (existing && (existing.match_1_id || existing.match_2_id)) {
+    throw new Error(
+      `Gameweek 1 row for "${competition.name}" (id: ${existing.id}) has only one slot set ` +
+        `(match_1_id: ${existing.match_1_id}, match_2_id: ${existing.match_2_id}) -- refusing to recompute. ` +
+        "Investigate and resolve manually.",
+    );
   }
 
   // Gameweek 1's fixtures, by provider matchday -- `matches` has no
