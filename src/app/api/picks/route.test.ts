@@ -8,6 +8,12 @@ const gameweeksSelectChain = {
 };
 const gameweeksSelectMock = vi.fn(() => gameweeksSelectChain);
 
+const matchesSelectChain = {
+  eq: vi.fn().mockReturnThis(),
+  single: vi.fn(),
+};
+const matchesSelectMock = vi.fn(() => matchesSelectChain);
+
 const picksUpsertChain = {
   select: vi.fn().mockReturnThis(),
   single: vi.fn(),
@@ -18,16 +24,24 @@ vi.mock("@/app/_lib/session-cookie", () => ({
   getSessionPlayerId: () => getSessionPlayerIdMock(),
 }));
 
-vi.mock("@/lib/competitions/scope", () => ({
-  resolveCompetitionId: (...args: unknown[]) =>
-    resolveCompetitionIdMock(...args),
-}));
+vi.mock("@/lib/competitions/scope", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/competitions/scope")>();
+  return {
+    ...actual,
+    resolveCompetitionId: (...args: unknown[]) =>
+      resolveCompetitionIdMock(...args),
+  };
+});
 
 vi.mock("@/lib/supabase/server", () => ({
   createServerSupabaseClient: () => ({
     from: (table: string) => {
       if (table === "gameweeks") {
         return { select: gameweeksSelectMock };
+      }
+      if (table === "matches") {
+        return { select: matchesSelectMock };
       }
       if (table === "picks") {
         return { upsert: picksUpsertMock };
@@ -41,6 +55,7 @@ const { POST } = await import("./route");
 
 const GW_ROW = { match_1_id: "match-1", match_2_id: "match-2" };
 const OTHER_COMP_GW_ROW = { match_1_id: "other-match", match_2_id: null };
+const FAR_FUTURE_KICKOFF = "2099-01-01T00:00:00.000Z";
 
 function request(
   body: Record<string, unknown>,
@@ -60,9 +75,14 @@ describe("POST /api/picks", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     gameweeksSelectChain.eq.mockReturnThis();
+    matchesSelectChain.eq.mockReturnThis();
     getSessionPlayerIdMock.mockResolvedValue("player-1");
     resolveCompetitionIdMock.mockResolvedValue("comp-1");
     gameweeksSelectChain.eq.mockResolvedValue({ data: [GW_ROW], error: null });
+    matchesSelectChain.single.mockResolvedValue({
+      data: { kickoff_time: FAR_FUTURE_KICKOFF },
+      error: null,
+    });
     picksUpsertChain.single.mockResolvedValue({
       data: {
         id: "pick-1",
@@ -181,5 +201,66 @@ describe("POST /api/picks", () => {
     );
     expect(response.status).toBe(401);
     expect(gameweeksSelectMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a save exactly at the 5-minute lock boundary", async () => {
+    matchesSelectChain.single.mockResolvedValue({
+      data: {
+        kickoff_time: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+      },
+      error: null,
+    });
+    const response = await POST(
+      request({ matchId: "match-1", homeScore: 2, awayScore: 1 }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toBe("Picks lock 5 minutes before kickoff.");
+    expect(picksUpsertMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a save after kickoff", async () => {
+    matchesSelectChain.single.mockResolvedValue({
+      data: { kickoff_time: new Date(Date.now() - 60 * 1000).toISOString() },
+      error: null,
+    });
+    const response = await POST(
+      request({ matchId: "match-1", homeScore: 2, awayScore: 1 }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(picksUpsertMock).not.toHaveBeenCalled();
+  });
+
+  it("still accepts a save just before the lock boundary", async () => {
+    matchesSelectChain.single.mockResolvedValue({
+      data: {
+        kickoff_time: new Date(Date.now() + 5 * 60 * 1000 + 1000).toISOString(),
+      },
+      error: null,
+    });
+    const response = await POST(
+      request({ matchId: "match-1", homeScore: 2, awayScore: 1 }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(picksUpsertMock).toHaveBeenCalledOnce();
+  });
+
+  it("looks up the match's kickoff time by the submitted matchId", async () => {
+    await POST(request({ matchId: "match-1", homeScore: 2, awayScore: 1 }));
+
+    expect(matchesSelectChain.eq).toHaveBeenCalledWith("id", "match-1");
+  });
+
+  it("skips the match lookup entirely when matchId isn't a currently tipped match", async () => {
+    gameweeksSelectChain.eq.mockResolvedValue({
+      data: [OTHER_COMP_GW_ROW],
+      error: null,
+    });
+    await POST(request({ matchId: "match-1", homeScore: 2, awayScore: 1 }));
+
+    expect(matchesSelectMock).not.toHaveBeenCalled();
   });
 });

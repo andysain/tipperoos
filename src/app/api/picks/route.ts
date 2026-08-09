@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { hasCsrfHeader } from "@/app/_lib/csrf";
 import { getSessionPlayerId } from "@/app/_lib/session-cookie";
-import { resolveCompetitionId } from "@/lib/competitions/scope";
+import { isMatchLocked, resolveCompetitionId } from "@/lib/competitions/scope";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 interface SaveBody {
@@ -30,11 +30,11 @@ function invalidScoreResponse() {
 }
 
 // Saves and re-edits a pick (issue #15): upsert on (player_id, match_id), so
-// filing and re-filing before lock are the same call. Lock enforcement is
-// deliberately NOT here -- it's issue #16's dedicated, test-first module
-// (docs.md: "do not consider this route safe for real gameweek picks until
-// #16 has merged"). Request/response bodies are camelCase, matching every
-// other route in the repo.
+// filing and re-filing before lock are the same call. Lock enforcement
+// (issue #16) reuses the same isMatchLocked predicate and DB-time pattern
+// as picksForMatch's read-path enforcement (src/lib/competitions/scope.ts).
+// Request/response bodies are camelCase, matching every other route in the
+// repo.
 export async function POST(request: Request) {
   if (!hasCsrfHeader(request)) {
     return NextResponse.json({ error: "Forbidden." }, { status: 403 });
@@ -100,6 +100,24 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "That match isn't a currently tipped match." },
       { status: 400 },
+    );
+  }
+
+  const { data: match, error: matchError } = await supabase
+    .from("matches")
+    .select("kickoff_time")
+    .eq("id", matchId)
+    .single();
+  if (matchError || !match) {
+    return NextResponse.json(
+      { error: "Couldn't verify that match -- try again." },
+      { status: 500 },
+    );
+  }
+  if (isMatchLocked(new Date(match.kickoff_time), new Date())) {
+    return NextResponse.json(
+      { error: "Picks lock 5 minutes before kickoff." },
+      { status: 403 },
     );
   }
 
