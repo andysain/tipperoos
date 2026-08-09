@@ -104,10 +104,23 @@ function Badge({
   );
 }
 
-function PositionLabel({ position }: { position: number | null }) {
+/** Rendered only when a position is present (CLAUDE.md: degrade to absent,
+ * not zero) -- shown across every card state per the ADR ("Live league
+ * position is shown ahead of each club"), not just entry. */
+function PositionLabel({
+  position,
+  tone = "on-white",
+}: {
+  position: number | null;
+  tone?: "on-white" | "on-ink";
+}) {
   if (position === null) return null;
   return (
-    <span className="text-[0.7rem] font-bold tabular-nums text-ink/55">
+    <span
+      className={`text-[0.7rem] font-bold tabular-nums ${
+        tone === "on-white" ? "text-ink/55" : "text-paper/60"
+      }`}
+    >
       {position}
       {ordinalSuffix(position)}
     </span>
@@ -265,7 +278,10 @@ function SettledPlate({
         ) : null}
       </div>
       <div className="flex w-full items-center justify-center gap-4">
-        <Badge shortCode={home.shortCode} fill={homeFill} />
+        <div className="flex flex-col items-center gap-1">
+          <Badge shortCode={home.shortCode} fill={homeFill} />
+          <PositionLabel position={home.leaguePosition} tone="on-ink" />
+        </div>
         <span
           className={`text-[clamp(2.5rem,7vw,3.25rem)] font-extrabold tabular-nums ${
             scoreTone === "own-pick" ? "text-accent" : "text-paper"
@@ -273,7 +289,10 @@ function SettledPlate({
         >
           {homeScore ?? "–"}–{awayScore ?? "–"}
         </span>
-        <Badge shortCode={away.shortCode} fill={awayFill} />
+        <div className="flex flex-col items-center gap-1">
+          <Badge shortCode={away.shortCode} fill={awayFill} />
+          <PositionLabel position={away.leaguePosition} tone="on-ink" />
+        </div>
       </div>
       {points !== null ? (
         <span className="rounded-badge bg-accent px-2.5 py-1 text-xs font-extrabold text-accent-ink">
