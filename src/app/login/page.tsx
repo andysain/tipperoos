@@ -315,10 +315,10 @@ function LoginFlow() {
                   : "You're logged in."}
               </p>
               <Link
-                href="/predict-table"
+                href="/"
                 className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-btn bg-accent px-5 py-3 text-[1.0625rem] font-bold text-accent-ink transition hover:brightness-105"
               >
-                Predict the Table
+                Let&apos;s go
               </Link>
             </>
           )}

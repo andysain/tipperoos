@@ -54,6 +54,43 @@ export interface TablePredictionPlayer {
   joinedAt: Date;
 }
 
+export interface TablePredictionRecord {
+  id: string;
+  submittedAt: string | null;
+  skipped: boolean;
+}
+
+/**
+ * This player's Predict the Table record, if any -- shared by /predict-table
+ * (issue #26, which also needs `id` to fetch band assignments and the raw
+ * `submittedAt` timestamp) and the Pick Board's prompt banner (issue #90,
+ * decision 6), so the two call sites can't drift apart on what "submitted"
+ * means -- the prompt only needs `submittedAt != null`. A row with neither
+ * `submitted_at` nor `is_skipped` set exists mid-sort (moves persist
+ * immediately, per CLAUDE.md) and counts as neither. Null means the player
+ * has never touched the flow.
+ */
+export async function getTablePredictionRecord(
+  supabase: SupabaseClient,
+  playerId: string,
+): Promise<TablePredictionRecord | null> {
+  // .order() required even though player_id is unique on this table
+  // (AGENTS.md: "Never select a row without an explicit .order()").
+  const { data: prediction } = await supabase
+    .from("table_predictions")
+    .select("id, is_skipped, submitted_at")
+    .eq("player_id", playerId)
+    .order("id")
+    .maybeSingle();
+  if (!prediction) return null;
+
+  return {
+    id: prediction.id,
+    submittedAt: prediction.submitted_at,
+    skipped: prediction.is_skipped ?? false,
+  };
+}
+
 // Shared by all three table-predictions routes (assign/submit/skip), each of
 // which needs the same "look up the session's player" step before applying
 // any lock/late-joiner rule.
