@@ -72,7 +72,10 @@ export default async function PickBoardPage() {
     (!gameweekOneKickoff || now < gameweekOneKickoff);
 
   return (
-    <main className="flex flex-col gap-4 bg-paper p-4">
+    // pr-14 clears SwitchPlayerButton (fixed top-3 right-3, size-10) -- it's
+    // fixed-positioned so it reserves no space on its own, and without this
+    // GameweekHeader's right-aligned "Locks from…" text renders underneath it.
+    <main className="flex flex-col gap-4 bg-paper p-4 pr-14">
       <StatsStrip stats={seasonStats} />
       <LastWeekStrip summary={lastWeek} />
       {showTablePredictionPrompt ? <TablePredictionPrompt /> : null}
