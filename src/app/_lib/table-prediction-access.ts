@@ -74,10 +74,13 @@ export async function getTablePredictionRecord(
   supabase: SupabaseClient,
   playerId: string,
 ): Promise<TablePredictionRecord | null> {
+  // .order() required even though player_id is unique on this table
+  // (AGENTS.md: "Never select a row without an explicit .order()").
   const { data: prediction } = await supabase
     .from("table_predictions")
     .select("id, is_skipped, submitted_at")
     .eq("player_id", playerId)
+    .order("id")
     .maybeSingle();
   if (!prediction) return null;
 

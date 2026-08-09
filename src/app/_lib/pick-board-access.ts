@@ -63,6 +63,7 @@ export interface PickBoardGameweek {
 }
 
 interface GameweekRow {
+  id: string;
   match_1_id: string | null;
   match_2_id: string | null;
   match_1_voided_at: string | null;
@@ -82,13 +83,60 @@ interface MatchRow {
 async function getCurrentSeasonId(
   supabase: SupabaseClient,
 ): Promise<string | null> {
+  // .order() is required even for a single expected row -- AGENTS.md:
+  // "Never select a row without an explicit .order()... Postgres row order
+  // is arbitrary." start_date desc is the meaningful tiebreak if `is_current`
+  // were ever momentarily true on more than one row during a season rollover.
   const { data: season, error } = await supabase
     .from("seasons")
     .select("id")
     .eq("is_current", true)
+    .order("start_date", { ascending: false })
     .maybeSingle();
   if (error) throw error;
   return season?.id ?? null;
+}
+
+/**
+ * A gameweek's two Tipped Match slot columns, for a specific competition +
+ * season + number -- shared by loadPickBoardGameweek (the current
+ * gameweek) and loadLastWeekSummary (the previous one), so the fetch
+ * itself can't drift between the two callers.
+ */
+async function loadGameweekSlotRow(
+  supabase: SupabaseClient,
+  competitionId: string,
+  seasonId: string,
+  gameweekNumber: number,
+): Promise<GameweekRow | null> {
+  const { data: gwRow, error } = await supabase
+    .from("gameweeks")
+    .select("id, match_1_id, match_2_id, match_1_voided_at, match_2_voided_at")
+    .eq("season_id", seasonId)
+    .eq("competition_id", competitionId)
+    .eq("number", gameweekNumber)
+    .order("id")
+    .maybeSingle<GameweekRow>();
+  if (error) throw error;
+  return gwRow ?? null;
+}
+
+/** Shared by both loaders below -- see loadTeamsById's own doc comment for
+ * what `teamsById` holds. */
+function buildPickBoardTeam(
+  teamId: string,
+  teamsById: Map<
+    string,
+    { name: string; shortCode: string | null; position: number | null }
+  >,
+): PickBoardTeam {
+  const team = teamsById.get(teamId);
+  return {
+    id: teamId,
+    name: team?.name ?? "Unknown",
+    shortCode: team?.shortCode ?? null,
+    leaguePosition: team?.position ?? null,
+  };
 }
 
 async function loadTeamsById(
@@ -158,14 +206,12 @@ export async function loadPickBoardGameweek(
   );
   if (gameweekNumber === null) return null;
 
-  const { data: gwRow, error: gwError } = await supabase
-    .from("gameweeks")
-    .select("match_1_id, match_2_id, match_1_voided_at, match_2_voided_at")
-    .eq("season_id", seasonId)
-    .eq("competition_id", competitionId)
-    .eq("number", gameweekNumber)
-    .maybeSingle<GameweekRow>();
-  if (gwError) throw gwError;
+  const gwRow = await loadGameweekSlotRow(
+    supabase,
+    competitionId,
+    seasonId,
+    gameweekNumber,
+  );
   if (!gwRow) return null;
 
   const matchIds = [gwRow.match_1_id, gwRow.match_2_id].filter(
@@ -226,15 +272,7 @@ export async function loadPickBoardGameweek(
     ]),
   );
 
-  function buildTeam(teamId: string): PickBoardTeam {
-    const team = teamsById.get(teamId);
-    return {
-      id: teamId,
-      name: team?.name ?? "Unknown",
-      shortCode: team?.shortCode ?? null,
-      leaguePosition: team?.position ?? null,
-    };
-  }
+  const buildTeam = (teamId: string) => buildPickBoardTeam(teamId, teamsById);
 
   function buildSlot(
     matchId: string | null,
@@ -364,14 +402,12 @@ export async function loadLastWeekSummary(
   const seasonId = await getCurrentSeasonId(supabase);
   if (!seasonId) return null;
 
-  const { data: gwRow, error: gwError } = await supabase
-    .from("gameweeks")
-    .select("match_1_id, match_2_id, match_1_voided_at, match_2_voided_at")
-    .eq("season_id", seasonId)
-    .eq("competition_id", competitionId)
-    .eq("number", previousNumber)
-    .maybeSingle<GameweekRow>();
-  if (gwError) throw gwError;
+  const gwRow = await loadGameweekSlotRow(
+    supabase,
+    competitionId,
+    seasonId,
+    previousNumber,
+  );
   if (!gwRow) return null;
 
   const matchIds = [gwRow.match_1_id, gwRow.match_2_id].filter(
@@ -411,15 +447,7 @@ export async function loadLastWeekSummary(
   );
   const teamsById = await loadTeamsById(supabase, teamIds, seasonId);
 
-  function buildTeam(teamId: string): PickBoardTeam {
-    const team = teamsById.get(teamId);
-    return {
-      id: teamId,
-      name: team?.name ?? "Unknown",
-      shortCode: team?.shortCode ?? null,
-      leaguePosition: team?.position ?? null,
-    };
-  }
+  const buildTeam = (teamId: string) => buildPickBoardTeam(teamId, teamsById);
 
   const voidedMatchIds = new Set(
     [
