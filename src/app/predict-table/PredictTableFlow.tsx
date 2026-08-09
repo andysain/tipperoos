@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-} from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CircleCheck } from "lucide-react";
 import { tv } from "tailwind-variants";
 import { Button } from "@/components/ui/Button";
@@ -16,6 +10,7 @@ import {
   TABLE_BANDS,
   validateBandCounts,
 } from "@/lib/table-predictions/rules";
+import { kitColors, stripeStyle } from "@/lib/teams/kit-colors";
 
 interface Team {
   id: string;
@@ -100,56 +95,9 @@ const BAND_META: Record<
 // a deliberate, requested exception to DESIGN_SYSTEM.md's "no other colors"
 // rule (see docs/adr/0003-predict-the-table-shape.md's build-log addendum),
 // scoped to exactly this one identity cue. No crests/logos anywhere (still
-// a hard trademark constraint) -- colors only.
-// Club-sourced values -- where only one color was sourced, both stops are
-// the same (a solid stripe) rather than inventing a second tone.
-const CLUB_COLORS: Record<string, readonly [string, string]> = {
-  ARS: ["#DB0007", "#FFFFFF"],
-  AVL: ["#670E36", "#95BFE5"],
-  BOU: ["#DA291C", "#000000"],
-  BRE: ["#E03A3E", "#FFFFFF"],
-  BHA: ["#0057B8", "#FFFFFF"],
-  CHE: ["#034694", "#034694"],
-  COV: ["#78C4F5", "#78C4F5"],
-  CRY: ["#C4122E", "#1B458F"],
-  EVE: ["#003399", "#003399"],
-  FUL: ["#FFFFFF", "#000000"],
-  HUL: ["#F18A00", "#000000"],
-  IPS: ["#0044A9", "#0044A9"],
-  LEE: ["#FFFFFF", "#FFCD00"],
-  LIV: ["#C8102E", "#C8102E"],
-  MCI: ["#6CABDD", "#6CABDD"],
-  MUN: ["#DA291C", "#000000"],
-  NEW: ["#000000", "#FFFFFF"],
-  NOT: ["#DD0000", "#FFFFFF"],
-  SUN: ["#EB172B", "#FFFFFF"],
-  TOT: ["#FFFFFF", "#132257"],
-};
-const FALLBACK_KIT: readonly [string, string] = ["#9CA3AF", "#6B7280"];
-
-function kitColors(shortCode: string | null): readonly [string, string] {
-  if (!shortCode) return FALLBACK_KIT;
-  return CLUB_COLORS[shortCode] ?? FALLBACK_KIT;
-}
-
-// A flat single-color stripe (c1 === c2, e.g. Chelsea's all-blue) is left
-// alone -- a fake midline seam would look like a rendering glitch on those.
-// A genuine two-tone stripe gets a hairline divider between the halves and a
-// faint outer ring, so a white half (Leeds, Spurs, Fulham) stays visible
-// against the card's own white background instead of disappearing into it.
-function stripeStyle(
-  c1: string,
-  c2: string,
-  angle: 90 | 180 = 180,
-): CSSProperties {
-  if (c1.toLowerCase() === c2.toLowerCase()) {
-    return { background: c1, boxShadow: "inset 0 0 0 1px rgba(18,60,67,0.12)" };
-  }
-  return {
-    background: `linear-gradient(${angle}deg, ${c1} calc(50% - 0.5px), rgba(18,60,67,0.22) calc(50% - 0.5px) calc(50% + 0.5px), ${c2} calc(50% + 0.5px))`,
-    boxShadow: "inset 0 0 0 1px rgba(18,60,67,0.12)",
-  };
-}
+// a hard trademark constraint) -- colors only. `kitColors`/`stripeStyle`
+// live in `@/lib/teams/kit-colors` (shared with the Tipped Match card,
+// issue #15) rather than duplicated here.
 
 // Cards per row matches the Band's target size, so a full/correct Band
 // reads as one tidy row -- with a floor of 3 so an overfull Champion (target
