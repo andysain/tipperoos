@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   PROMOTED_CLUB_SENTINEL_POSITION,
   chooseRankSource,
+  selectMatch2,
   selectTopMatchup,
   type ClubPlayedCount,
   type ClubPosition,
@@ -232,6 +233,186 @@ describe("selectTopMatchup", () => {
 
     expect(forward?.id).toBe(reversed?.id);
     expect(forward?.id).toBe("m1");
+  });
+});
+
+// Returns a `random` stub that yields the given sequence in order, one call
+// per draw -- lets a test pin exactly which pool index selectMatch2 lands on
+// without depending on Math.random.
+function stubRandom(...sequence: readonly number[]): () => number {
+  let i = 0;
+  return () => {
+    const value = sequence[i];
+    i += 1;
+    return value;
+  };
+}
+
+describe("selectMatch2", () => {
+  const now = new Date("2026-08-15T00:00:00Z");
+
+  it("draws the fixture at the index implied by a stubbed random value", () => {
+    const fixtures = [
+      fixture("m1", "arsenal", "villa", "2026-08-15T14:00:00Z", "100"),
+      fixture("m2", "wolves", "burnley", "2026-08-15T14:00:00Z", "101"),
+      fixture("m3", "city", "everton", "2026-08-15T14:00:00Z", "102"),
+    ];
+
+    const result = selectMatch2({
+      fixtures,
+      match1FixtureId: "m1",
+      now,
+      random: stubRandom(0.5),
+    });
+
+    // pool after excluding m1 is [m2, m3]; floor(0.5 * 2) = 1 -> m3
+    expect(fixtures.length).toBe(3);
+    expect(result?.id).toBe("m3");
+  });
+
+  it("excludes the Match 1 fixture id from the pool", () => {
+    const fixtures = [
+      fixture("m1", "arsenal", "villa", "2026-08-15T14:00:00Z", "100"),
+      fixture("m2", "wolves", "burnley", "2026-08-15T14:00:00Z", "101"),
+    ];
+
+    const result = selectMatch2({
+      fixtures,
+      match1FixtureId: "m1",
+      now,
+      random: stubRandom(0),
+    });
+
+    expect(result?.id).toBe("m2");
+  });
+
+  it("excludes a fixture that has already kicked off", () => {
+    const fixtures = [
+      // already kicked off relative to `now`
+      fixture("m1", "arsenal", "villa", "2026-08-14T10:00:00Z", "100"),
+      fixture("m2", "wolves", "burnley", "2026-08-15T14:00:00Z", "101"),
+    ];
+
+    const result = selectMatch2({
+      fixtures,
+      match1FixtureId: null,
+      now,
+      random: stubRandom(0),
+    });
+
+    expect(result?.id).toBe("m2");
+  });
+
+  it("treats a fixture kicking off at exactly `now` as already kicked off", () => {
+    const fixtures = [
+      fixture("m1", "arsenal", "villa", "2026-08-15T00:00:00Z", "100"),
+      fixture("m2", "wolves", "burnley", "2026-08-15T14:00:00Z", "101"),
+    ];
+
+    const result = selectMatch2({
+      fixtures,
+      match1FixtureId: null,
+      now,
+      random: stubRandom(0),
+    });
+
+    expect(result?.id).toBe("m2");
+  });
+
+  it("applies both exclusions together", () => {
+    const fixtures = [
+      fixture("m1", "arsenal", "villa", "2026-08-15T14:00:00Z", "100"),
+      fixture("m2", "wolves", "burnley", "2026-08-14T10:00:00Z", "101"),
+      fixture("m3", "city", "everton", "2026-08-15T16:00:00Z", "102"),
+    ];
+
+    const result = selectMatch2({
+      fixtures,
+      match1FixtureId: "m1",
+      now,
+      random: stubRandom(0),
+    });
+
+    expect(fixtures.length).toBe(3);
+    expect(result?.id).toBe("m3");
+  });
+
+  it("returns null when the only fixture is Match 1", () => {
+    const fixtures = [
+      fixture("m1", "arsenal", "villa", "2026-08-15T14:00:00Z", "100"),
+    ];
+
+    const result = selectMatch2({
+      fixtures,
+      match1FixtureId: "m1",
+      now,
+      random: stubRandom(0),
+    });
+
+    expect(result).toBe(null);
+  });
+
+  it("returns null when every remaining fixture has already kicked off", () => {
+    const fixtures = [
+      fixture("m1", "arsenal", "villa", "2026-08-15T14:00:00Z", "100"),
+      fixture("m2", "wolves", "burnley", "2026-08-14T10:00:00Z", "101"),
+    ];
+
+    const result = selectMatch2({
+      fixtures,
+      match1FixtureId: "m1",
+      now,
+      random: stubRandom(0),
+    });
+
+    expect(result).toBe(null);
+  });
+
+  it("returns null on an empty fixture pool", () => {
+    const result = selectMatch2({
+      fixtures: [],
+      match1FixtureId: null,
+      now,
+      random: stubRandom(0),
+    });
+
+    expect(result).toBe(null);
+  });
+
+  it("is uniform: every pool member is reachable, each at the position its stubbed draw implies", () => {
+    const fixtures = [
+      fixture("m1", "arsenal", "villa", "2026-08-15T14:00:00Z", "100"),
+      fixture("m2", "wolves", "burnley", "2026-08-15T14:00:00Z", "101"),
+      fixture("m3", "city", "everton", "2026-08-15T14:00:00Z", "102"),
+      fixture("m4", "spurs", "forest", "2026-08-15T14:00:00Z", "103"),
+    ];
+
+    // Draw indices 0, 1, 2, 3 of a 4-fixture pool via evenly spaced [0, 1)
+    // values -- every pool member must be reachable, not just the first/last.
+    const draws = [0, 0.25, 0.5, 0.75].map((value) =>
+      selectMatch2({
+        fixtures,
+        match1FixtureId: null,
+        now,
+        random: stubRandom(value),
+      }),
+    );
+
+    expect(draws.map((d) => d?.id)).toEqual(["m1", "m2", "m3", "m4"]);
+  });
+
+  it("defaults to Math.random when no generator is provided", () => {
+    const fixtures = [
+      fixture("m1", "arsenal", "villa", "2026-08-15T14:00:00Z", "100"),
+    ];
+
+    const result = selectMatch2({
+      fixtures,
+      match1FixtureId: null,
+      now,
+    });
+
+    expect(result?.id).toBe("m1");
   });
 });
 
