@@ -296,7 +296,16 @@ export async function loadPickBoardGameweek(
         homeScore: match.team_a_score,
         awayScore: match.team_b_score,
       },
-      voided: voidedAt !== null,
+      // `voided_at` is the authoritative Voided Match signal (CLAUDE.md), but
+      // also defensively treat `matches.status === "postponed"` as voided on
+      // its own -- postponement handling isn't built yet (no sync writes
+      // either signal today), so nothing guarantees `voided_at` gets set in
+      // the same instant `status` flips. Without this, a sync step that
+      // updates `status` first (before the gameweek's voided/skip columns
+      // catch up) would render a postponed match as a normal playable card.
+      // Voided is the safe default either way: it hides pick entry, which a
+      // postponed match must never allow regardless of which signal moved.
+      voided: voidedAt !== null || match.status === "postponed",
       ownPick: pick
         ? { homeScore: pick.pred_home_score, awayScore: pick.pred_away_score }
         : null,

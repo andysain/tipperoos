@@ -252,4 +252,46 @@ describe("loadPickBoardGameweek", () => {
     expect(result?.slots[0]).toEqual({ kind: "skipped" });
     expect(result?.slots[1].kind).toBe("match");
   });
+
+  it("treats a postponed match as voided even when voided_at hasn't been set yet", async () => {
+    // Postponement handling isn't built yet, so nothing guarantees
+    // matches.status and gameweeks.match_N_voided_at flip together --
+    // this covers a sync step writing status first.
+    const { from } = createSupabaseMock({
+      seasons: { single: { id: SEASON_ID } },
+      gameweeks: {
+        single: {
+          match_1_id: "match-1",
+          match_2_id: null,
+          match_1_voided_at: null,
+          match_2_voided_at: null,
+        },
+      },
+      matches: {
+        list: [
+          {
+            id: "match-1",
+            team_a_id: "team-a",
+            team_b_id: "team-b",
+            kickoff_time: "2026-08-22T15:00:00.000Z",
+            status: "postponed",
+            team_a_score: null,
+            team_b_score: null,
+          },
+        ],
+      },
+      picks: { list: [] },
+      scores: { list: [] },
+      teams: { list: [] },
+      team_standings: { list: [] },
+    });
+
+    const result = await loadPickBoardGameweek(
+      { from } as never,
+      COMPETITION_ID,
+      SESSION_PLAYER,
+      NOW,
+    );
+    expect(result?.slots[0]).toMatchObject({ kind: "match", voided: true });
+  });
 });
