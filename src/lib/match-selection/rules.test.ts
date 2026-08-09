@@ -337,41 +337,31 @@ describe("selectMatch2", () => {
     expect(result?.id).toBe("m3");
   });
 
-  it("returns null when the only fixture is Match 1", () => {
-    const fixtures = [
-      fixture("m1", "arsenal", "villa", "2026-08-15T14:00:00Z", "100"),
-    ];
-
-    const result = selectMatch2({
-      fixtures,
+  it.each([
+    {
+      name: "the only fixture is Match 1",
+      fixtures: [
+        fixture("m1", "arsenal", "villa", "2026-08-15T14:00:00Z", "100"),
+      ],
       match1FixtureId: "m1",
-      now,
-      random: stubRandom(0),
-    });
-
-    expect(result).toBe(null);
-  });
-
-  it("returns null when every remaining fixture has already kicked off", () => {
-    const fixtures = [
-      fixture("m1", "arsenal", "villa", "2026-08-15T14:00:00Z", "100"),
-      fixture("m2", "wolves", "burnley", "2026-08-14T10:00:00Z", "101"),
-    ];
-
-    const result = selectMatch2({
-      fixtures,
+    },
+    {
+      name: "every remaining fixture has already kicked off",
+      fixtures: [
+        fixture("m1", "arsenal", "villa", "2026-08-15T14:00:00Z", "100"),
+        fixture("m2", "wolves", "burnley", "2026-08-14T10:00:00Z", "101"),
+      ],
       match1FixtureId: "m1",
-      now,
-      random: stubRandom(0),
-    });
-
-    expect(result).toBe(null);
-  });
-
-  it("returns null on an empty fixture pool", () => {
-    const result = selectMatch2({
+    },
+    {
+      name: "the fixture pool is empty",
       fixtures: [],
       match1FixtureId: null,
+    },
+  ])("returns null when $name", ({ fixtures, match1FixtureId }) => {
+    const result = selectMatch2({
+      fixtures,
+      match1FixtureId,
       now,
       random: stubRandom(0),
     });
