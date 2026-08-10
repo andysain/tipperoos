@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import {
   TippedMatchCard,
   type TippedMatchCardState,
@@ -93,6 +94,8 @@ export function PickBoardSlotCard({
   nowIso: string;
   timeZone: string;
 }) {
+  const router = useRouter();
+
   if (slot.kind === "skipped") {
     return (
       <UnsettledSlotPlate
@@ -120,9 +123,14 @@ export function PickBoardSlotCard({
       now={new Date(nowIso)}
       provenance={slot.provenance}
       state={buildCardState(slot, locked)}
-      onSave={(homeScore, awayScore) =>
-        savePick(slot.match.id, homeScore, awayScore)
-      }
+      onSave={async (homeScore, awayScore) => {
+        await savePick(slot.match.id, homeScore, awayScore);
+        // page.tsx is a Server Component fetched fresh per request (ADR-0007) --
+        // nothing else re-runs that fetch after a client-side save, so the
+        // header would keep showing the pre-save state until a hard navigation
+        // without this. router.refresh() re-runs the server fetch in place.
+        router.refresh();
+      }}
     />
   );
 }
