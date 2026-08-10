@@ -596,41 +596,47 @@ export function TippedMatchCard({
   // picks" is deliberately absent from "live" -- Match Centre (#91)
   // doesn't exist yet, and #90's decision 2 is not to link to a route
   // that isn't real (ADR-0005).
+  //
+  // Deliberately NOT gated on `!showEntryBody`: while editing a filed pick,
+  // the header keeps showing the pick being replaced, and the digit boxes
+  // below start blank rather than prefilled. Prefilling used to auto-save
+  // the moment one side was re-tapped (the other side's stale prefilled
+  // value completed the pair) -- e.g. re-picking 2-1 as 3-1 would fire and
+  // save 3-0 the instant "3" was tapped. Treating it as a fresh two-tap
+  // entry, with the old pick visible above only for reference, avoids that.
   let scores: RowScores | undefined;
   let note: string | undefined;
-  if (!showEntryBody) {
-    switch (state.kind) {
-      case "filed":
-        scores = {
-          home: state.ownHomeScore,
-          away: state.ownAwayScore,
-          tone: "own-pick",
-        };
-        break;
-      case "locked":
-        scores = {
-          home: state.ownHomeScore,
-          away: state.ownAwayScore,
-          tone: "own-pick",
-        };
-        note = "Locked in";
-        break;
-      case "live":
-        scores = {
-          home: state.ownHomeScore,
-          away: state.ownAwayScore,
-          tone: "own-pick",
-        };
-        note = "Playing now";
-        break;
-      case "finished":
-        scores = {
-          home: state.homeScore,
-          away: state.awayScore,
-          tone: "result",
-        };
-        break;
-    }
+  switch (state.kind) {
+    case "filed":
+      scores = {
+        home: state.ownHomeScore,
+        away: state.ownAwayScore,
+        tone: "own-pick",
+      };
+      break;
+    case "locked":
+      scores = {
+        home: state.ownHomeScore,
+        away: state.ownAwayScore,
+        tone: "own-pick",
+      };
+      note = "Locked in";
+      break;
+    case "live":
+      scores = {
+        home: state.ownHomeScore,
+        away: state.ownAwayScore,
+        tone: "own-pick",
+      };
+      note = "Playing now";
+      break;
+    case "finished":
+      scores = {
+        home: state.homeScore,
+        away: state.awayScore,
+        tone: "result",
+      };
+      break;
   }
 
   return (
@@ -689,12 +695,11 @@ export function TippedMatchCard({
       ) : state.kind === "filed" ? (
         <ChangeButton
           onClick={() => {
-            // Seed from the existing pick rather than blanking it -- the old
-            // scores stay visible (and already "complete", so tapping just
-            // one new digit immediately overwrites and re-files) instead of
-            // the card going empty while the player picks new digits.
-            setHomeSelected(state.ownHomeScore);
-            setAwaySelected(state.ownAwayScore);
+            // Blank, not seeded from the existing pick -- see the `scores`
+            // comment above for why: the header keeps the old pick visible
+            // as a reference, and re-entry is a fresh two-tap flow.
+            setHomeSelected(null);
+            setAwaySelected(null);
             setEditingFiled(true);
           }}
         />
