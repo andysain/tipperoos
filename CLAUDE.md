@@ -18,7 +18,7 @@ Do not build a general tournament/sports platform. Build for this specific priva
 - Private competition: no open public registration. New players may create themselves only if they know the private competition code.
 - No gambling language or mechanics. Use `prediction`, `pick`, `points`, `leaderboard`, `competition`. Avoid `bet`, `odds`, `wager`, `stake`, `payout`, `bookie`.
 - No chat, comments, public profiles, or social features beyond the leaderboard and Match Centre.
-- Timezone for display and rules is `Australia/Sydney`; kickoffs are UK time. Store all timestamps and do all lock/deadline comparisons in UTC; render in Sydney local time only.
+- Kickoffs are UK time. Store all timestamps and do all lock/deadline comparisons in UTC. Render datetimes in the viewer's browser-detected local timezone (resolved via a `tz` cookie the client keeps in sync with `Intl.DateTimeFormat().resolvedOptions().timeZone`; falls back to `Australia/Sydney` before that cookie exists). Email notifications are the one exception — sent server-side with no browser to read a timezone from, they render in a fixed `Australia/Sydney` instead. See issue #93 for the full reasoning and rejected alternatives.
 - All lock/deadline enforcement is server-side, always. Never trust a client clock or a merely-disabled UI control.
 
 ## Stack and architecture
