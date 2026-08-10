@@ -8,7 +8,14 @@ import {
   formatCountdown,
   formatKickoffInTimeZone,
 } from "@/lib/dates/kickoff-format";
-import { badgeTextColor, matchBadgeColors } from "@/lib/teams/kit-colors";
+import { matchBadgeColors } from "@/lib/teams/kit-colors";
+import { ClubCodeBadge } from "@/components/ui/ClubCodeBadge";
+import {
+  CardShell,
+  CardShellBody,
+  CardShellHeader,
+  CardShellSeam,
+} from "@/components/ui/CardShell";
 
 export interface TippedMatchTeam {
   name: string;
@@ -92,31 +99,6 @@ function ordinalSuffix(n: number): string {
   return (["th", "st", "nd", "rd"] as const)[n % 10] ?? "th";
 }
 
-/**
- * Rounded-rect club-code chip used in every header team row, replacing the
- * older circular badge that only ever appeared in a separate settled plate.
- */
-function CodeBadge({
-  shortCode,
-  fill,
-}: {
-  shortCode: string | null;
-  fill: string;
-}) {
-  const textToken = badgeTextColor(fill);
-  return (
-    <span
-      className={`inline-flex shrink-0 items-center justify-center rounded-md px-1.5 py-0.5 text-[0.7rem] font-extrabold tracking-wide ${
-        textToken === "ink" ? "text-ink" : "text-paper"
-      }`}
-      style={{ background: fill }}
-      aria-hidden
-    >
-      {shortCode ?? "?"}
-    </span>
-  );
-}
-
 type ChipTone = "open" | "locked" | "final";
 
 const chipStyles = tv({
@@ -166,7 +148,7 @@ function TeamRow({ team, fill }: { team: TippedMatchTeam; fill: string }) {
           ? `${team.leaguePosition}${ordinalSuffix(team.leaguePosition)}`
           : ""}
       </span>
-      <CodeBadge shortCode={team.shortCode} fill={fill} />
+      <ClubCodeBadge shortCode={team.shortCode} fill={fill} />
       <span className="min-w-0 flex-1 truncate text-[1.125rem] font-bold text-paper">
         {team.name}
       </span>
@@ -293,7 +275,7 @@ function CardHeader({
   note?: string;
 }) {
   return (
-    <div className="flex flex-col gap-2 bg-ink px-3.5 py-3">
+    <CardShellHeader>
       <div className="flex items-start gap-2.5">
         {scores ? (
           <div className="grid min-w-0 flex-1 grid-cols-[1fr_auto] items-center gap-x-2.5 gap-y-1">
@@ -318,22 +300,7 @@ function CardHeader({
         showCountdown={showCountdown}
         note={note}
       />
-    </div>
-  );
-}
-
-/** Two-tone bar tying the header to the digit rows / score line below it --
- * hairlined top and bottom so it reads as a bar regardless of which way a
- * kit's luminance leans (issue #15 prototype note). */
-function Seam({ homeFill, awayFill }: { homeFill: string; awayFill: string }) {
-  return (
-    <div className="flex h-1.5 border-y border-ink/25">
-      <div className="flex-1" style={{ background: homeFill }} />
-      <div
-        className="flex-1 border-l border-ink/30"
-        style={{ background: awayFill }}
-      />
-    </div>
+    </CardShellHeader>
   );
 }
 
@@ -640,7 +607,7 @@ export function TippedMatchCard({
   }
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-card shadow-[0_10px_24px_-12px_rgba(18,60,67,0.28)]">
+    <CardShell>
       <CardHeader
         home={home}
         away={away}
@@ -655,10 +622,10 @@ export function TippedMatchCard({
         scores={scores}
         note={note}
       />
-      <Seam homeFill={homeFill} awayFill={awayFill} />
+      <CardShellSeam segments={[{ fill: homeFill }, { fill: awayFill }]} />
 
       {showEntryBody ? (
-        <div className="flex flex-col gap-3 bg-white p-4">
+        <CardShellBody className="gap-3">
           <DigitRow
             team={home}
             homeAwayLabel="Home"
@@ -691,7 +658,7 @@ export function TippedMatchCard({
           {error ? (
             <p className="text-xs font-semibold text-danger">{error}</p>
           ) : null}
-        </div>
+        </CardShellBody>
       ) : state.kind === "filed" ? (
         <ChangeButton
           onClick={() => {
@@ -712,6 +679,6 @@ export function TippedMatchCard({
           points={state.points}
         />
       ) : null}
-    </div>
+    </CardShell>
   );
 }
