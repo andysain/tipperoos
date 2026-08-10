@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { PinInput } from "@/components/ui/PinInput";
 import { TextField } from "@/components/ui/TextField";
+import { detectBrowserTimeZone } from "@/lib/dates/timezone-cookie";
 
 const STORED_CODE_KEY = "tipperoos.competitionCode";
 
@@ -37,9 +38,12 @@ interface SuccessState {
   pinResetRequired?: boolean;
 }
 
-function formatSydneyTime(iso: string): string {
+// This page is "use client" and the lockout message only ever renders after
+// a client-side fetch response, so the viewer's browser timezone is read
+// directly -- no cookie/SSR involvement needed here at all (see issue #93).
+function formatLocalTime(iso: string): string {
   return new Intl.DateTimeFormat("en-AU", {
-    timeZone: "Australia/Sydney",
+    timeZone: detectBrowserTimeZone(),
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(iso));
@@ -192,7 +196,7 @@ function LoginFlow() {
 
       if (response.status === 423) {
         setPinError(
-          `Too many tries — take a short break and try again at ${formatSydneyTime(data.lockedUntil)}.`,
+          `Too many tries — take a short break and try again at ${formatLocalTime(data.lockedUntil)}.`,
         );
         setPinResetKey((k) => k + 1);
         return;
