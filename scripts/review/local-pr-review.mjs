@@ -94,7 +94,7 @@ const LARGE_RISK_PATTERNS = [
   /^supabase\/migrations\//,
   /^src\/app\/_lib\/session-cookie\.ts$/,
 ];
-const LOW_RISK_PATTERNS = [/^src\/components\/ui\//]; // trivial comment for incremental-skip test
+const LOW_RISK_PATTERNS = [/^src\/components\/ui\//];
 
 function classifyTier(changedFiles) {
   if (changedFiles.some((f) => LARGE_RISK_PATTERNS.some((p) => p.test(f)))) {
