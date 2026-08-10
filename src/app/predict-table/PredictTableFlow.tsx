@@ -391,7 +391,7 @@ function BandHeader({
             type="button"
             onClick={onClear}
             disabled={clearing}
-            className="text-xs font-bold text-ink/40 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
+            className="-my-3 flex h-11 min-w-11 items-center justify-center px-2 text-xs font-bold text-ink/40 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
           >
             Clear
           </button>
@@ -801,14 +801,14 @@ export function PredictTableFlow({
                   type="button"
                   onClick={clearAllTeams}
                   disabled={bulkClearing}
-                  className="text-danger hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                  className="-my-3 flex h-11 min-w-11 items-center justify-center px-2 text-danger hover:underline disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Yes
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirmingClearAll(false)}
-                  className="text-ink/50 hover:text-ink"
+                  className="-my-3 flex h-11 min-w-11 items-center justify-center px-2 text-ink/50 hover:text-ink"
                 >
                   Cancel
                 </button>
@@ -818,7 +818,7 @@ export function PredictTableFlow({
                 type="button"
                 onClick={() => setConfirmingClearAll(true)}
                 disabled={bulkClearing}
-                className="shrink-0 text-xs font-bold text-ink/50 hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+                className="-my-3 flex h-11 min-w-11 shrink-0 items-center justify-center px-2 text-xs font-bold text-ink/50 hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Clear all
               </button>
@@ -1149,7 +1149,7 @@ function Picker({
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="text-ink/40 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="-my-3 -mr-2 flex h-11 w-11 items-center justify-center text-ink/40 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           &times;
         </button>
