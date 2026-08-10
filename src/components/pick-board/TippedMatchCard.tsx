@@ -28,10 +28,11 @@ export type TippedMatchProvenance = "top_matchup" | "random_pick";
  *
  * Rebuilt to match issue #15's own approved design prototype ("Pick card,
  * final", v6) -- the ink header (position, club-code badge, full team
- * name, "Home" label, status chip) is present in every state, not only
- * once settled; only the status chip and the body beneath the seam bar
- * change. The previous shipped version had drifted from that prototype
- * (no header/chip/seam at all in the entry state) with nothing in issue
+ * name, status chip) is present in every state, not only once settled;
+ * once a pick or result exists it's baked directly into the header rows
+ * and the card collapses to just that header (no separate plate below).
+ * The previous shipped version had drifted from that prototype (no
+ * header/chip/seam at all in the entry state) with nothing in issue
  * #15's decision log explaining why -- this restores it.
  */
 export type TippedMatchCardState =
@@ -92,9 +93,8 @@ function ordinalSuffix(n: number): string {
 }
 
 /**
- * Rounded-rect club-code chip -- the one badge shape used everywhere on the
- * card now (header team rows and the plate's score line alike), replacing
- * the older circular badge that only ever appeared in the settled plate.
+ * Rounded-rect club-code chip used in every header team row, replacing the
+ * older circular badge that only ever appeared in a separate settled plate.
  */
 function CodeBadge({
   shortCode,
@@ -152,14 +152,24 @@ function chipForState(kind: TippedMatchCardState["kind"]): {
   }
 }
 
+/**
+ * One header row: position, club badge, full name -- and, once a pick or
+ * result exists, that side's score baked directly into the row. Dropped
+ * the "Home"/"Away" text label entirely (the row order already conveys
+ * it, and the space reads better spent on the score once one exists).
+ * Team name bumped up a touch (1.0625rem -> 1.125rem) so the row still
+ * feels balanced now that it sometimes carries a second, larger element.
+ */
 function TeamRow({
   team,
   fill,
-  homeAwayLabel,
+  score,
+  scoreTone,
 }: {
   team: TippedMatchTeam;
   fill: string;
-  homeAwayLabel?: string;
+  score?: number | null;
+  scoreTone?: "own-pick" | "result";
 }) {
   return (
     <div className="flex min-w-0 items-center gap-1.5">
@@ -169,12 +179,16 @@ function TeamRow({
           : ""}
       </span>
       <CodeBadge shortCode={team.shortCode} fill={fill} />
-      <span className="min-w-0 flex-1 truncate text-[1.0625rem] font-bold text-paper">
+      <span className="min-w-0 flex-1 truncate text-[1.125rem] font-bold text-paper">
         {team.name}
       </span>
-      {homeAwayLabel ? (
-        <span className="shrink-0 text-[0.62rem] font-bold uppercase tracking-wide text-paper/55">
-          {homeAwayLabel}
+      {score !== undefined ? (
+        <span
+          className={`shrink-0 text-[1.6rem] font-extrabold leading-none tabular-nums ${
+            scoreTone === "result" ? "text-paper" : "text-accent"
+          }`}
+        >
+          {score ?? "–"}
         </span>
       ) : null}
     </div>
@@ -187,12 +201,17 @@ function MetaLine({
   timeZone,
   now,
   showCountdown,
+  note,
 }: {
   provenance: TippedMatchProvenance;
   kickoffUtcIso: string;
   timeZone: string;
   now: Date;
   showCountdown: boolean;
+  /** "Locked in" / "Playing now" -- replaces the old plate footer's job
+   * now that locked/live states collapse to just the header. Mutually
+   * exclusive with the countdown (never both set for the same state). */
+  note?: string;
 }) {
   const Icon = ProvenanceIcon[provenance];
   const countdownParts = showCountdown
@@ -219,13 +238,30 @@ function MetaLine({
           </span>
         </>
       ) : null}
+      {note ? (
+        <>
+          <span aria-hidden>·</span>
+          <span className="font-semibold text-paper/80">{note}</span>
+        </>
+      ) : null}
     </div>
   );
 }
 
-/** The card's ink header -- present in every state (docs/adr/0007's own
+interface RowScores {
+  home: number | null;
+  away: number | null;
+  tone: "own-pick" | "result";
+}
+
+/**
+ * The card's ink header -- present in every state (docs/adr/0007's own
  * language: club badge and per-row colour bar apply "both times", not just
- * once settled). Only the status chip and meta line's countdown vary. */
+ * once settled). Once a pick or result exists, `scores` bakes it directly
+ * into the team rows -- filed/locked/live/finished then render as this
+ * header plus the seam and nothing else, an accordion-style collapse
+ * rather than a second, separate score plate below it.
+ */
 function CardHeader({
   home,
   away,
@@ -237,6 +273,8 @@ function CardHeader({
   timeZone,
   now,
   showCountdown,
+  scores,
+  note,
 }: {
   home: TippedMatchTeam;
   away: TippedMatchTeam;
@@ -248,13 +286,25 @@ function CardHeader({
   timeZone: string;
   now: Date;
   showCountdown: boolean;
+  scores?: RowScores;
+  note?: string;
 }) {
   return (
     <div className="flex flex-col gap-2 bg-ink px-3.5 py-3">
       <div className="flex items-start gap-2.5">
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <TeamRow team={home} fill={homeFill} homeAwayLabel="Home" />
-          <TeamRow team={away} fill={awayFill} />
+          <TeamRow
+            team={home}
+            fill={homeFill}
+            score={scores?.home}
+            scoreTone={scores?.tone}
+          />
+          <TeamRow
+            team={away}
+            fill={awayFill}
+            score={scores?.away}
+            scoreTone={scores?.tone}
+          />
         </div>
         <StatusChip label={chip.label} tone={chip.tone} />
       </div>
@@ -264,6 +314,7 @@ function CardHeader({
         timeZone={timeZone}
         now={now}
         showCountdown={showCountdown}
+        note={note}
       />
     </div>
   );
@@ -379,79 +430,62 @@ function DigitRow({
   );
 }
 
-function ScoreLine({
-  home,
-  away,
-  homeFill,
-  awayFill,
-  homeScore,
-  awayScore,
-  tone,
-}: {
-  home: TippedMatchTeam;
-  away: TippedMatchTeam;
-  homeFill: string;
-  awayFill: string;
-  homeScore: number | null;
-  awayScore: number | null;
-  tone: "own-pick" | "result";
-}) {
+/**
+ * Filed (pre-lock) gets a slim, full-width Change affordance below the
+ * seam -- the only settled state that still allows editing. A subtle
+ * fill (not just a border) so it reads as a distinct tappable shape
+ * against the ink background without competing with the header above it.
+ */
+function ChangeButton({ onClick }: { onClick: () => void }) {
   return (
-    <div
-      className={`flex items-center gap-2.5 text-[3rem] font-extrabold leading-none tabular-nums ${
-        tone === "own-pick" ? "text-accent" : "text-paper"
-      }`}
-    >
-      <CodeBadge shortCode={home.shortCode} fill={homeFill} />
-      <span>{homeScore ?? "–"}</span>
-      <span className="text-[0.4em] font-bold text-paper/35">—</span>
-      <span>{awayScore ?? "–"}</span>
-      <CodeBadge shortCode={away.shortCode} fill={awayFill} />
+    <div className="bg-ink px-3.5 pt-1 pb-3.5">
+      <button
+        type="button"
+        className="flex min-h-11 w-full items-center justify-center rounded-btn-sm border border-paper/45 bg-white/8 text-[0.92rem] font-bold text-paper transition hover:border-paper hover:bg-white/14"
+        onClick={onClick}
+      >
+        Change
+      </button>
     </div>
   );
 }
 
-/** The dark plate every non-entry state renders as the card body --
- * "Your pick" pre-result, "Full time" once finished. Same ink background
- * as the header (docs/DESIGN_SYSTEM.md has no separate header/plate ink
- * shade documented yet, unlike the prototype's ink-2/ink-3 split -- flat
- * `ink` throughout until that lands). */
-function Plate({
-  home,
-  away,
-  homeFill,
-  awayFill,
+/** Finished only: the one thing that doesn't fit in a header row -- the
+ * verdict (exact / what you tipped) plus the points chip. Still flat ink,
+ * still no separate plate -- just the header's natural continuation. */
+function FinishedFooter({
+  ownHomeScore,
+  ownAwayScore,
   homeScore,
   awayScore,
-  scoreTone,
-  label,
-  footer,
+  points,
 }: {
-  home: TippedMatchTeam;
-  away: TippedMatchTeam;
-  homeFill: string;
-  awayFill: string;
-  homeScore: number | null;
-  awayScore: number | null;
-  scoreTone: "own-pick" | "result";
-  label: string;
-  footer: React.ReactNode;
+  ownHomeScore: number | null;
+  ownAwayScore: number | null;
+  homeScore: number;
+  awayScore: number;
+  points: number | null;
 }) {
+  const exact = ownHomeScore === homeScore && ownAwayScore === awayScore;
   return (
-    <div className="flex flex-col gap-2 bg-ink px-3.5 py-3.5">
-      <span className="text-[0.64rem] font-bold uppercase tracking-wide text-paper/55">
-        {label}
-      </span>
-      <ScoreLine
-        home={home}
-        away={away}
-        homeFill={homeFill}
-        awayFill={awayFill}
-        homeScore={homeScore}
-        awayScore={awayScore}
-        tone={scoreTone}
-      />
-      {footer}
+    <div className="flex items-center gap-2 bg-ink px-3.5 pt-0.5 pb-3.5 text-[0.86rem]">
+      {exact ? (
+        <span className="font-bold text-success">You called it exactly</span>
+      ) : ownHomeScore !== null && ownAwayScore !== null ? (
+        <span className="text-paper/75">
+          You tipped{" "}
+          <span className="font-extrabold text-accent">
+            {ownHomeScore}–{ownAwayScore}
+          </span>
+        </span>
+      ) : (
+        <span className="text-paper/60">No pick filed</span>
+      )}
+      {points !== null ? (
+        <span className="ml-auto rounded-full bg-success/25 px-2.5 py-1 text-[0.82rem] font-extrabold text-success">
+          +{points} pts
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -494,7 +528,7 @@ export function TippedMatchCard({
       setEditingFiled(false);
       // Success: the parent owns pick data and is expected to flip `state`
       // to "filed" on its next render. Local selection stays as-is until
-      // then (harmless -- it's about to be replaced by the plate).
+      // then (harmless -- it's about to be replaced by the collapsed header).
     } catch {
       // A partial/failed pick is never restored (ADR) -- back to a clean
       // entry state, not a half-filled one, with a plain inline error line
@@ -515,6 +549,49 @@ export function TippedMatchCard({
   const showEntryBody =
     state.kind === "entry" || (state.kind === "filed" && editingFiled);
 
+  // Once a pick or result exists, it bakes into the header rows and the
+  // card collapses to just that header + seam -- no separate plate below
+  // (accordion-style; see CardHeader's own doc comment). "See everyone's
+  // picks" is deliberately absent from "live" -- Match Centre (#91)
+  // doesn't exist yet, and #90's decision 2 is not to link to a route
+  // that isn't real (ADR-0005).
+  let scores: RowScores | undefined;
+  let note: string | undefined;
+  if (!showEntryBody) {
+    switch (state.kind) {
+      case "filed":
+        scores = {
+          home: state.ownHomeScore,
+          away: state.ownAwayScore,
+          tone: "own-pick",
+        };
+        break;
+      case "locked":
+        scores = {
+          home: state.ownHomeScore,
+          away: state.ownAwayScore,
+          tone: "own-pick",
+        };
+        note = "Locked in";
+        break;
+      case "live":
+        scores = {
+          home: state.ownHomeScore,
+          away: state.ownAwayScore,
+          tone: "own-pick",
+        };
+        note = "Playing now";
+        break;
+      case "finished":
+        scores = {
+          home: state.homeScore,
+          away: state.awayScore,
+          tone: "result",
+        };
+        break;
+    }
+  }
+
   return (
     <div className="flex flex-col overflow-hidden rounded-card shadow-[0_10px_24px_-12px_rgba(18,60,67,0.28)]">
       <CardHeader
@@ -528,6 +605,8 @@ export function TippedMatchCard({
         timeZone={timeZone}
         now={now}
         showCountdown={state.kind === "entry" || state.kind === "filed"}
+        scores={scores}
+        note={note}
       />
       <Seam homeFill={homeFill} awayFill={awayFill} />
 
@@ -566,129 +645,23 @@ export function TippedMatchCard({
             <p className="text-xs font-semibold text-danger">{error}</p>
           ) : null}
         </div>
-      ) : (
-        (() => {
-          switch (state.kind) {
-            case "filed":
-              return (
-                <Plate
-                  home={home}
-                  away={away}
-                  homeFill={homeFill}
-                  awayFill={awayFill}
-                  homeScore={state.ownHomeScore}
-                  awayScore={state.ownAwayScore}
-                  scoreTone="own-pick"
-                  label="Your pick"
-                  // No "Filed HH:MM" line -- the score itself is the only
-                  // thing worth stating twice; a timestamp is supporting
-                  // detail nobody re-reads. Visual hierarchy: label (small,
-                  // muted) sets context, the score is the sole dominant
-                  // element (size + accent colour), and Change is a clearly
-                  // secondary, full-width action -- distinct in weight from
-                  // the score via outline styling, but full-width so the
-                  // plate's whole footprint stays purposeful rather than a
-                  // small button floating against empty space.
-                  footer={
-                    <button
-                      type="button"
-                      className="mt-1 flex min-h-11 w-full items-center justify-center rounded-btn-sm border border-paper/35 text-[0.92rem] font-bold text-paper transition hover:border-paper hover:bg-white/5"
-                      onClick={() => {
-                        setHomeSelected(null);
-                        setAwaySelected(null);
-                        setEditingFiled(true);
-                      }}
-                    >
-                      Change
-                    </button>
-                  }
-                />
-              );
-            case "locked":
-              return (
-                <Plate
-                  home={home}
-                  away={away}
-                  homeFill={homeFill}
-                  awayFill={awayFill}
-                  homeScore={state.ownHomeScore}
-                  awayScore={state.ownAwayScore}
-                  scoreTone="own-pick"
-                  label="Your pick"
-                  footer={
-                    <p className="pt-0.5 text-[0.86rem] text-paper/75">
-                      Locked in
-                    </p>
-                  }
-                />
-              );
-            case "live":
-              return (
-                <Plate
-                  home={home}
-                  away={away}
-                  homeFill={homeFill}
-                  awayFill={awayFill}
-                  homeScore={state.ownHomeScore}
-                  awayScore={state.ownAwayScore}
-                  scoreTone="own-pick"
-                  label="Your pick"
-                  // "See everyone's picks" deliberately absent -- Match
-                  // Centre (#91) doesn't exist yet, and #90's decision 2
-                  // is not to link to a route that isn't real (ADR-0005).
-                  footer={
-                    <p className="pt-0.5 text-[0.86rem] text-paper/75">
-                      Playing now
-                    </p>
-                  }
-                />
-              );
-            case "finished": {
-              const exact =
-                state.ownHomeScore === state.homeScore &&
-                state.ownAwayScore === state.awayScore;
-              return (
-                <Plate
-                  home={home}
-                  away={away}
-                  homeFill={homeFill}
-                  awayFill={awayFill}
-                  homeScore={state.homeScore}
-                  awayScore={state.awayScore}
-                  scoreTone="result"
-                  label="Full time"
-                  footer={
-                    <div className="flex items-center gap-2 pt-0.5 text-[0.9rem]">
-                      {exact ? (
-                        <span className="font-bold text-success">
-                          You called it exactly
-                        </span>
-                      ) : state.ownHomeScore !== null &&
-                        state.ownAwayScore !== null ? (
-                        <span className="text-paper/85">
-                          You tipped{" "}
-                          <span className="font-extrabold text-accent">
-                            {state.ownHomeScore}–{state.ownAwayScore}
-                          </span>
-                        </span>
-                      ) : (
-                        <span className="text-paper/60">No pick filed</span>
-                      )}
-                      {state.points !== null ? (
-                        <span className="ml-auto rounded-full bg-success/25 px-2.5 py-1 text-[0.86rem] font-extrabold text-success">
-                          +{state.points} pts
-                        </span>
-                      ) : null}
-                    </div>
-                  }
-                />
-              );
-            }
-            default:
-              return null;
-          }
-        })()
-      )}
+      ) : state.kind === "filed" ? (
+        <ChangeButton
+          onClick={() => {
+            setHomeSelected(null);
+            setAwaySelected(null);
+            setEditingFiled(true);
+          }}
+        />
+      ) : state.kind === "finished" ? (
+        <FinishedFooter
+          ownHomeScore={state.ownHomeScore}
+          ownAwayScore={state.ownAwayScore}
+          homeScore={state.homeScore}
+          awayScore={state.awayScore}
+          points={state.points}
+        />
+      ) : null}
     </div>
   );
 }
