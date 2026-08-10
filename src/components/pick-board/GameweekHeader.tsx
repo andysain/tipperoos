@@ -26,9 +26,9 @@ export function GameweekHeader({
 
   return (
     <div className="flex items-baseline justify-between">
-      <h1 className="text-xl font-extrabold text-ink">
+      <h2 className="text-[1.3rem] font-bold text-ink">
         Gameweek {gameweekNumber}
-      </h1>
+      </h2>
       {earliestLockUtcIso ? (
         <span className="text-xs font-semibold text-ink/55">
           Locks from {formatKickoffInTimeZone(earliestLockUtcIso, timeZone)}

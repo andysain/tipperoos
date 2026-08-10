@@ -79,6 +79,7 @@ export default async function PickBoardPage() {
     // (PredictTableFlow.tsx) -- one column on phone, room for two slot
     // cards side by side once there's a tablet/desktop-width viewport.
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4 pr-14">
+      <h1 className="text-[1.9rem] font-extrabold text-ink">Pick Board</h1>
       <StatsStrip stats={seasonStats} />
       <LastWeekStrip summary={lastWeek} />
       {showTablePredictionPrompt ? <TablePredictionPrompt /> : null}
