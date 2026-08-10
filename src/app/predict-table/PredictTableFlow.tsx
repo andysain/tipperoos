@@ -1136,7 +1136,7 @@ function Picker({
   const isReconsider = fromBand !== null;
 
   return (
-    <div className="grid max-h-[92svh] grid-rows-[auto_auto_auto_1fr_auto] overflow-hidden rounded-t-card border border-paper-line bg-white shadow-[0_-10px_30px_-15px_rgba(0,0,0,0.35)] md:max-h-[85svh] md:rounded-card md:shadow-[0_10px_24px_-12px_rgba(18,60,67,0.28)]">
+    <div className="grid max-h-[92svh] grid-rows-[auto_auto_auto_1fr_auto] overflow-hidden rounded-t-card border border-paper-line bg-white shadow-[0_-10px_30px_-15px_rgba(18,60,67,0.35)] md:max-h-[85svh] md:rounded-card md:shadow-[0_10px_24px_-12px_rgba(18,60,67,0.28)]">
       <div className="flex justify-center pt-3 pb-1 md:hidden" aria-hidden>
         <span className="h-1 w-10 rounded-full bg-paper-line" />
       </div>

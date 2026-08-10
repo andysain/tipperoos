@@ -21,6 +21,34 @@ rather than decorating everything: a soft warm lift-shadow on cards (real depth,
 the accent color reserved for exactly two emotionally-relevant spots — the 1st-place leaderboard row, and a
 player's own predicted scoreline. Restraint everywhere else is what makes those two moments land.
 
+## Card anatomy
+
+Two card shapes exist, chosen by what a card needs to communicate, not by which screen it's on:
+
+- **Plain surface** (`src/components/ui/Card.tsx`) — a single white surface, shadow-only (see Spacing & radius
+  below), no border. Used where the whole card is one undifferentiated area: `/login`, Predict the Table's
+  outer frame and picker sheet.
+- **Ink-header shell** (`src/components/ui/CardShell.tsx`) — a three-part sandwich for cards that need a
+  structural break between "identity" and "content": an ink header (`CardShellHeader`, `bg-ink`) carrying
+  whatever most needs weight (club identity, a status chip), a kit-coloured seam (`CardShellSeam`) tying the
+  header to what sits below it, and a white body (`CardShellBody`) for the interactive or detail content. Dark
+  ink is used here as a _surface_, not just as text colour — that structural use of ink is what gives a card
+  built this way its shape. Originated inside the Pick Board's Tipped Match card
+  (`docs/adr/0007-home-surface-and-pick-entry.md`); extracted into `src/components/ui/` so a second screen can
+  adopt the same shape without reading that component. A card built from this shell can still end a state below
+  the seam with more ink rather than a white body (see `TippedMatchCard.tsx`'s locked/live/finished states,
+  which collapse to header + seam with no separate plate) — the white body is one state, not a hard requirement
+  of the shell.
+
+Reach for the ink-header shell when a card's identity (which two clubs, whose pick) needs to read before its
+content does. Reach for the plain surface everywhere else — it's the default, not a fallback.
+
+Neither shape ever gets a border; depth comes from the shadow alone, on both (see "Visual direction" above:
+"real depth, not flat bordered boxes"). The club-code badge used inside an ink header (`ClubCodeBadge`, in
+`src/components/ui/`) always resolves its own text colour via `badgeTextColor()` — a caller only has to hand it
+a fill that's already been run through `kit-colors.ts`'s contrast floor and clash rule for the grounds it'll
+actually be drawn on (see the kit-colour rules under Palette below).
+
 ## Palette
 
 | Token (Tailwind: `bg-<token>` / `text-<token>` / `border-<token>`) | Hex       | Usage                                                                               |
