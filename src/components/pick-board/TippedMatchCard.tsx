@@ -398,7 +398,7 @@ function ScoreLine({
 }) {
   return (
     <div
-      className={`flex items-center gap-2.5 text-[2.75rem] font-extrabold leading-none tabular-nums ${
+      className={`flex items-center gap-2.5 text-[3rem] font-extrabold leading-none tabular-nums ${
         tone === "own-pick" ? "text-accent" : "text-paper"
       }`}
     >
@@ -580,23 +580,27 @@ export function TippedMatchCard({
                   awayScore={state.ownAwayScore}
                   scoreTone="own-pick"
                   label="Your pick"
+                  // No "Filed HH:MM" line -- the score itself is the only
+                  // thing worth stating twice; a timestamp is supporting
+                  // detail nobody re-reads. Visual hierarchy: label (small,
+                  // muted) sets context, the score is the sole dominant
+                  // element (size + accent colour), and Change is a clearly
+                  // secondary, full-width action -- distinct in weight from
+                  // the score via outline styling, but full-width so the
+                  // plate's whole footprint stays purposeful rather than a
+                  // small button floating against empty space.
                   footer={
-                    <div className="flex items-center gap-2.5 pt-0.5">
-                      <span className="text-[0.86rem] text-paper/75">
-                        Filed
-                      </span>
-                      <button
-                        type="button"
-                        className="ml-auto flex min-h-9 items-center rounded-btn-sm border border-paper/35 px-3 text-[0.82rem] font-bold text-paper transition hover:border-paper hover:bg-white/5"
-                        onClick={() => {
-                          setHomeSelected(null);
-                          setAwaySelected(null);
-                          setEditingFiled(true);
-                        }}
-                      >
-                        Change
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      className="mt-1 flex min-h-11 w-full items-center justify-center rounded-btn-sm border border-paper/35 text-[0.92rem] font-bold text-paper transition hover:border-paper hover:bg-white/5"
+                      onClick={() => {
+                        setHomeSelected(null);
+                        setAwaySelected(null);
+                        setEditingFiled(true);
+                      }}
+                    >
+                      Change
+                    </button>
                   }
                 />
               );
