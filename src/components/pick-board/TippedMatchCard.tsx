@@ -153,24 +153,12 @@ function chipForState(kind: TippedMatchCardState["kind"]): {
 }
 
 /**
- * One header row: position, club badge, full name -- and, once a pick or
- * result exists, that side's score baked directly into the row. Dropped
- * the "Home"/"Away" text label entirely (the row order already conveys
- * it, and the space reads better spent on the score once one exists).
- * Team name bumped up a touch (1.0625rem -> 1.125rem) so the row still
- * feels balanced now that it sometimes carries a second, larger element.
+ * One header row: position, club badge, full name. Dropped the "Home"/
+ * "Away" text label entirely (the row order already conveys it). Team
+ * name bumped up a touch (1.0625rem -> 1.125rem) for balance against the
+ * larger score column that sits alongside it once a pick or result exists.
  */
-function TeamRow({
-  team,
-  fill,
-  score,
-  scoreTone,
-}: {
-  team: TippedMatchTeam;
-  fill: string;
-  score?: number | null;
-  scoreTone?: "own-pick" | "result";
-}) {
+function TeamRow({ team, fill }: { team: TippedMatchTeam; fill: string }) {
   return (
     <div className="flex min-w-0 items-center gap-1.5">
       <span className="w-6 shrink-0 text-[0.68rem] font-bold tabular-nums text-paper/55">
@@ -182,16 +170,31 @@ function TeamRow({
       <span className="min-w-0 flex-1 truncate text-[1.125rem] font-bold text-paper">
         {team.name}
       </span>
-      {score !== undefined ? (
-        <span
-          className={`shrink-0 text-[1.6rem] font-extrabold leading-none tabular-nums ${
-            scoreTone === "result" ? "text-paper" : "text-accent"
-          }`}
-        >
-          {score ?? "–"}
-        </span>
-      ) : null}
     </div>
+  );
+}
+
+/**
+ * A score, in its own grid column rather than trailing inline in the team
+ * row -- keeps it vertically centred against that row regardless of the
+ * row's own line-height, and lets it sit visually apart (bigger, its own
+ * column) instead of reading as an afterthought at the row's tail end.
+ */
+function ScoreCell({
+  value,
+  tone,
+}: {
+  value: number | null;
+  tone: "own-pick" | "result";
+}) {
+  return (
+    <span
+      className={`shrink-0 text-center text-[1.75rem] font-extrabold leading-none tabular-nums ${
+        tone === "result" ? "text-paper" : "text-accent"
+      }`}
+    >
+      {value ?? "–"}
+    </span>
   );
 }
 
@@ -292,20 +295,19 @@ function CardHeader({
   return (
     <div className="flex flex-col gap-2 bg-ink px-3.5 py-3">
       <div className="flex items-start gap-2.5">
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <TeamRow
-            team={home}
-            fill={homeFill}
-            score={scores?.home}
-            scoreTone={scores?.tone}
-          />
-          <TeamRow
-            team={away}
-            fill={awayFill}
-            score={scores?.away}
-            scoreTone={scores?.tone}
-          />
-        </div>
+        {scores ? (
+          <div className="grid min-w-0 flex-1 grid-cols-[1fr_auto] items-center gap-x-2.5 gap-y-1">
+            <TeamRow team={home} fill={homeFill} />
+            <ScoreCell value={scores.home} tone={scores.tone} />
+            <TeamRow team={away} fill={awayFill} />
+            <ScoreCell value={scores.away} tone={scores.tone} />
+          </div>
+        ) : (
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <TeamRow team={home} fill={homeFill} />
+            <TeamRow team={away} fill={awayFill} />
+          </div>
+        )}
         <StatusChip label={chip.label} tone={chip.tone} />
       </div>
       <MetaLine
@@ -346,6 +348,22 @@ const digitCell = tv({
   defaultVariants: { selected: false },
 });
 
+// Real top-flight scores essentially never exceed single digits, but this
+// leaves headroom rather than hard-capping at a number someone could argue
+// with -- 20 is generous without inviting genuinely silly values.
+const CUSTOM_SCORE_MAX = 20;
+
+const customScoreInput = tv({
+  base: "h-11 flex-1 min-w-0 rounded-btn-sm border bg-white text-center text-base font-bold tabular-nums text-ink outline-none transition placeholder:font-semibold placeholder:text-ink/35 disabled:cursor-not-allowed disabled:opacity-50",
+  variants: {
+    active: {
+      true: "border-accent bg-accent/10",
+      false: "border-paper-line focus:border-accent/60",
+    },
+  },
+  defaultVariants: { active: false },
+});
+
 function DigitRow({
   team,
   homeAwayLabel,
@@ -366,8 +384,26 @@ function DigitRow({
   onExpand: () => void;
 }) {
   const primaryDigits = [0, 1, 2, 3, 4];
-  const extraDigits = [5, 6, 7, 8, 9];
-  const showExtra = expanded || (selected !== null && selected >= 5);
+  const showCustom = expanded || (selected !== null && selected >= 5);
+  const customActive = selected !== null && selected >= 5;
+  // Buffers what's being typed until commit (blur/Enter) -- unlike the
+  // digit buttons, which fire (and auto-save) on every tap, a free-text
+  // field needs an explicit "done typing" moment rather than saving on
+  // every keystroke. Only initialised from `selected` on mount: this
+  // subtree remounts fresh each time the entry body reappears (see
+  // TippedMatchCard's showEntryBody), so that's the one moment it needs to
+  // pick up an existing 5+ pick (e.g. reopened via Change).
+  const [customText, setCustomText] = useState(
+    customActive ? String(selected) : "",
+  );
+
+  function commitCustom() {
+    if (customText === "") return;
+    const parsed = Number.parseInt(customText, 10);
+    if (Number.isInteger(parsed) && parsed >= 5 && parsed <= CUSTOM_SCORE_MAX) {
+      onSelect(parsed);
+    }
+  }
 
   return (
     <div className="flex items-stretch gap-2">
@@ -398,7 +434,7 @@ function DigitRow({
               {digit}
             </button>
           ))}
-          {!showExtra ? (
+          {!showCustom ? (
             <button
               type="button"
               disabled={disabled}
@@ -407,24 +443,27 @@ function DigitRow({
             >
               5+
             </button>
-          ) : null}
+          ) : (
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={2}
+              disabled={disabled}
+              value={customText}
+              placeholder="5+"
+              aria-label={`${team.shortCode ?? "team"} score, 5 or more`}
+              className={customScoreInput({ active: customActive })}
+              onChange={(event) =>
+                setCustomText(event.target.value.replace(/\D/g, "").slice(0, 2))
+              }
+              onBlur={commitCustom}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") event.currentTarget.blur();
+              }}
+            />
+          )}
         </div>
-        {showExtra ? (
-          <div className="flex items-center gap-1.5">
-            {extraDigits.map((digit) => (
-              <button
-                key={digit}
-                type="button"
-                disabled={disabled}
-                aria-pressed={selected === digit}
-                className={digitCell({ selected: selected === digit })}
-                onClick={() => onSelect(digit)}
-              >
-                {digit}
-              </button>
-            ))}
-          </div>
-        ) : null}
       </div>
     </div>
   );
@@ -432,16 +471,18 @@ function DigitRow({
 
 /**
  * Filed (pre-lock) gets a slim, full-width Change affordance below the
- * seam -- the only settled state that still allows editing. A subtle
- * fill (not just a border) so it reads as a distinct tappable shape
- * against the ink background without competing with the header above it.
+ * seam -- the only settled state that still allows editing. Tied to the
+ * accent color (rather than a neutral paper/white outline) so it reads
+ * as a considered action in this card's own palette instead of a generic
+ * form control, and pulled in tight under the seam instead of floating
+ * in its own block of ink.
  */
 function ChangeButton({ onClick }: { onClick: () => void }) {
   return (
-    <div className="bg-ink px-3.5 pt-1 pb-3.5">
+    <div className="bg-ink px-3.5 pt-2 pb-3">
       <button
         type="button"
-        className="flex min-h-11 w-full items-center justify-center rounded-btn-sm border border-paper/45 bg-white/8 text-[0.92rem] font-bold text-paper transition hover:border-paper hover:bg-white/14"
+        className="flex h-9 w-full items-center justify-center rounded-btn-sm border border-accent/50 bg-accent/12 text-[0.8rem] font-bold tracking-wide text-accent uppercase transition hover:border-accent hover:bg-accent/22"
         onClick={onClick}
       >
         Change
@@ -648,8 +689,12 @@ export function TippedMatchCard({
       ) : state.kind === "filed" ? (
         <ChangeButton
           onClick={() => {
-            setHomeSelected(null);
-            setAwaySelected(null);
+            // Seed from the existing pick rather than blanking it -- the old
+            // scores stay visible (and already "complete", so tapping just
+            // one new digit immediately overwrites and re-files) instead of
+            // the card going empty while the player picks new digits.
+            setHomeSelected(state.ownHomeScore);
+            setAwaySelected(state.ownAwayScore);
             setEditingFiled(true);
           }}
         />
