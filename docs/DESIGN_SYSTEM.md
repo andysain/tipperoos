@@ -18,16 +18,16 @@ what this app should feel like.
 
 The shipped direction takes the base Matchday palette and adds two deliberate, sparing touches of richness
 rather than decorating everything: a soft warm lift-shadow on cards (real depth, not flat bordered boxes), and
-the accent color reserved for exactly two emotionally-relevant spots — the 1st-place leaderboard row, and a
-player's own predicted scoreline. Restraint everywhere else is what makes those two moments land.
+the accent color reserved for exactly three emotionally-relevant spots — the 1st-place leaderboard row, a
+player's own predicted scoreline, and Predict the Table's Champion Band pick (issue #107). Restraint everywhere
+else is what makes those moments land.
 
 ## Card anatomy
 
 Two card shapes exist, chosen by what a card needs to communicate, not by which screen it's on:
 
 - **Plain surface** (`src/components/ui/Card.tsx`) — a single white surface, shadow-only (see Spacing & radius
-  below), no border. Used where the whole card is one undifferentiated area: `/login`, Predict the Table's
-  outer frame and picker sheet.
+  below), no border. Used where the whole card is one undifferentiated area: `/login`.
 - **Ink-header shell** (`src/components/ui/CardShell.tsx`) — a three-part sandwich for cards that need a
   structural break between "identity" and "content": an ink header (`CardShellHeader`, `bg-ink`) carrying
   whatever most needs weight (club identity, a status chip), a kit-coloured seam (`CardShellSeam`) tying the
@@ -35,10 +35,12 @@ Two card shapes exist, chosen by what a card needs to communicate, not by which 
   ink is used here as a _surface_, not just as text colour — that structural use of ink is what gives a card
   built this way its shape. Originated inside the Pick Board's Tipped Match card
   (`docs/adr/0007-home-surface-and-pick-entry.md`); extracted into `src/components/ui/` so a second screen can
-  adopt the same shape without reading that component. A card built from this shell can still end a state below
-  the seam with more ink rather than a white body (see `TippedMatchCard.tsx`'s locked/live/finished states,
-  which collapse to header + seam with no separate plate) — the white body is one state, not a hard requirement
-  of the shell.
+  adopt the same shape without reading that component — Predict the Table's Band cards and picker sheet are
+  that second consumer (issue #107). A card built from this shell can still end a state below the seam with
+  more ink rather than a white body (see `TippedMatchCard.tsx`'s locked/live/finished states, which collapse to
+  header + seam with no separate plate), or skip the seam entirely when there's no kit colour to bridge (a
+  Table Band isn't two clubs — its cards go straight from header to body) — the seam and the white body are
+  each one option, not a hard requirement of the shell.
 
 Reach for the ink-header shell when a card's identity (which two clubs, whose pick) needs to read before its
 content does. Reach for the plain surface everywhere else — it's the default, not a fallback.

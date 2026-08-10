@@ -1,16 +1,31 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { CircleCheck } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  ArrowDown,
+  CircleCheck,
+  Minus,
+  Plane,
+  Star,
+  TrendingDown,
+  TriangleAlert,
+  Trophy,
+} from "lucide-react";
 import { tv } from "tailwind-variants";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
+import { ClubCodeBadge } from "@/components/ui/ClubCodeBadge";
+import {
+  CardShell,
+  CardShellBody,
+  CardShellHeader,
+  CardShellSeam,
+} from "@/components/ui/CardShell";
 import {
   type BandKey,
   TABLE_BANDS,
   validateBandCounts,
 } from "@/lib/table-predictions/rules";
-import { kitColors, stripeStyle } from "@/lib/teams/kit-colors";
+import { applyContrastFloor, INK, kitColors } from "@/lib/teams/kit-colors";
 
 interface Team {
   id: string;
@@ -37,67 +52,63 @@ function ordinal(n: number): string {
 
 type BandTone = "success" | "info" | "warning" | "danger" | "neutral";
 
-// Decorative emoji per Band -- purely a personalization/delight layer
-// (DESIGN_SYSTEM.md's "emoji stay the personalization layer" split,
-// distinct from lucide-react's functional icon chrome). `tone` reuses the
-// *existing* semantic palette (success/info/warning/danger) rather than
-// inventing new colors -- DESIGN_SYSTEM.md reserves `accent` for exactly
-// two spots elsewhere.
+// Functional wayfinding icon per Band (lucide-react, matches the Pick
+// Board's Star/Dices convention -- docs/DESIGN_SYSTEM.md § Icons: emoji
+// stay the personalization layer and must never stand in for a functional
+// icon). Bands render neutral -- no per-band semantic tint. A previous
+// version tinted each Band success/info/warning/danger by table position,
+// which gave those tokens a second meaning that contradicted the one
+// docs/DESIGN_SYSTEM.md § Palette assigns them everywhere else in the app
+// (issue #107).
 const BAND_META: Record<
   BandKey,
-  { emoji: string; blurb: string; tone: BandTone; positions: string }
+  { Icon: typeof Trophy; blurb: string; positions: string }
 > = {
   champion: {
-    emoji: "🏆",
+    Icon: Trophy,
     blurb: "Wins the whole league!",
-    tone: "success",
     positions: "1",
   },
   champions_league: {
-    emoji: "⭐",
+    Icon: Star,
     blurb: "Top 4 -- plays Champions League next season",
-    tone: "success",
     positions: "2-5",
   },
   europe: {
-    emoji: "✈️",
+    Icon: Plane,
     blurb: "5th-8th -- Europa League or Conference League",
-    tone: "info",
     positions: "6-8",
   },
   mid_table: {
-    emoji: "😌",
+    Icon: Minus,
     blurb: "Comfortably mid-table, nothing to worry about",
-    tone: "neutral",
     positions: "9-11",
   },
   lower_table: {
-    emoji: "😬",
+    Icon: TrendingDown,
     blurb: "Lower half -- could do with a good run of form",
-    tone: "neutral",
     positions: "12-14",
   },
   relegation_battle: {
-    emoji: "⚠️",
+    Icon: TriangleAlert,
     blurb: "Fighting hard to stay in the league",
-    tone: "warning",
     positions: "15-17",
   },
   relegated: {
-    emoji: "⬇️",
+    Icon: ArrowDown,
     blurb: "Bottom 3 -- drops down a division",
-    tone: "danger",
     positions: "18-20",
   },
 };
 
-// Real club colors, used as a two-tone "kit stripe" on each team card --
-// a deliberate, requested exception to DESIGN_SYSTEM.md's "no other colors"
-// rule (see docs/adr/0003-predict-the-table-shape.md's build-log addendum),
-// scoped to exactly this one identity cue. No crests/logos anywhere (still
-// a hard trademark constraint) -- colors only. `kitColors`/`stripeStyle`
-// live in `@/lib/teams/kit-colors` (shared with the Tipped Match card,
-// issue #15) rather than duplicated here.
+// A team's identity fill for its rail + ClubCodeBadge -- contrast-floored
+// against both grounds it can be drawn on (an ink header, a white card
+// body), same grounds matchBadgeColors() defaults to for the Tipped Match
+// card, since a team card here only ever shows one club at a time (no
+// clash rule needed -- that's a two-club-in-one-row concern).
+function teamFill(shortCode: string | null): string {
+  return applyContrastFloor(kitColors(shortCode)[0], [INK, "#ffffff"]);
+}
 
 // Cards per row matches the Band's target size, so a full/correct Band
 // reads as one tidy row -- with a floor of 3 so an overfull Champion (target
@@ -118,43 +129,27 @@ function formatCountdown(msRemaining: number): string {
   return `${minutes}m`;
 }
 
-const positionBadge = tv({
-  base: "inline-flex shrink-0 items-center justify-center rounded-badge px-2 py-1 text-[0.7rem] font-extrabold text-ink tabular-nums",
-  variants: {
-    tone: {
-      success: "bg-success/20",
-      info: "bg-info/20",
-      warning: "bg-warning/30",
-      danger: "bg-danger/20",
-      neutral: "bg-ink/10",
-    },
-  },
-  defaultVariants: { tone: "neutral" },
-});
+// Sits inside a CardShellHeader (ink ground) -- Band position range.
+const positionBadge =
+  "inline-flex shrink-0 items-center justify-center rounded-badge bg-paper/15 px-2 py-1 text-[0.7rem] font-extrabold text-paper tabular-nums";
 
 const bandHeaderChip = tv({
-  base: "inline-flex items-center gap-1.5 text-[0.8rem] font-bold tracking-[0.04em] text-ink uppercase",
+  base: "inline-flex items-center gap-1.5 text-[0.8rem] font-bold tracking-[0.04em] text-paper uppercase",
 });
 
-const bandPickerRow = tv({
-  base: "flex items-center gap-2.5 rounded-btn border border-paper-line bg-white px-3 py-2 text-left transition hover:border-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50",
-  variants: {
-    tone: {
-      success: "border-l-4 border-l-success",
-      info: "border-l-4 border-l-info",
-      warning: "border-l-4 border-l-warning",
-      danger: "border-l-4 border-l-danger",
-      neutral: "",
-    },
-  },
-  defaultVariants: { tone: "neutral" },
-});
+// Sits inside a CardShellBody (white ground) -- one row of the Picker's
+// Band list.
+const bandPickerRow =
+  "flex items-center gap-2.5 rounded-btn border border-paper-line bg-white px-3 py-2 text-left transition hover:border-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50";
 
-// A team's row card: a two-tone kit-stripe rail + code/name, in a denser
-// format than a plain pill so a full Band's membership reads as a group at
-// a glance rather than a wrapped cloud of small pills.
+// A team's row card: a rail + club-code badge + name, in a denser format
+// than a plain pill so a full Band's membership reads as a group at a
+// glance rather than a wrapped cloud of small pills. Rail spec matches the
+// Pick Board's inset rounded rail (TippedMatchCard.tsx's DigitRow) rather
+// than a full-bleed edge stripe -- one shared spec for a kit-colour rail
+// across both screens (issue #107).
 const teamCard = tv({
-  base: "group relative flex items-center gap-0 overflow-hidden rounded-btn border py-2 pr-1 pl-3.5 text-left transition",
+  base: "group flex items-stretch gap-2 overflow-hidden rounded-btn border py-1.5 pr-1 pl-1.5 text-left transition",
   variants: {
     tone: {
       readonly: "border-paper-line bg-white",
@@ -164,6 +159,10 @@ const teamCard = tv({
       // ring, not just a uniform tint across the whole Band, so it's
       // obvious which one to tap.
       excess: "-rotate-1 border-danger bg-danger/5 ring-2 ring-danger/40",
+      // The Champion Band's single occupant -- this screen's one accent
+      // spot (docs/DESIGN_SYSTEM.md § Visual direction, issue #107):
+      // everything else on this screen stays restrained so this lands.
+      champion: "border-accent bg-accent/10 ring-1 ring-accent/40",
     },
   },
   defaultVariants: { tone: "ok" },
@@ -175,35 +174,30 @@ const ghostSocket = tv({
 
 // The dot-row "how filled is this Band" readout (the thing you liked in the
 // Verdicts prototype) -- always visible, not just when something's wrong,
-// so the whole table's progress reads at a glance.
+// so the whole table's progress reads at a glance. Filled dots are always
+// the same neutral color -- "how full" must read identically across every
+// Band, since a tone-colored fill could misread as a correctness signal
+// rather than progress. `inverted` flips the palette for use on an ink
+// ground (a Band card's header) vs. the default for a white ground (a
+// Picker row).
 function FillDots({
   filled,
   target,
-  tone,
+  inverted,
 }: {
   filled: number;
   target: number;
-  tone: BandTone;
+  inverted?: boolean;
 }) {
-  // Filled dots are always the same neutral-ink color -- "how full" must read
-  // identically across every Band, since a tone-colored fill (e.g. red for
-  // Relegation Battle) could misread as a correctness signal rather than
-  // progress. The Band's own tone still shows, just on the *empty* slots, as
-  // a preview accent rather than a status.
-  const emptyOutline: Record<BandTone, string> = {
-    success: "border-success/40",
-    info: "border-info/40",
-    warning: "border-warning/50",
-    danger: "border-danger/40",
-    neutral: "border-paper-line",
-  };
+  const filledClass = inverted ? "bg-paper/85" : "bg-ink/70";
+  const emptyClass = inverted ? "border-paper/30" : "border-paper-line";
   return (
     <span className="flex items-center gap-1" aria-hidden>
       {Array.from({ length: target }, (_, i) => (
         <span
           key={i}
           className={`size-2 rounded-full ${
-            i < filled ? "bg-ink/70" : `border ${emptyOutline[tone]}`
+            i < filled ? filledClass : `border ${emptyClass}`
           }`}
         />
       ))}
@@ -230,56 +224,47 @@ function TeamCard({
   removing?: boolean;
   emphasis?: boolean;
 }) {
-  const [c1, c2] = kitColors(team.shortCode);
-  const cls = `${teamCard({ tone })} ${emphasis ? "col-span-full" : ""} ${
-    removing ? "motion-safe:animate-chip-out" : ""
-  }`;
+  const fill = teamFill(team.shortCode);
+  const cls = `${teamCard({ tone: emphasis ? "champion" : tone })} ${
+    emphasis ? "col-span-full" : ""
+  } ${removing ? "motion-safe:animate-chip-out" : ""}`;
 
-  const stripe = (
+  const rail = (
     <span
       aria-hidden
-      className="absolute inset-y-0 left-0 w-2"
-      style={stripeStyle(c1, c2)}
+      className="w-1 shrink-0 rounded-full"
+      style={{ background: fill }}
     />
   );
-  const codeAndName = (
-    <span className="flex min-w-0 flex-col">
-      <span
-        className={`truncate font-extrabold tracking-wide text-ink ${emphasis ? "text-base" : "text-sm"}`}
-      >
-        {team.shortCode ?? "?"}
-      </span>
+  const identity = (
+    <>
+      {emphasis ? (
+        <Trophy className="size-4 shrink-0 text-accent" aria-hidden />
+      ) : null}
+      <ClubCodeBadge shortCode={team.shortCode} fill={fill} />
       <span
         title={team.name}
-        className="truncate text-[0.7rem] font-medium text-ink/55"
+        className={`min-w-0 flex-1 truncate font-bold text-ink ${emphasis ? "text-base" : "text-sm"}`}
       >
         {team.name}
       </span>
-    </span>
-  );
-  const label = (
-    <span className="relative flex min-w-0 flex-1 items-center gap-2">
-      {emphasis ? (
-        <span className="text-xl" aria-hidden>
-          🏆
-        </span>
-      ) : null}
-      {codeAndName}
-    </span>
+    </>
   );
 
   if (!onOpen && !onRemove) {
     return (
       <div className={cls}>
-        {stripe}
-        {label}
+        {rail}
+        <span className="flex min-w-0 flex-1 items-center gap-2">
+          {identity}
+        </span>
       </div>
     );
   }
 
   return (
     <div className={cls}>
-      {stripe}
+      {rail}
       {onOpen ? (
         <button
           type="button"
@@ -287,17 +272,14 @@ function TeamCard({
           onClick={onOpen}
           title="Move to a different Band"
           aria-label={`Move ${team.name} out of ${bandLabel}`}
-          className="relative flex min-w-0 flex-1 items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex min-w-0 flex-1 items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {emphasis ? (
-            <span className="text-xl" aria-hidden>
-              🏆
-            </span>
-          ) : null}
-          {codeAndName}
+          {identity}
         </button>
       ) : (
-        label
+        <span className="flex min-w-0 flex-1 items-center gap-2">
+          {identity}
+        </span>
       )}
       {onRemove ? (
         <button
@@ -306,7 +288,7 @@ function TeamCard({
           onClick={onRemove}
           title="Remove and call again"
           aria-label={`Remove ${team.name} from ${bandLabel} and call them again`}
-          className="relative ml-1 shrink-0 rounded-btn-sm px-2 py-1 text-ink/30 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
+          className="ml-1 shrink-0 self-center rounded-btn-sm px-2 py-1 text-ink/30 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
         >
           &times;
         </button>
@@ -351,18 +333,34 @@ interface PredictTableFlowProps {
   gameweekOneKickoff: string | null;
 }
 
-function TeamBadge({ team }: { team: Team }) {
+// A team's club-code badge + name, at whatever text color its ground
+// needs -- shared by the Picker's team plate, the SwapChooser occupant
+// rows, and the SealedMoment celebration line (#106's kit-filled badge,
+// replacing the old grey `bg-ink/10` pill everywhere it appeared).
+function TeamIdentity({
+  team,
+  toneClassName = "text-ink",
+}: {
+  team: Team;
+  toneClassName?: string;
+}) {
   return (
     <span className="flex items-center gap-2">
-      <span className="rounded-badge bg-ink/10 px-2 py-0.5 text-xs font-bold tracking-wide text-ink">
-        {team.shortCode ?? "?"}
-      </span>
-      {team.name}
+      <ClubCodeBadge
+        shortCode={team.shortCode}
+        fill={teamFill(team.shortCode)}
+      />
+      <span className={`font-bold ${toneClassName}`}>{team.name}</span>
     </span>
   );
 }
 
-function BandHeader({
+/** A Table Band's ink header: position range, name + icon, fill dots, and
+ * (interactively) a Clear affordance -- #106's card anatomy applied to a
+ * Band instead of a fixture (issue #107). No seam below it -- a Band isn't
+ * two clubs, so there's no kit-colour pairing to bridge; straight to the
+ * white body. */
+function BandCardHeader({
   band,
   filled,
   mismatch,
@@ -377,36 +375,36 @@ function BandHeader({
 }) {
   const meta = BAND_META[band.key];
   return (
-    <div className="flex items-start justify-between gap-2">
-      <div className="flex items-center gap-2">
-        <span className={positionBadge({ tone: meta.tone })}>
-          {meta.positions}
-        </span>
-        <h2 className={bandHeaderChip()}>
-          <span aria-hidden>{meta.emoji}</span>
-          {band.label}
-        </h2>
-        {onClear && filled > 0 ? (
-          <button
-            type="button"
-            onClick={onClear}
-            disabled={clearing}
-            className="-my-3 flex h-11 min-w-11 items-center justify-center px-2 text-xs font-bold text-ink/40 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Clear
-          </button>
-        ) : null}
+    <CardShellHeader>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className={positionBadge}>{meta.positions}</span>
+          <h2 className={bandHeaderChip()}>
+            <meta.Icon className="size-4" aria-hidden />
+            {band.label}
+          </h2>
+          {onClear && filled > 0 ? (
+            <button
+              type="button"
+              onClick={onClear}
+              disabled={clearing}
+              className="-my-3 flex h-11 min-w-11 items-center justify-center px-2 text-xs font-bold text-paper/50 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Clear
+            </button>
+          ) : null}
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-0.5">
+          <FillDots filled={filled} target={band.target} inverted />
+          {mismatch ? (
+            <span className="text-xs font-bold text-warning">
+              <span className="sr-only">Currently has </span>
+              {mismatch.actual} / {mismatch.expected}
+            </span>
+          ) : null}
+        </div>
       </div>
-      <div className="flex shrink-0 flex-col items-end gap-0.5">
-        <FillDots filled={filled} target={band.target} tone={meta.tone} />
-        {mismatch ? (
-          <span className="text-xs font-bold text-warning">
-            <span className="sr-only">Currently has </span>
-            {mismatch.actual} / {mismatch.expected}
-          </span>
-        ) : null}
-      </div>
-    </div>
+    </CardShellHeader>
   );
 }
 
@@ -733,36 +731,36 @@ export function PredictTableFlow({
 
   if (locked) {
     return (
-      <main className="flex min-h-full flex-1 items-center justify-center bg-paper p-4">
-        <Card className="w-full max-w-md">
-          <h1 className="text-[1.9rem] font-extrabold text-ink">
-            Predict the Table
-          </h1>
-          <p className="mt-1 mb-6 text-ink/70">
-            {Object.keys(assignments).length === 20
-              ? "Locked in -- Gameweek 1 has kicked off."
-              : "Gameweek 1 has kicked off, so this is locked. Here's what you had:"}
-          </p>
-          <BandSummary assignments={assignments} teamsById={teamsById} />
-        </Card>
+      <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4 pr-14">
+        <h1 className="text-[1.9rem] font-extrabold text-ink">
+          Predict the Table
+        </h1>
+        <p className="text-ink/70">
+          {Object.keys(assignments).length === 20
+            ? "Locked in -- Gameweek 1 has kicked off."
+            : "Gameweek 1 has kicked off, so this is locked. Here's what you had:"}
+        </p>
+        <BandSummary assignments={assignments} teamsById={teamsById} />
       </main>
     );
   }
 
   if (isSkipped) {
     return (
-      <main className="flex min-h-full flex-1 items-center justify-center bg-paper p-4">
-        <Card className="w-full max-w-md text-center">
-          <h1 className="text-[1.9rem] font-extrabold text-ink">
-            You skipped Predict the Table
-          </h1>
-          <p className="mt-1 mb-6 text-ink/70">
-            No worries -- you can still call your table whenever you like.
-          </p>
-          <Button onClick={() => setIsSkipped(false)} fullWidth>
-            Call my table
-          </Button>
-        </Card>
+      <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4 pr-14">
+        <h1 className="text-[1.9rem] font-extrabold text-ink">
+          You skipped Predict the Table
+        </h1>
+        <p className="text-ink/70">
+          No worries -- you can still call your table whenever you like.
+        </p>
+        <Button
+          onClick={() => setIsSkipped(false)}
+          fullWidth
+          className="max-w-md"
+        >
+          Call my table
+        </Button>
       </main>
     );
   }
@@ -770,195 +768,195 @@ export function PredictTableFlow({
   const doneCalling = unsortedQueue.length === 0;
 
   return (
-    <main className="flex min-h-full flex-1 items-center justify-center bg-paper p-4">
-      <Card className="relative w-full max-w-md overflow-hidden md:max-w-4xl md:overflow-visible">
-        <h1 className="text-[1.9rem] font-extrabold text-ink">
-          Predict the Table
-        </h1>
-        <p className="mt-1 text-ink/70">
-          Where will each Premier League club finish? Tap a team to place or
-          swap it.
-        </p>
+    <main className="relative mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4 pr-14">
+      <h1 className="text-[1.9rem] font-extrabold text-ink">
+        Predict the Table
+      </h1>
+      <p className="-mt-2 text-ink/70">
+        Where will each Premier League club finish? Tap a team to place or swap
+        it.
+      </p>
 
-        <div className="mt-2 flex items-center justify-between gap-2">
-          <p className="flex items-center gap-1.5 text-xs font-bold text-ink/50">
-            <span>
-              {teams.length - unsortedQueue.length} of {teams.length} called
-            </span>
-            {!locked && !isLateJoiner && gameweekOneKickoff ? (
-              <>
-                <span aria-hidden>&middot;</span>
-                <LockCountdown kickoffIso={gameweekOneKickoff} now={now} />
-              </>
-            ) : null}
-          </p>
-
-          {Object.keys(assignments).length > 0 ? (
-            confirmingClearAll ? (
-              <span className="flex shrink-0 items-center gap-2 text-xs font-bold">
-                <span className="text-ink/60">Clear all?</span>
-                <button
-                  type="button"
-                  onClick={clearAllTeams}
-                  disabled={bulkClearing}
-                  className="-my-3 flex h-11 min-w-11 items-center justify-center px-2 text-danger hover:underline disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Yes
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConfirmingClearAll(false)}
-                  className="-my-3 flex h-11 min-w-11 items-center justify-center px-2 text-ink/50 hover:text-ink"
-                >
-                  Cancel
-                </button>
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setConfirmingClearAll(true)}
-                disabled={bulkClearing}
-                className="-my-3 flex h-11 min-w-11 shrink-0 items-center justify-center px-2 text-xs font-bold text-ink/50 hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Clear all
-              </button>
-            )
-          ) : null}
-        </div>
-
-        {isLateJoiner ? (
-          <p className="mt-2 text-sm text-info">
-            You joined after Gameweek 1 kicked off, so this one&apos;s totally
-            optional -- submit whenever you like, or skip it.
-          </p>
-        ) : null}
-
-        {submittedAt && doneCalling && validation.ok ? (
-          <p
-            role="status"
-            className="mt-2 flex items-center gap-1.5 text-sm text-success"
-          >
-            <CircleCheck className="size-4 shrink-0" aria-hidden />
-            Submitted, and every Band looks right -- keep editing anytime until
-            Gameweek 1 kicks off.
-          </p>
-        ) : (
-          <>
-            {submittedAt ? (
-              <p className="mt-2 flex items-center gap-1.5 text-sm text-success">
-                <CircleCheck className="size-4 shrink-0" aria-hidden />
-                Submitted -- you can keep editing until Gameweek 1 kicks off.
-              </p>
-            ) : null}
-
-            {doneCalling ? (
-              validation.ok ? (
-                <p
-                  role="status"
-                  className="mt-2 flex items-center gap-1.5 text-sm text-success"
-                >
-                  <CircleCheck className="size-4 shrink-0" aria-hidden />
-                  Every Band looks right!
-                </p>
-              ) : (
-                <p role="status" className="mt-2 text-sm text-warning">
-                  Some Bands don&apos;t match yet -- tap a team to move it.
-                </p>
-              )
-            ) : null}
-          </>
-        )}
-
-        {saveError ? (
-          <p role="alert" className="mt-2 text-sm text-danger">
-            {saveError}
-          </p>
-        ) : null}
-
-        <div className="mt-6 md:flex md:items-start md:gap-5">
-          <div className="md:min-w-0 md:flex-1">
-            <BandsBoard
-              assignments={assignments}
-              teamsById={teamsById}
-              busyTeamId={busyTeamId}
-              removingIds={removingIds}
-              validation={validation}
-              onOpenPicker={openPickerFor}
-              onRemove={handleRemove}
-              onClearBand={clearBand}
-              clearing={bulkClearing}
-            />
-          </div>
-
-          {activePickTeam ? (
+      <div className="-mt-2 flex items-center justify-between gap-2">
+        <p className="flex items-center gap-1.5 text-xs font-bold text-ink/50">
+          <span>
+            {teams.length - unsortedQueue.length} of {teams.length} called
+          </span>
+          {!locked && !isLateJoiner && gameweekOneKickoff ? (
             <>
-              <button
-                type="button"
-                onClick={closePicker}
-                aria-hidden
-                tabIndex={-1}
-                className="fixed inset-0 z-20 bg-ink/20 md:hidden"
-              />
-              <div className="fixed inset-x-0 bottom-0 z-30 md:sticky md:top-4 md:z-auto md:w-80 md:shrink-0 md:self-start">
-                <Picker
-                  team={activePickTeam}
-                  fromBand={activePickFromBand}
-                  disabled={busyTeamId === activePickTeam.id}
-                  swapChooserBand={swapChooserBand}
-                  assignments={assignments}
-                  teamsById={teamsById}
-                  onChooseBand={chooseBand}
-                  onChooseSwapOccupant={chooseSwapOccupant}
-                  onCancelSwap={() => setSwapChooserBand(null)}
-                  onLater={
-                    !activePickFromBand && unsortedQueue.length > 1
-                      ? handleLater
-                      : undefined
-                  }
-                  onClose={closePicker}
-                />
-              </div>
+              <span aria-hidden>&middot;</span>
+              <LockCountdown kickoffIso={gameweekOneKickoff} now={now} />
             </>
           ) : null}
-        </div>
+        </p>
 
-        {actionError ? (
-          <p role="alert" className="mt-4 text-sm text-danger">
-            {actionError}
-          </p>
+        {Object.keys(assignments).length > 0 ? (
+          confirmingClearAll ? (
+            <span className="flex shrink-0 items-center gap-2 text-xs font-bold">
+              <span className="text-ink/60">Clear all?</span>
+              <button
+                type="button"
+                onClick={clearAllTeams}
+                disabled={bulkClearing}
+                className="-my-3 flex h-11 min-w-11 items-center justify-center px-2 text-danger hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Yes
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmingClearAll(false)}
+                className="-my-3 flex h-11 min-w-11 items-center justify-center px-2 text-ink/50 hover:text-ink"
+              >
+                Cancel
+              </button>
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmingClearAll(true)}
+              disabled={bulkClearing}
+              className="-my-3 flex h-11 min-w-11 shrink-0 items-center justify-center px-2 text-xs font-bold text-ink/50 hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Clear all
+            </button>
+          )
         ) : null}
+      </div>
 
-        <div className="mt-6 flex flex-col gap-2">
+      {isLateJoiner ? (
+        <p className="-mt-2 text-sm text-info">
+          You joined after Gameweek 1 kicked off, so this one&apos;s totally
+          optional -- submit whenever you like, or skip it.
+        </p>
+      ) : null}
+
+      {submittedAt && doneCalling && validation.ok ? (
+        <p
+          role="status"
+          className="-mt-2 flex items-center gap-1.5 text-sm text-success"
+        >
+          <CircleCheck className="size-4 shrink-0" aria-hidden />
+          Submitted, and every Band looks right -- keep editing anytime until
+          Gameweek 1 kicks off.
+        </p>
+      ) : (
+        <>
+          {submittedAt ? (
+            <p className="-mt-2 flex items-center gap-1.5 text-sm text-success">
+              <CircleCheck className="size-4 shrink-0" aria-hidden />
+              Submitted -- you can keep editing until Gameweek 1 kicks off.
+            </p>
+          ) : null}
+
           {doneCalling ? (
-            <Button
-              onClick={handleSubmit}
-              disabled={!validation.ok || busy}
-              fullWidth
-            >
-              {submittedAt ? "Re-submit" : "Submit my table"}
-            </Button>
+            validation.ok ? (
+              <p
+                role="status"
+                className="-mt-2 flex items-center gap-1.5 text-sm text-success"
+              >
+                <CircleCheck className="size-4 shrink-0" aria-hidden />
+                Every Band looks right!
+              </p>
+            ) : (
+              <p role="status" className="-mt-2 text-sm text-warning">
+                Some Bands don&apos;t match yet -- tap a team to move it.
+              </p>
+            )
           ) : null}
+        </>
+      )}
 
-          {isLateJoiner ? (
-            <Button
-              intent="ghost"
-              onClick={handleSkip}
-              disabled={busy}
-              fullWidth
-            >
-              Skip for now
-            </Button>
-          ) : null}
-        </div>
+      {saveError ? (
+        <p role="alert" className="-mt-2 text-sm text-danger">
+          {saveError}
+        </p>
+      ) : null}
 
-        {justSealed ? (
-          <SealedMoment
+      <div className="md:flex md:items-start md:gap-5">
+        <div className="md:min-w-0 md:flex-1">
+          <BandsBoard
             assignments={assignments}
             teamsById={teamsById}
-            onDismiss={() => setJustSealed(false)}
+            busyTeamId={busyTeamId}
+            removingIds={removingIds}
+            validation={validation}
+            onOpenPicker={openPickerFor}
+            onRemove={handleRemove}
+            onClearBand={clearBand}
+            clearing={bulkClearing}
           />
+        </div>
+
+        {activePickTeam ? (
+          <>
+            <button
+              type="button"
+              onClick={closePicker}
+              aria-hidden
+              tabIndex={-1}
+              className="fixed inset-0 z-20 bg-ink/20 md:hidden"
+            />
+            <div className="fixed inset-x-0 bottom-0 z-30 md:sticky md:top-4 md:z-auto md:w-80 md:shrink-0 md:self-start">
+              <Picker
+                team={activePickTeam}
+                fromBand={activePickFromBand}
+                disabled={busyTeamId === activePickTeam.id}
+                swapChooserBand={swapChooserBand}
+                assignments={assignments}
+                teamsById={teamsById}
+                onChooseBand={chooseBand}
+                onChooseSwapOccupant={chooseSwapOccupant}
+                onCancelSwap={() => setSwapChooserBand(null)}
+                onLater={
+                  !activePickFromBand && unsortedQueue.length > 1
+                    ? handleLater
+                    : undefined
+                }
+                onClose={closePicker}
+              />
+            </div>
+          </>
         ) : null}
-      </Card>
+      </div>
+
+      {actionError ? (
+        <p role="alert" className="text-sm text-danger">
+          {actionError}
+        </p>
+      ) : null}
+
+      <div className="flex flex-col gap-2">
+        {doneCalling ? (
+          <Button
+            onClick={handleSubmit}
+            disabled={!validation.ok || busy}
+            fullWidth
+            className="max-w-md"
+          >
+            {submittedAt ? "Re-submit" : "Submit my table"}
+          </Button>
+        ) : null}
+
+        {isLateJoiner ? (
+          <Button
+            intent="ghost"
+            onClick={handleSkip}
+            disabled={busy}
+            fullWidth
+            className="max-w-md"
+          >
+            Skip for now
+          </Button>
+        ) : null}
+      </div>
+
+      {justSealed ? (
+        <SealedMoment
+          assignments={assignments}
+          teamsById={teamsById}
+          onDismiss={() => setJustSealed(false)}
+        />
+      ) : null}
     </main>
   );
 }
@@ -999,53 +997,59 @@ function BandsBoard({
         return (
           <div key={band.key}>
             {band.key === "relegated" ? <DropDivider /> : null}
-            <BandHeader
-              band={band}
-              filled={filled}
-              mismatch={mismatch}
-              onClear={() => onClearBand(band.key)}
-              clearing={clearing}
-            />
-            <div className={`mt-2 grid ${bandGridCols(band)} gap-1.5`}>
-              {teamIds.length === 0 ? (
-                <p className="col-span-full text-sm text-ink/40">
-                  {band.key === "champion"
-                    ? "Call a champion to fill this slot."
-                    : "-"}
-                </p>
-              ) : (
-                teamIds.map((teamId, index) => {
-                  const team = teamsById.get(teamId);
-                  if (!team) return null;
-                  const isExcess = isOverfull && index >= band.target;
-                  return (
-                    <TeamCard
-                      key={teamId}
-                      team={team}
-                      bandLabel={band.label}
-                      tone={isExcess ? "excess" : mismatch ? "mismatch" : "ok"}
-                      busy={busyTeamId === team.id}
-                      removing={removingIds.has(teamId)}
-                      emphasis={isChampionSingle}
-                      onOpen={() => onOpenPicker(teamId)}
-                      onRemove={() => onRemove(teamId)}
-                    />
-                  );
-                })
-              )}
-              {Array.from(
-                { length: Math.max(0, band.target - teamIds.length) },
-                (_, i) => (
-                  <span
-                    key={`ghost-${i}`}
-                    aria-hidden
-                    className={ghostSocket()}
-                  >
-                    empty
-                  </span>
-                ),
-              )}
-            </div>
+            <CardShell>
+              <BandCardHeader
+                band={band}
+                filled={filled}
+                mismatch={mismatch}
+                onClear={() => onClearBand(band.key)}
+                clearing={clearing}
+              />
+              <CardShellBody>
+                <div className={`grid ${bandGridCols(band)} gap-1.5`}>
+                  {teamIds.length === 0 ? (
+                    <p className="col-span-full text-sm text-ink/40">
+                      {band.key === "champion"
+                        ? "Call a champion to fill this slot."
+                        : "-"}
+                    </p>
+                  ) : (
+                    teamIds.map((teamId, index) => {
+                      const team = teamsById.get(teamId);
+                      if (!team) return null;
+                      const isExcess = isOverfull && index >= band.target;
+                      return (
+                        <TeamCard
+                          key={teamId}
+                          team={team}
+                          bandLabel={band.label}
+                          tone={
+                            isExcess ? "excess" : mismatch ? "mismatch" : "ok"
+                          }
+                          busy={busyTeamId === team.id}
+                          removing={removingIds.has(teamId)}
+                          emphasis={isChampionSingle}
+                          onOpen={() => onOpenPicker(teamId)}
+                          onRemove={() => onRemove(teamId)}
+                        />
+                      );
+                    })
+                  )}
+                  {Array.from(
+                    { length: Math.max(0, band.target - teamIds.length) },
+                    (_, i) => (
+                      <span
+                        key={`ghost-${i}`}
+                        aria-hidden
+                        className={ghostSocket()}
+                      >
+                        empty
+                      </span>
+                    ),
+                  )}
+                </div>
+              </CardShellBody>
+            </CardShell>
           </div>
         );
       })}
@@ -1079,9 +1083,9 @@ function SwapChooser({
       >
         ← Back
       </button>
-      <p className="mb-2 text-sm font-bold text-ink">
-        <span aria-hidden>{meta.emoji}</span> {bandInfo?.label} is full -- swap
-        with:
+      <p className="mb-2 flex items-center gap-1.5 text-sm font-bold text-ink">
+        <meta.Icon className="size-4" aria-hidden />
+        {bandInfo?.label} is full -- swap with:
       </p>
       <div className="flex flex-col gap-2">
         {occupantIds.map((id) => {
@@ -1094,12 +1098,38 @@ function SwapChooser({
               onClick={() => onChoose(id)}
               className="flex items-center gap-2 rounded-btn border border-paper-line bg-white px-3 py-2 text-left transition hover:border-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
-              <TeamBadge team={team} />
+              <TeamIdentity team={team} />
             </button>
           );
         })}
       </div>
     </div>
+  );
+}
+
+/** A full-width bordered footer action -- the picker sheet's equivalent of
+ * TippedMatchCard.tsx's `ChangeButton` (issue #107): a real control in the
+ * card's own footer slot, not bare centered text. Kept neutral rather than
+ * accent-tinted -- both uses here (Cancel, Call later) are dismissive
+ * actions, not the considered "Change" action that pattern was styled for. */
+function FooterButton({
+  onClick,
+  disabled,
+  children,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="flex h-9 w-full items-center justify-center rounded-btn-sm border border-paper-line bg-white text-[0.8rem] font-bold tracking-wide text-ink/60 uppercase transition hover:border-ink/25 hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {children}
+    </button>
   );
 }
 
@@ -1136,42 +1166,45 @@ function Picker({
   const isReconsider = fromBand !== null;
 
   return (
-    <div className="grid max-h-[92svh] grid-rows-[auto_auto_auto_1fr_auto] overflow-hidden rounded-t-card border border-paper-line bg-white shadow-[0_-10px_30px_-15px_rgba(18,60,67,0.35)] md:max-h-[85svh] md:rounded-card md:shadow-[0_10px_24px_-12px_rgba(18,60,67,0.28)]">
-      <div className="flex justify-center pt-3 pb-1 md:hidden" aria-hidden>
-        <span className="h-1 w-10 rounded-full bg-paper-line" />
-      </div>
+    <div className="grid max-h-[92svh] grid-rows-[auto_auto_1fr_auto] overflow-hidden rounded-t-card shadow-[0_-10px_30px_-15px_rgba(18,60,67,0.35)] md:max-h-[85svh] md:rounded-card md:shadow-[0_10px_24px_-12px_rgba(18,60,67,0.28)]">
+      <CardShellHeader className="gap-2">
+        <div className="flex justify-center pt-1 pb-0.5 md:hidden" aria-hidden>
+          <span className="h-1 w-10 rounded-full bg-paper/30" />
+        </div>
+        <div className="flex items-center justify-between">
+          <p className="text-[0.7rem] leading-normal font-bold tracking-wide text-paper/60 uppercase">
+            {isReconsider ? "Move this team" : "Where do they finish?"}
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="-my-3 -mr-2 flex h-11 w-11 items-center justify-center text-paper/50 hover:text-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            &times;
+          </button>
+        </div>
+        <div className="flex items-center gap-2.5 rounded-btn bg-paper/10 px-3 py-2">
+          <ClubCodeBadge
+            shortCode={team.shortCode}
+            fill={teamFill(team.shortCode)}
+          />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[0.95rem] font-bold text-paper">
+              {team.name}
+            </span>
+            <span className="block text-xs text-paper/60">{context}</span>
+          </span>
+        </div>
+      </CardShellHeader>
 
-      <div className="flex items-center justify-between px-4 pt-1 pb-1 md:px-4 md:pt-4">
-        <p className="text-[0.7rem] leading-normal font-bold tracking-wide text-ink/50 uppercase">
-          {isReconsider ? "Move this team" : "Where do they finish?"}
-        </p>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          className="-my-3 -mr-2 flex h-11 w-11 items-center justify-center text-ink/40 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        >
-          &times;
-        </button>
-      </div>
-
-      <div className="relative mx-3.5 mt-1.5 overflow-hidden rounded-card border border-paper-line bg-paper p-2 text-center md:mx-4 md:mt-2 md:p-3.5">
-        <span
-          aria-hidden
-          className="absolute inset-x-0 top-0 h-1"
-          style={stripeStyle(c1, c2, 90)}
-        />
-        <p className="text-[0.95rem] font-bold text-ink md:text-[1.1rem]">
-          <TeamBadge team={team} />
-        </p>
-        <p className="mt-0.5 text-xs text-ink/60">{context}</p>
-      </div>
+      <CardShellSeam segments={[{ fill: c1 }, { fill: c2 }]} />
 
       {/* This row is the grid's 1fr track -- it's the only one allowed to
           shrink, so it (not the whole sheet) is what scrolls. CSS Grid's 1fr
           tracks shrink correctly without flexbox's "min-height: auto" trap,
           which is what silently broke scrolling in earlier attempts here. */}
-      <div className="relative min-h-0">
+      <div className="relative min-h-0 bg-white">
         <div className="h-full overflow-y-auto px-3.5 py-2 md:px-4 md:py-3">
           {swapChooserBand ? (
             <SwapChooser
@@ -1198,13 +1231,14 @@ function Picker({
                       disabled={disabled || isCurrent}
                       onClick={() => onChooseBand(band.key)}
                       aria-label={`Place ${team.name} in ${band.label}`}
-                      className={`${bandPickerRow({ tone: meta.tone })} ${
+                      className={`${bandPickerRow} ${
                         isCurrent ? "ring-2 ring-accent/50" : ""
                       }`}
                     >
-                      <span className="text-xl" aria-hidden>
-                        {meta.emoji}
-                      </span>
+                      <meta.Icon
+                        className="size-5 shrink-0 text-ink/60"
+                        aria-hidden
+                      />
                       <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink">
                         {band.label}
                       </span>
@@ -1213,11 +1247,7 @@ function Picker({
                           Here
                         </span>
                       ) : (
-                        <FillDots
-                          filled={filled}
-                          target={band.target}
-                          tone={meta.tone}
-                        />
+                        <FillDots filled={filled} target={band.target} />
                       )}
                     </button>
                   </div>
@@ -1233,25 +1263,14 @@ function Picker({
       </div>
 
       {!swapChooserBand ? (
-        <div className="px-3.5 pb-2.5 md:px-4 md:pb-3.5">
+        <div className="bg-white px-3.5 pb-3 md:px-4 md:pb-3.5">
           {!isReconsider && onLater ? (
-            <button
-              type="button"
-              onClick={onLater}
-              disabled={disabled}
-              className="w-full text-center text-sm font-bold text-ink/50 hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
-            >
+            <FooterButton onClick={onLater} disabled={disabled}>
               Not sure? Call them later
-            </button>
+            </FooterButton>
           ) : null}
           {isReconsider ? (
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-full text-center text-sm font-bold text-ink/50 hover:text-ink"
-            >
-              Cancel
-            </button>
+            <FooterButton onClick={onClose}>Cancel</FooterButton>
           ) : null}
         </div>
       ) : null}
@@ -1275,29 +1294,33 @@ function BandSummary({
         return (
           <div key={band.key}>
             {band.key === "relegated" ? <DropDivider /> : null}
-            <BandHeader
-              band={band}
-              filled={Math.min(teamIds.length, band.target)}
-            />
-            <div className={`mt-2 grid ${bandGridCols(band)} gap-1.5`}>
-              {teamIds.length === 0 ? (
-                <span className="text-sm text-ink/40">-</span>
-              ) : (
-                teamIds.map((teamId) => {
-                  const team = teamsById.get(teamId);
-                  if (!team) return null;
-                  return (
-                    <TeamCard
-                      key={teamId}
-                      team={team}
-                      tone="readonly"
-                      bandLabel={band.label}
-                      emphasis={isChampion && teamIds.length === 1}
-                    />
-                  );
-                })
-              )}
-            </div>
+            <CardShell>
+              <BandCardHeader
+                band={band}
+                filled={Math.min(teamIds.length, band.target)}
+              />
+              <CardShellBody>
+                <div className={`grid ${bandGridCols(band)} gap-1.5`}>
+                  {teamIds.length === 0 ? (
+                    <span className="text-sm text-ink/40">-</span>
+                  ) : (
+                    teamIds.map((teamId) => {
+                      const team = teamsById.get(teamId);
+                      if (!team) return null;
+                      return (
+                        <TeamCard
+                          key={teamId}
+                          team={team}
+                          tone="readonly"
+                          bandLabel={band.label}
+                          emphasis={isChampion && teamIds.length === 1}
+                        />
+                      );
+                    })
+                  )}
+                </div>
+              </CardShellBody>
+            </CardShell>
           </div>
         );
       })}
@@ -1382,7 +1405,7 @@ function SealedMoment({
           shown ? "scale-100 opacity-100" : "scale-75 opacity-0"
         }`}
       >
-        <div className="text-5xl">🏆</div>
+        <Trophy className="mx-auto size-12 text-accent" aria-hidden />
         <p className="mt-2 text-xl font-extrabold text-ink">
           You&apos;re locked in!
         </p>
@@ -1390,8 +1413,9 @@ function SealedMoment({
           Submitted -- you can keep editing until Gameweek 1 kicks off.
         </p>
         {champion ? (
-          <div className="mt-3 inline-flex items-center gap-2 rounded-btn bg-success/10 px-3 py-2 text-sm font-bold text-ink">
-            🏆 <TeamBadge team={champion} /> to win it all
+          <div className="mt-3 inline-flex items-center gap-2 rounded-btn bg-accent/10 px-3 py-2 text-sm font-bold text-ink">
+            <Trophy className="size-4 shrink-0 text-accent" aria-hidden />
+            <TeamIdentity team={champion} /> to win it all
           </div>
         ) : null}
       </div>
