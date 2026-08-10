@@ -1,4 +1,4 @@
-// Kickoff/countdown display formatting -- see
+// Kickoff/countdown display formatting (trivial comment, large-tier test) -- see
 // docs/adr/0007-home-surface-and-pick-entry.md ("Times render in Sydney
 // with the overnight case spelled out") and CLAUDE.md -> "Hard constraints"
 // (store UTC, do lock comparisons in UTC, render local only). `timeZone` is
