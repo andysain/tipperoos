@@ -30,22 +30,127 @@
 // second-guessing step; a lane's block/fix is trusted directly in that case.
 //
 // Skips entirely on `main` or when there's no diff against it -- fast
-// no-op for the common case. Not cached across pushes: iterating with
-// several small pushes to the same branch re-reviews the accumulated diff
-// each time. Acceptable at this project's scale; revisit if it gets
-// annoying.
+// no-op for the common case.
+//
+// Incremental re-review: a per-branch "last reviewed SHA" is recorded
+// locally (.git/tipperoos-review-state.json, never committed) after a run
+// where every lane came back clean. The *next* push on that branch only
+// sends lanes the diff since that SHA, not the whole PR again -- several
+// small pushes iterating on the same branch no longer re-pay for the
+// already-reviewed portion. Falls back to the full merge-base diff if the
+// recorded SHA isn't an ancestor of HEAD anymore (rebase, branch reuse,
+// force-push) or isn't recorded yet. State is only written on the fully
+// clean path -- a run that blocked or fixed something must not mark
+// anything as reviewed, since the next push still needs to re-check it.
+//
+// Tiering: lane selection scales with blast radius, judged by *which
+// files* the diff-under-review touches, not diff size -- a one-line change
+// to lock-time comparison is high-risk at 1 line; a 200-line pure-styling
+// diff is low-risk regardless of size. See LARGE_RISK_PATTERNS /
+// LOW_RISK_PATTERNS below.
+//   - Large (touches src/lib/**, src/app/api/**, supabase/migrations/**,
+//     or the session-cookie module): all 3 lanes, run separately, as
+//     before -- this is the CODEOWNERS-gated/security-named surface.
+//   - Medium (default -- anything not caught by the large or low
+//     patterns): 2 calls -- correctness + spec-conformance combined into
+//     one call, security kept standalone. Security is never merged with
+//     another lane at any tier: CLAUDE.md names it as this app's single
+//     biggest security invariant and its lane is a fixed checklist
+//     (client-side Supabase, lock enforcement, cookie flags, PIN hashing,
+//     kid-friendly copy) that's cheap to run focused and the likeliest to
+//     silently drop a checklist item if diluted into a broader pass.
+//   - Low (every changed file matches LOW_RISK_PATTERNS -- currently just
+//     src/components/ui/**, pure presentational primitives): all 3 lanes
+//     combined into a single call.
+// The trigger-path lists are the maintenance cost of this scheme: they
+// need updating whenever the app grows a new sensitive area (a new API
+// route directory, a new src/lib/** module) or a new safely-low-risk one --
+// an unclassified new src/lib/** file silently reviewed at Medium tier is
+// exactly the failure mode this tiering could introduce if the lists rot.
 
 import { execSync, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, unlinkSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const LANES = ["correctness", "security", "spec-conformance"];
 const REVIEW_DIR = ".github/claude/review";
+const STATE_FILE = ".git/tipperoos-review-state.json";
 const READ_ONLY_TOOLS =
   "Read,Grep,Glob,Bash(git show *),Bash(git diff *),Bash(git log *)";
 const LANE_TOOLS =
   "Read,Grep,Glob,Edit,Write,Bash(git add *),Bash(git commit *),Bash(git diff *),Bash(git log *),Bash(git status),Bash(npm run typecheck),Bash(npm run lint),Bash(npm run test),Bash(npm run build)";
+
+// Order matters only for readability of the concatenated prompt.
+const LARGE_RISK_PATTERNS = [
+  /^src\/lib\//,
+  /^src\/app\/api\//,
+  /^supabase\/migrations\//,
+  /^src\/app\/_lib\/session-cookie\.ts$/,
+];
+const LOW_RISK_PATTERNS = [/^src\/components\/ui\//];
+
+function classifyTier(changedFiles) {
+  if (changedFiles.some((f) => LARGE_RISK_PATTERNS.some((p) => p.test(f)))) {
+    return "large";
+  }
+  if (changedFiles.every((f) => LOW_RISK_PATTERNS.some((p) => p.test(f)))) {
+    return "low";
+  }
+  return "medium";
+}
+
+// Each group is one `claude` call. `name` is used for logging and the
+// block-file name; `lanes` are concatenated into one prompt.
+function buildGroups(tier) {
+  if (tier === "large") {
+    return LANES.map((lane) => ({ name: lane, lanes: [lane] }));
+  }
+  if (tier === "low") {
+    return [{ name: "combined", lanes: [...LANES] }];
+  }
+  return [
+    {
+      name: "correctness+spec-conformance",
+      lanes: ["correctness", "spec-conformance"],
+    },
+    { name: "security", lanes: ["security"] },
+  ];
+}
+
+function readState() {
+  if (!existsSync(STATE_FILE)) return {};
+  try {
+    return JSON.parse(readFileSync(STATE_FILE, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+function writeState(state) {
+  try {
+    writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
+  } catch {
+    // Non-fatal -- worst case the next push just re-reviews from scratch.
+  }
+}
+
+function isAncestor(sha, ref) {
+  try {
+    execSync(`git merge-base --is-ancestor ${sha} ${ref}`, {
+      stdio: "ignore",
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function run(cmd) {
   return execSync(cmd, { encoding: "utf8" }).trim();
@@ -160,12 +265,29 @@ try {
   process.exit(0);
 }
 
-const diff = run(`git diff ${base}...HEAD`);
+const head = run("git rev-parse HEAD");
+const state = readState();
+const lastReviewed = state[branch];
+
+// Only narrow the review range if the recorded SHA is still an ancestor of
+// HEAD (a rebase or force-push invalidates it) and there's actually
+// something new since then -- otherwise fall back to the full PR diff.
+let reviewBase = base;
+let incremental = false;
+if (lastReviewed && lastReviewed !== head && isAncestor(lastReviewed, "HEAD")) {
+  reviewBase = lastReviewed;
+  incremental = true;
+}
+
+const diff = run(`git diff ${reviewBase}...HEAD`);
 if (!diff.trim()) {
+  console.log(
+    "local-pr-review: nothing new since the last clean review, skipping.",
+  );
   process.exit(0);
 }
 
-const changedFiles = run(`git diff --name-only ${base}...HEAD`)
+const changedFiles = run(`git diff --name-only ${reviewBase}...HEAD`)
   .split("\n")
   .filter(Boolean);
 const docsOnly = changedFiles.every((file) => file.endsWith(".md"));
@@ -174,6 +296,16 @@ if (docsOnly) {
     "local-pr-review: docs-only diff -- lanes still run, verify pass skipped.",
   );
 }
+if (incremental) {
+  console.log(
+    `local-pr-review: reviewing only the diff since the last clean review (${lastReviewed.slice(0, 7)}), not the whole PR again.`,
+  );
+}
+
+const tier = classifyTier(changedFiles);
+console.log(
+  `local-pr-review: tier = ${tier} (${changedFiles.length} file${changedFiles.length === 1 ? "" : "s"} changed).`,
+);
 
 const workDir = mkdtempSync(join(tmpdir(), "tipperoos-review-"));
 const sharedContext = [
@@ -191,23 +323,32 @@ const procedure = readFileSync(join(REVIEW_DIR, "local-procedure.md"), "utf8");
 let blocked = false;
 let fixed = false;
 
-for (const lane of LANES) {
-  const blockFile = join(workDir, `block-${lane}.txt`);
+for (const group of buildGroups(tier)) {
+  const blockFile = join(workDir, `block-${group.name}.txt`);
+  const laneDocs = group.lanes
+    .map((lane) => readFileSync(join(REVIEW_DIR, `${lane}.md`), "utf8"))
+    .join("\n\n");
+  const multiLane = group.lanes.length > 1;
   const prompt = [
     sharedContext,
-    readFileSync(join(REVIEW_DIR, `${lane}.md`), "utf8"),
+    multiLane
+      ? `You are covering ${group.lanes.length} review lanes in this single pass (tier: ${tier}) -- give each the same attention as if it ran alone; don't let one lane's checklist crowd out another's.`
+      : "",
+    laneDocs,
     `Your block-file path if you need it (see the procedure below): ${blockFile}`,
     procedure,
-  ].join("\n\n");
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
   const headBefore = run("git rev-parse HEAD");
 
-  console.log(`\n--- ${lane} lane ---`);
+  console.log(`\n--- ${group.name} ${multiLane ? "lanes" : "lane"} ---`);
   const result = callClaude(prompt, LANE_TOOLS);
 
   if (result.status !== 0) {
     console.error(
-      `local-pr-review: ${lane} lane's claude invocation failed (exit ${result.status}) -- not blocking the push on a tooling failure, but worth checking why.`,
+      `local-pr-review: ${group.name} lane's claude invocation failed (exit ${result.status}) -- not blocking the push on a tooling failure, but worth checking why.`,
     );
     continue;
   }
@@ -220,25 +361,25 @@ for (const lane of LANES) {
     continue;
   }
 
-  // Verified independently, not as mutually exclusive cases -- a lane can
+  // Verified independently, not as mutually exclusive cases -- a group can
   // legitimately both fix one thing and block on a separate thing it
   // couldn't safely fix in the same run. Treating them as either/or here
   // used to mean a co-occurring fix silently skipped verification whenever
   // a block was also present.
   if (laneBlocked) {
     if (docsOnly) {
-      console.log(`  ${lane}'s block trusted as-is (docs-only diff).`);
+      console.log(`  ${group.name}'s block trusted as-is (docs-only diff).`);
       blocked = true;
     } else {
-      console.log(`\n--- verifying ${lane} lane's block ---`);
-      const finding = `The ${lane} lane flagged a blocking issue it could not safely fix:\n\n${readFileSync(blockFile, "utf8")}`;
+      console.log(`\n--- verifying ${group.name}'s block ---`);
+      const finding = `The ${group.name} lane(s) flagged a blocking issue it could not safely fix:\n\n${readFileSync(blockFile, "utf8")}`;
       const verdict = parseVerdict(verify(sharedContext, finding), "CONFIRMED");
       if (verdict === "CONFIRMED") {
-        console.log(`  verify: ${lane}'s block confirmed.`);
+        console.log(`  verify: ${group.name}'s block confirmed.`);
         blocked = true;
       } else {
         console.log(
-          `  verify: ${lane}'s block rejected on independent review -- not blocking the push on it.`,
+          `  verify: ${group.name}'s block rejected on independent review -- not blocking the push on it.`,
         );
         unlinkSync(blockFile);
       }
@@ -247,18 +388,18 @@ for (const lane of LANES) {
 
   if (laneCommitted) {
     if (docsOnly) {
-      console.log(`  ${lane}'s fix trusted as-is (docs-only diff).`);
+      console.log(`  ${group.name}'s fix trusted as-is (docs-only diff).`);
       fixed = true;
     } else {
-      console.log(`\n--- verifying ${lane} lane's fix ---`);
-      const finding = `The ${lane} lane committed the following fix:\n\n\`\`\`\n${run("git show HEAD")}\n\`\`\``;
+      console.log(`\n--- verifying ${group.name}'s fix ---`);
+      const finding = `The ${group.name} lane(s) committed the following fix:\n\n\`\`\`\n${run("git show HEAD")}\n\`\`\``;
       const verdict = parseVerdict(verify(sharedContext, finding), "REJECTED");
       if (verdict === "CONFIRMED") {
-        console.log(`  verify: ${lane}'s fix confirmed.`);
+        console.log(`  verify: ${group.name}'s fix confirmed.`);
         fixed = true;
       } else {
         console.log(
-          `  verify: ${lane}'s fix rejected on independent review -- reverting it.`,
+          `  verify: ${group.name}'s fix rejected on independent review -- reverting it.`,
         );
         run(`git reset --hard ${headBefore}`);
       }
@@ -279,5 +420,10 @@ if (fixed) {
   );
   process.exit(1);
 }
+
+// Only the fully-clean path records progress -- a blocked/fixed run exits
+// above without reaching here, so the next push still re-reviews from the
+// same point rather than skipping past unresolved or just-fixed work.
+writeState({ ...state, [branch]: run("git rev-parse HEAD") });
 
 console.log("\nlocal-pr-review: all lanes clean.");
