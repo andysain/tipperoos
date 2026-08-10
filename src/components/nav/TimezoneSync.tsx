@@ -6,7 +6,7 @@ import {
   detectBrowserTimeZone,
   readCookieValue,
   TIMEZONE_COOKIE_NAME,
-} from "@/lib/dates/timezone-cookie";
+} from "./timezone-cookie";
 
 // A preference, not a session -- long-lived, no expiry logic needed (see
 // CLAUDE.md's session cookie, which is the opposite: no max-age at all,

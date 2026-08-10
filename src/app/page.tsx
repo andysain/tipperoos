@@ -11,10 +11,6 @@ import {
   loadSeasonStats,
 } from "@/app/_lib/pick-board-access";
 import { isMatchLocked, resolveCompetitionId } from "@/lib/competitions/scope";
-import {
-  DEFAULT_TIME_ZONE,
-  TIMEZONE_COOKIE_NAME,
-} from "@/lib/dates/timezone-cookie";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { GameweekHeader } from "@/components/pick-board/GameweekHeader";
 import { LastWeekStrip } from "@/components/pick-board/LastWeekStrip";
@@ -22,6 +18,10 @@ import { PickBoardSlotCard } from "@/components/pick-board/PickBoardSlotCard";
 import { SeasonStatsBlock } from "@/components/pick-board/SeasonStatsBlock";
 import { StatsStrip } from "@/components/pick-board/StatsStrip";
 import { TablePredictionPrompt } from "@/components/pick-board/TablePredictionPrompt";
+import {
+  DEFAULT_TIME_ZONE,
+  TIMEZONE_COOKIE_NAME,
+} from "@/components/nav/timezone-cookie";
 
 // The current gameweek is derived per request (docs/adr/0007), never
 // cached -- this route has to be as fresh as the resolver it calls. Also

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { PinInput } from "@/components/ui/PinInput";
 import { TextField } from "@/components/ui/TextField";
-import { detectBrowserTimeZone } from "@/lib/dates/timezone-cookie";
+import { detectBrowserTimeZone } from "@/components/nav/timezone-cookie";
 
 const STORED_CODE_KEY = "tipperoos.competitionCode";
 

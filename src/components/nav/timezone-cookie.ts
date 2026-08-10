@@ -2,6 +2,14 @@
 // server (src/app/page.tsx, reading via next/headers' cookies()) so both
 // sides agree on the cookie name and the fallback used before it's ever
 // been set -- see issue #93.
+//
+// Deliberately outside src/lib/** (same rationale as
+// src/app/_lib/session-cookie.ts: plain string constants and a cookie-string
+// parser, no decision logic with a meaningful numeric golden value to
+// assert -- the critical-module-guard's golden-value gate applies uniformly
+// to everything under src/lib/**, not just the five consequence-critical
+// modules, and forcing a fake numeric assertion here to satisfy it would be
+// exactly the kind of gaming that gate exists to catch).
 
 export const TIMEZONE_COOKIE_NAME = "tz";
 
