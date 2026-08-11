@@ -5,17 +5,12 @@ import {
   getPlayerForTablePrediction,
   getTablePredictionEditabilityForPlayer,
 } from "@/app/_lib/table-prediction-access";
-import {
-  type BandKey,
-  validateBandCounts,
-} from "@/lib/table-predictions/rules";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 // Marks the current band assignment as submitted -- re-submittable any
-// number of times until Gameweek 1's first kickoff (CLAUDE.md). Requires
-// every Band to exactly match its target size first (the "flagged and fixed
-// via tap-team -> move-to-Band ... before submission is allowed" rule from
-// docs/adr/0003-predict-the-table-shape.md).
+// number of times until Gameweek 1's first kickoff (CLAUDE.md). Submit never
+// blocks on an untidy table; a wrongly-sized Band simply forfeits that
+// Band's Bonus (docs/adr/0008-predict-the-table-group-fill-capture.md).
 export async function POST(request: Request) {
   if (!hasCsrfHeader(request)) {
     return NextResponse.json({ error: "Forbidden." }, { status: 403 });
@@ -64,35 +59,6 @@ export async function POST(request: Request) {
   if (!prediction) {
     return NextResponse.json(
       { error: "Sort some teams into Bands before submitting." },
-      { status: 400 },
-    );
-  }
-
-  const { data: ranks, error: ranksError } = await supabase
-    .from("table_prediction_ranks")
-    .select("band")
-    .eq("table_prediction_id", prediction.id);
-  if (ranksError) {
-    return NextResponse.json(
-      { error: "Couldn't load your table prediction -- try again." },
-      { status: 500 },
-    );
-  }
-
-  const counts: Partial<Record<BandKey, number>> = {};
-  for (const rank of ranks ?? []) {
-    const band = rank.band as BandKey;
-    counts[band] = (counts[band] ?? 0) + 1;
-  }
-
-  const validation = validateBandCounts(counts);
-  if (!validation.ok) {
-    return NextResponse.json(
-      {
-        error: "Every Band needs to match its target size before submitting.",
-        mismatches: validation.mismatches,
-        unsortedCount: validation.unsortedCount,
-      },
       { status: 400 },
     );
   }
