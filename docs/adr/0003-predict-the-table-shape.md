@@ -1,5 +1,12 @@
 # Predict the Table: band-sort capture UI, band-distance scoring, standalone from Season Total
 
+> **Partly superseded by `0008-predict-the-table-group-fill-capture.md`.** The band
+> structure, band-distance scoring, standalone-from-Season-Total decision, no-crest
+> constraint, and the rejection of drag-and-drop all still stand. Everything below about the
+> Picker, the calling queue, swapping, remove-and-requeue, and the Clear actions — including
+> the build-update entries that fix them — is history: the capture flow now iterates per
+> group, not per team. Read 0008 first.
+
 Issue #25 deferred the Predict the Table capture/scoring shape until build time, flagging that a full 20-item mobile drag-reorder is meaningfully harder to build than the alternative. Three divergent capture concepts were prototyped in a grilling session (tap-efficient default-and-bucket editor, delight-focused card-swipe draft, zero-drag sequential single-pick draft) and synthesized: players freely sort all 20 teams into 7 fixed Table Bands (Champion, Champions League, Europe, Mid Table, Lower Table, Relegation Battle, Relegated) via a single-card swipe/tap gesture against static Band targets. Sorting is free-form — a Band may be temporarily over- or under-filled — with any mismatched Band flagged and corrected via a tap-team → move-to-Band action before submission. No drag-and-drop reordering exists anywhere in this feature.
 
 Because scoring only ever depends on Band placement, not fine position, the order within a Band is incidental (whatever order the player assigned it in) rather than a genuine ranking signal — "full 20-team ordering" is captured in name (per the storage principle already established), but only the Band-membership portion carries predictive meaning today.
