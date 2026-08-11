@@ -1,0 +1,129 @@
+# Build order — Minimum Launch, Gameweek 1 (2026-08-21)
+
+Working checklist for the **Minimum Launch — Gameweek 1** milestone. Not committed; scratch file.
+
+Launch is defined as: _a player logs in, lands on the Pick Board, sees gameweek 1's two auto-selected Tipped Matches, and files a scoreline that a server-side lock enforces._ Source of truth for scope is `BUILD_PLAN.md` decision 42; the design decisions are `docs/adr/0006-auto-selected-tipped-matches.md` and `docs/adr/0007-home-surface-and-pick-entry.md`.
+
+```
+#87 ──> #15 ──> #16          critical path (4 deep)
+              └> #90
+#18 ──> #19 ──> #89 ──┘
+#86 ──────────────────┘
+#88 (migration, standalone)
+#11 (sync cadence — see gap below)
+```
+
+---
+
+## Per-issue workflow (every item below)
+
+Per `AGENTS.md`:
+
+1. `git fetch && git rebase origin/main`, one worktree per issue, branch from `origin/main`.
+2. Re-run the **current-state check** (`docs/standards/ISSUE_STANDARD.md` §4) before writing code — several of these issues already have partial implementations upstream.
+3. Tests per `docs/standards/TESTING_STANDARD.md` §1; golden values where the issue says so.
+4. Validation sequence, then **open the Preview URL and exercise the flow yourself**.
+5. PR with a plain-language **TL;DR** first line, then `gh pr merge --auto --squash`.
+6. Delete the worktree and branch the moment the PR merges.
+
+Anything touching `src/lib/**` needs your explicit approval before merge (CODEOWNERS) — in this set that's **#16**, and likely **#18**/**#19**/**#86** depending on where the pure logic lands.
+
+---
+
+## Wave 1 — four in parallel, all `status: ready`
+
+- [x] **#88 — Team league-position store + standings fetch**
+
+  _Only migration in the set. Run it alone so nothing races it in `supabase/migrations/**`._
+  **Migration discipline (`CLAUDE.md` → Stack):** apply to staging → confirm → apply to production → only then merge the branch that depends on it.
+
+- [x] **#87 — Kickoff and countdown display formatting (Sydney)**
+
+  _Head of the critical path. #15 cannot start without it._
+
+- [x] **#86 — Shared current-gameweek resolver**
+
+  _No dependents until #90._
+
+- [x] **#18 — Match 1: Top Matchup auto-selection rule**
+
+  _Head of the selection chain. Pure logic; positions are an input, so it does not wait on #88._
+
+## Wave 2 — two in parallel
+
+- [x] **#19 — Match 2: uniform-random rule** (after #18)
+- [x] **#15 — Tipped Match card + pick save/edit route** (after #87)
+
+  _Decide optimistic-vs-awaited filing deliberately here — the deferred offline/retry states constrain this route's contract, so reversing it later means changing the signature._
+
+## Wave 3 — two in parallel
+
+- [x] **#16 — Server-side 5-minute pre-kickoff lock** (after #15)
+
+  _The one launch item that must be **correct**, not merely present. The predicate `isMatchLocked` already exists in `src/lib/competitions/scope.ts` (#80) — reuse it; this issue owes enforcement on the **write** path._
+
+- [x] **#89 — Gameweek 1 Tipped Match seed script** (after #18, #19)
+
+## Wave 4 — one
+
+- [x] **#90 — Pick Board route (`/`)** (after #86, #87, #15)
+
+  _Also needs #89 in practice: no gameweek exists to render or to exercise on Preview until the seed script has run._
+  _Includes the login redirect — login currently dead-ends into `/predict-table`._
+
+---
+
+## Open gap to resolve before wave 1
+
+- [ ] **#11 — GitHub Actions sync workflow.** Already `launch-critical` but sitting in _Fixtures &amp; Results Sync_, not the launch milestone. Two reasons it belongs in wave 1:
+  - #88's standings fetch is written as "wired into the existing sync cadence" — and that cadence does not exist yet.
+  - Kickoff times drive lock times, so a rescheduled gameweek-1 fixture with no sync locks at the wrong moment.
+
+  **Decision needed:** move #11 into the launch milestone and build it in wave 1, or ship #88 as a route the seed script invokes manually for day one (works, but leaves kickoff drift unhandled).
+
+---
+
+## Second deadline on the same date
+
+- [ ] **#26 — Predict the Table capture UI.** The table locks at gameweek 1's first kickoff and can never be captured afterwards except by late joiners. Labelled `cut-if-behind`, which reads as slippable — it isn't, beyond a few days. **Run as an independent track, not after the picks work.**
+
+## Pre-kickoff, not tracked as issues
+
+- [x] Run the #89 seed script against **production**, not only staging.
+- [x] Confirm production and staging schemas match (no drift from #88's migration).
+- [ ] Walk the deployed Production URL end to end as a real player: enter competition code → sign up → file both picks → re-edit one → confirm the other players' picks are not visible anywhere.
+- [ ] Confirm at least one other household can log in on their own device.
+
+---
+
+## After launch, in order
+
+1. **#21 — Additive scoring engine.** Within days, not weeks: gameweek 1's results land 21–23 August and the Pick Board shows no points, rank or last-week strip until this runs.
+2. **#23 — Per-gameweek standings snapshot.** Lights up rank and the last-week strip on `/`.
+3. **#92 — Per-gameweek selection runner.** Hard deadline of gameweek 2, roughly 28 August.
+4. **#91 — Match Centre** (+ **#17** visibility rule). The read-path `picksForMatch` already exists; this is the surface that consumes it.
+5. **#24 — Leaderboard view.**
+6. **#28 / #29 / #30 — Transactional email + the two sends.** `CLAUDE.md` calls the post-result push the highest-leverage retention lever in the product; don't let it drift behind the reminder.
+7. **#35 — Bot picks** (Random, 1-1, Median).
+8. **#33 — Postponement-void handling**, plus the Skipped Slot and Voided Match card states, which are still undrawn (`docs/adr/0007-home-surface-and-pick-entry.md` → _Deferred_).
+
+## Still deferred, deliberately
+
+Offline/retry states for the filing stamp · the ambient countdown treatment · remembering the `5+` row per player · the last-place Picker mechanic (#20, closed — reopen to revive) · Superadmin role · WhatsApp.
+
+# TO DO
+
+- [ ] PRE Launch
+  - [ ] When logging in remove the "**Welcome back, Test2345!** You're logged in. Let's Go" screen. Have it just go straight to the home page
+  - [ ] Need instructions on scoring and page helpers etc
+- [ ] POST Launch
+  - [ ] make it so text input is only single digit on 5+. currently just get a vague error about it. or just add an error messgae that value must be between 5-9
+
+# TO CHANGE/DECIDE
+
+- [ ] PRE LAUNCH
+  - [ ] Login with list of all players. Pivot this approach
+  - [ ] new predict the table input approach
+- [ ] POST Launch
+  - [ ] predict the table can be set until aug 31
+  - [ ] how to compare table predictions with other players/actual state
