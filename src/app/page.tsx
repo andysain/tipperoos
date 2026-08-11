@@ -78,13 +78,14 @@ export default async function PickBoardPage() {
     (!gameweekOneKickoff || now < gameweekOneKickoff);
 
   return (
-    // pr-14 clears SwitchPlayerButton (fixed top-3 right-3, size-10) -- it's
-    // fixed-positioned so it reserves no space on its own, and without this
-    // GameweekHeader's right-aligned "Locks from…" text renders underneath it.
+    // SwitchPlayerButton (fixed top-3 right-3, size-10) floats above content
+    // as it scrolls -- no reserved gutter (ADR-0005: the shell owns chrome,
+    // pages own content; the button's bg-paper + shadow make the overlay
+    // read as intentional rather than a rendering glitch).
     // md:max-w-4xl mx-auto matches predict-table's mobile/desktop pivot
     // (PredictTableFlow.tsx) -- one column on phone, room for two slot
     // cards side by side once there's a tablet/desktop-width viewport.
-    <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4 pr-14">
+    <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4">
       <h1 className="text-[1.9rem] font-extrabold text-ink">Pick Board</h1>
       <StatsStrip stats={seasonStats} />
       <LastWeekStrip summary={lastWeek} />
