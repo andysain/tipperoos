@@ -2,10 +2,13 @@
  * Predict the Table scoring — see CLAUDE.md's "Predict the Table" section
  * and docs/adr/0003-predict-the-table-shape.md for the full decision.
  *
- * Both `predictedOrder` and `actualOrder` are full 20-team orderings
- * (index 0 = 1st place), matching the "always store the full ordering"
- * rule. Only which Table Band a team's position falls into is ever read —
- * order within a Band carries no scoring weight.
+ * The predicted side is a team-to-Band assignment map: a prediction under
+ * docs/adr/0008-predict-the-table-group-fill-capture.md may have Bands of
+ * any size, a team left unplaced scores nothing, and a wrongly-sized Band
+ * simply forfeits its bonus. The actual side is the genuine 1-20 standings
+ * ordering (index 0 = 1st place) and must be exactly `TOTAL_TEAMS` long.
+ * Only which Table Band a team lands in is ever read — order within a Band
+ * carries no scoring weight.
  */
 
 export type TeamId = string;
@@ -76,29 +79,37 @@ function bandByTeam(order: readonly TeamId[]): Map<TeamId, number> {
 }
 
 export function scorePredictTable(
-  predictedOrder: readonly TeamId[],
+  predictedBands: Readonly<Map<TeamId, number>>,
   actualOrder: readonly TeamId[],
 ): PredictTableScoreResult {
-  if (
-    predictedOrder.length !== TOTAL_TEAMS ||
-    actualOrder.length !== TOTAL_TEAMS
-  ) {
+  if (actualOrder.length !== TOTAL_TEAMS) {
     throw new Error(
-      `expected ${TOTAL_TEAMS} teams in both orderings, got ${predictedOrder.length} predicted / ${actualOrder.length} actual`,
+      `expected ${TOTAL_TEAMS} teams in the actual ordering, got ${actualOrder.length}`,
     );
   }
 
-  const predictedBand = bandByTeam(predictedOrder);
   const actualBand = bandByTeam(actualOrder);
 
-  const teamScores: Record<TeamId, number> = {};
-  for (const team of actualOrder) {
-    const predicted = predictedBand.get(team);
-    const actual = actualBand.get(team);
-    if (predicted === undefined || actual === undefined) {
-      throw new Error(`team "${team}" is missing from the prediction`);
+  for (const [team, bandIndex] of predictedBands) {
+    if (
+      !Number.isInteger(bandIndex) ||
+      bandIndex < 0 ||
+      bandIndex >= TABLE_BANDS.length
+    ) {
+      throw new Error(
+        `team "${team}" has invalid predicted Band index ${bandIndex} (expected 0-${TABLE_BANDS.length - 1})`,
+      );
     }
-    teamScores[team] = teamScore(predicted, actual);
+    if (!actualBand.has(team)) {
+      throw new Error(`team "${team}" is not in the actual table`);
+    }
+  }
+
+  const teamScores: Record<TeamId, number> = {};
+  for (const [team, actual] of actualBand) {
+    const predicted = predictedBands.get(team);
+    teamScores[team] =
+      predicted === undefined ? 0 : teamScore(predicted, actual);
   }
 
   const bandBonuses: Record<string, number> = {};
@@ -107,7 +118,9 @@ export function scorePredictTable(
       actualOrder.filter((team) => actualBand.get(team) === bandIndex),
     );
     const predictedMembers = new Set(
-      predictedOrder.filter((team) => predictedBand.get(team) === bandIndex),
+      [...predictedBands.entries()]
+        .filter(([, index]) => index === bandIndex)
+        .map(([team]) => team),
     );
     const exactMatch =
       actualMembers.size === predictedMembers.size &&
