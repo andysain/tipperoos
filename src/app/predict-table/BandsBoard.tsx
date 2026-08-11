@@ -136,18 +136,22 @@ function RosterChip({
   );
 }
 
+// A collapsed Band is one tap target -- open it. An earlier version also
+// let you tap an individual team's code inline here to reconsider it
+// without opening the Band, but once a Band held several teams their
+// codes covered most of the row's width, crowding out the "open" tap and
+// making a filled Band feel impossible to get into. That shortcut was
+// redundant anyway -- the always-visible roster already reconsiders any
+// placed team, labelled with its current Band -- so it's gone; this row
+// only ever opens.
 function CollapsedBandRow({
   band,
   teams,
   onOpen,
-  onChipTap,
-  busyTeamId,
 }: {
   band: (typeof TABLE_BANDS)[number];
   teams: Team[];
   onOpen: () => void;
-  onChipTap: (teamId: string) => void;
-  busyTeamId: string | null;
 }) {
   const meta = BAND_META[band.key];
   const filled = teams.length;
@@ -164,29 +168,7 @@ function CollapsedBandRow({
       </span>
       <span className="min-w-0 flex-1 truncate text-[0.72rem] font-semibold text-ink/50">
         {teams.length
-          ? teams.map((t, i) => (
-              <span
-                key={t.id}
-                role="button"
-                tabIndex={0}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onChipTap(t.id);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    onChipTap(t.id);
-                  }
-                }}
-                aria-label={`Reconsider ${t.name}`}
-                className={`cursor-pointer hover:text-ink hover:underline ${busyTeamId === t.id ? "opacity-40" : ""}`}
-              >
-                {t.shortCode ?? t.name.slice(0, 3).toUpperCase()}
-                {i < teams.length - 1 ? " · " : ""}
-              </span>
-            ))
+          ? teams.map((t) => t.shortCode ?? t.name.slice(0, 3).toUpperCase()).join(" · ")
           : "—"}
       </span>
       <span
@@ -253,8 +235,6 @@ export function BandsBoard({
                 band={band}
                 teams={inBand}
                 onOpen={() => onOpenBand(band.key)}
-                onChipTap={onTapTeam}
-                busyTeamId={busyTeamId}
               />
             </div>
           );
