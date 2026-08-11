@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -29,14 +28,7 @@ interface Player {
   emoji: string | null;
 }
 
-type Step = "checking" | "code" | "list" | "pin" | "join" | "success";
-
-interface SuccessState {
-  kind: "login" | "join";
-  displayName: string;
-  emoji: string | null;
-  pinResetRequired?: boolean;
-}
+type Step = "checking" | "code" | "list" | "pin" | "join";
 
 // This page is "use client" and the lockout message only ever renders after
 // a client-side fetch response, so the viewer's browser timezone is read
@@ -79,6 +71,7 @@ export async function fetchPlayers(code: string): Promise<FetchPlayersResult> {
 
 function LoginFlow() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const wantsJoin = searchParams.get("intent") === "join";
 
   // Always starts at "checking" on both server and client. localStorage
@@ -107,8 +100,6 @@ function LoginFlow() {
   const [joinEmoji, setJoinEmoji] = useState<string | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [joinSubmitting, setJoinSubmitting] = useState(false);
-
-  const [success, setSuccess] = useState<SuccessState | null>(null);
 
   // On mount, silently replay a previously-verified code (if any) so a
   // returning player on the same device isn't asked for it again. Falls
@@ -212,13 +203,12 @@ function LoginFlow() {
         return;
       }
 
-      setSuccess({
-        kind: "login",
-        displayName: data.displayName,
-        emoji: data.emoji,
-        pinResetRequired: data.pinResetRequired,
-      });
-      setStep("success");
+      // Straight to the Pick Board -- no success interstitial. The session
+      // cookie is already set by this response, so `/` resolves the player
+      // without another round trip. (pin_reset_required is intentionally
+      // not surfaced here: the forced-PIN-reset flow isn't built yet, and
+      // this screen used to be a dead-end warning with no way forward.)
+      router.push("/");
     } catch {
       setPinError(
         "Couldn't reach Tipperoos. Check your connection and try again.",
@@ -267,12 +257,7 @@ function LoginFlow() {
         return;
       }
 
-      setSuccess({
-        kind: "join",
-        displayName: data.displayName,
-        emoji: data.emoji,
-      });
-      setStep("success");
+      router.push("/");
     } catch {
       setJoinError(
         "Couldn't reach Tipperoos. Check your connection and try again.",
@@ -293,40 +278,6 @@ function LoginFlow() {
     return (
       <main className="flex min-h-full flex-1 items-center justify-center bg-paper p-4">
         <p className="text-ink/60">Loading…</p>
-      </main>
-    );
-  }
-
-  if (step === "success" && success) {
-    return (
-      <main className="flex min-h-full flex-1 items-center justify-center bg-paper p-4">
-        <Card className="w-full max-w-sm text-center">
-          <div className="mb-2 text-5xl">{success.emoji ?? "⚽"}</div>
-          <h1 className="text-[1.9rem] font-extrabold text-ink">
-            {success.kind === "join"
-              ? `You're in, ${success.displayName}!`
-              : `Welcome back, ${success.displayName}!`}
-          </h1>
-          {success.pinResetRequired ? (
-            <p className="mt-2 text-warning">
-              You&apos;ll need to set a new PIN before you can keep going.
-            </p>
-          ) : (
-            <>
-              <p className="mt-2 text-ink/70">
-                {success.kind === "join"
-                  ? "You're all set and logged in — the pitch is waiting."
-                  : "You're logged in."}
-              </p>
-              <Link
-                href="/"
-                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-btn bg-accent px-5 py-3 text-[1.0625rem] font-bold text-accent-ink transition hover:brightness-105"
-              >
-                Let&apos;s go
-              </Link>
-            </>
-          )}
-        </Card>
       </main>
     );
   }
