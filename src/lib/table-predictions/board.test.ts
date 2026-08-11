@@ -16,6 +16,7 @@ describe("tapWhileFilling", () => {
   it("places an unplaced team into the open band", () => {
     const result = tapWhileFilling(empty, "arsenal", "champion");
     expect(result.assignments).toEqual({ arsenal: "champion" });
+    expect(Object.keys(result.assignments).length).toBe(1);
     expect(result.previous).toEqual({ arsenal: null });
     expect(result.movedFrom).toBeNull();
   });
@@ -27,6 +28,7 @@ describe("tapWhileFilling", () => {
     };
     const result = tapWhileFilling(state, "arsenal", "champion");
     expect(result.assignments).toEqual({ arsenal: "champion" });
+    expect(Object.keys(result.assignments).length).toBe(1);
     expect(result.previous).toEqual({ arsenal: "europe" });
     expect(result.movedFrom).toBe("europe");
   });
@@ -38,6 +40,7 @@ describe("tapWhileFilling", () => {
     };
     const result = tapWhileFilling(state, "arsenal", "champion");
     expect(result.assignments).toEqual({ arsenal: "europe" });
+    expect(Object.keys(result.assignments).length).toBe(1);
     expect(result.movedFrom).toBeNull();
   });
 
@@ -48,6 +51,7 @@ describe("tapWhileFilling", () => {
     };
     const result = tapWhileFilling(state, "arsenal", "champion");
     expect(result.assignments).toEqual({});
+    expect(Object.keys(result.assignments).length).toBe(0);
     expect(result.movedFrom).toBeNull();
   });
 });
@@ -60,6 +64,7 @@ describe("dropInto", () => {
     };
     const result = dropInto(state, "arsenal", "champion");
     expect(result.assignments).toEqual({ arsenal: "champion" });
+    expect(Object.keys(result.assignments).length).toBe(1);
     expect(result.previous).toEqual({ arsenal: "europe" });
     expect(result.movedFrom).toBe("europe");
   });
@@ -72,9 +77,11 @@ describe("startAgain", () => {
       previous: { arsenal: null, chelsea: "mid_table" },
     };
     expect(startAgain()).toEqual(empty);
+    expect(Object.keys(startAgain().assignments).length).toBe(0);
     // starAgain doesn't read the passed-in state at all -- confirm it's a
     // pure reset, not an accidental no-op.
     expect(state.assignments).not.toEqual({});
+    expect(Object.keys(state.assignments).length).toBe(2);
   });
 });
 
