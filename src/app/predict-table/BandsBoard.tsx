@@ -13,7 +13,7 @@ import {
   FILL_COUNT_TEXT,
   FILL_GROUND,
   HEADER_BACKGROUND,
-  bandGridCols,
+  PLACED_TEAM_GRID_COLS,
   teamFill,
   type Team,
 } from "./shared";
@@ -63,8 +63,8 @@ function PlacedTeamCard({
       type="button"
       onClick={onTap}
       disabled={disabled}
-      className={`group flex items-stretch gap-2.5 overflow-hidden rounded-btn border py-2.5 pr-2.5 pl-2 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
-        emphasis ? "col-span-full border-accent bg-accent/10 ring-1 ring-accent/40" : ""
+      className={`group flex items-stretch gap-3 overflow-hidden rounded-btn border py-3 pr-3 pl-2.5 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
+        emphasis ? "border-accent bg-accent/10 ring-1 ring-accent/40" : ""
       } ${liftedHere ? "border-accent bg-accent/10 ring-2 ring-accent/50" : !emphasis ? "border-paper-line bg-white hover:border-accent/50" : ""}`}
     >
       <span
@@ -72,11 +72,11 @@ function PlacedTeamCard({
         className="w-1 shrink-0 rounded-full"
         style={{ background: fill }}
       />
-      <span className="flex min-w-0 flex-1 items-center gap-2">
+      <span className="flex min-w-0 flex-1 items-center gap-2.5">
         <ClubCodeBadge shortCode={team.shortCode} fill={fill} />
         <span
           title={team.name}
-          className={`min-w-0 flex-1 truncate font-bold text-ink ${emphasis ? "text-base" : "text-sm"}`}
+          className={`min-w-0 flex-1 truncate font-bold text-ink ${emphasis ? "text-lg" : "text-[0.95rem]"}`}
         >
           {team.name}
         </span>
@@ -294,7 +294,7 @@ export function BandsBoard({
                   <UndoRow undo={undo} onUndo={onUndo} />
                 ) : null}
 
-                <div className={`grid ${bandGridCols(band)} gap-2`}>
+                <div className={`grid ${PLACED_TEAM_GRID_COLS} gap-2`}>
                   {inBand.length === 0 ? (
                     <p className="col-span-full text-sm text-ink/40">
                       {band.key === "champion"

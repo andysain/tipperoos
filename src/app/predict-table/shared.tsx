@@ -56,15 +56,12 @@ export function teamFill(shortCode: string | null): string {
   return applyContrastFloor(kitColors(shortCode)[0], [INK, "#ffffff"]);
 }
 
-// Cards per row matches the Band's target size, so a full/correct Band
-// reads as one tidy row -- with a floor of 3 so an overfull Champion (target
-// 1) doesn't wrap one-per-line. Champions League holds 4, which reads badly
-// as three-plus-one on a phone -- 2x2 until there's width for a single row
-// (docs/predict-table-capture-spec.md "Fill-state presentation").
-export function bandGridCols(band: (typeof TABLE_BANDS)[number]): string {
-  if (band.key === "champions_league") return "grid-cols-2 sm:grid-cols-4";
-  return Math.max(band.target, 3) >= 4 ? "grid-cols-4" : "grid-cols-3";
-}
+// Full team names don't survive being packed target-many-per-row on a
+// phone (a 3- or 4-column grid at mobile width truncates every club to
+// "AFC Bourn…"), so placed-team cards stay a single full-width column --
+// legible at real size -- until sm: (640px+) has genuine room for a second
+// column without truncating anything.
+export const PLACED_TEAM_GRID_COLS = "grid-cols-1 sm:grid-cols-2";
 
 // Ground treatment per fill state -- tint means "something to do here" and
 // nothing else. A Band that is exactly right stays plain, so the board

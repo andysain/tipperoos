@@ -8,7 +8,7 @@ import { type BandKey, TABLE_BANDS } from "@/lib/table-predictions/rules";
 import {
   BAND_META,
   DropDivider,
-  bandGridCols,
+  PLACED_TEAM_GRID_COLS,
   teamFill,
   type Team,
 } from "./shared";
@@ -48,7 +48,7 @@ export function BandSummary({
                 </div>
               </CardShellHeader>
               <CardShellBody>
-                <div className={`grid ${bandGridCols(band)} gap-1.5`}>
+                <div className={`grid ${PLACED_TEAM_GRID_COLS} gap-2`}>
                   {teamIds.length === 0 ? (
                     <span className="text-sm text-ink/40">-</span>
                   ) : (
@@ -60,9 +60,9 @@ export function BandSummary({
                       return (
                         <div
                           key={teamId}
-                          className={`flex items-stretch gap-2 overflow-hidden rounded-btn border py-1.5 pr-2 pl-1.5 ${
+                          className={`flex items-stretch gap-3 overflow-hidden rounded-btn border py-3 pr-3 pl-2.5 ${
                             emphasis
-                              ? "col-span-full border-accent bg-accent/10 ring-1 ring-accent/40"
+                              ? "border-accent bg-accent/10 ring-1 ring-accent/40"
                               : "border-paper-line bg-white"
                           }`}
                         >
@@ -71,14 +71,14 @@ export function BandSummary({
                             className="w-1 shrink-0 rounded-full"
                             style={{ background: fill }}
                           />
-                          <span className="flex min-w-0 flex-1 items-center gap-2">
+                          <span className="flex min-w-0 flex-1 items-center gap-2.5">
                             <ClubCodeBadge
                               shortCode={team.shortCode}
                               fill={fill}
                             />
                             <span
                               title={team.name}
-                              className={`min-w-0 flex-1 truncate font-bold text-ink ${emphasis ? "text-base" : "text-sm"}`}
+                              className={`min-w-0 flex-1 truncate font-bold text-ink ${emphasis ? "text-lg" : "text-[0.95rem]"}`}
                             >
                               {team.name}
                             </span>
