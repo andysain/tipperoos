@@ -113,17 +113,19 @@ function RosterChip({
       }
       className={`flex items-stretch gap-2 overflow-hidden rounded-btn-sm border px-2 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-40 ${
         band
-          ? "border-paper-line bg-ink/[0.03] opacity-70 hover:opacity-100"
+          ? "border-paper-line bg-ink/[0.06] opacity-50 hover:opacity-90"
           : "border-paper-line bg-white hover:border-accent/50"
       }`}
     >
       <span
         aria-hidden
-        className="w-1 shrink-0 rounded-full"
-        style={{ background: fill }}
+        className={`w-1 shrink-0 rounded-full ${band ? "bg-ink/20" : ""}`}
+        style={band ? undefined : { background: fill }}
       />
       <span className="min-w-0">
-        <span className="block truncate text-[0.76rem] leading-tight font-extrabold text-ink">
+        <span
+          className={`block truncate text-[0.76rem] leading-tight font-extrabold ${band ? "text-ink/60" : "text-ink"}`}
+        >
           {team.shortCode ?? team.name.slice(0, 3).toUpperCase()}
         </span>
         <span className="block truncate text-[0.66rem] leading-tight text-ink/50">
