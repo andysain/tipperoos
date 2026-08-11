@@ -53,8 +53,8 @@ export interface BandValidationResult {
 
 /**
  * Checks a player's current band assignment against the fixed target sizes.
- * Submission is only allowed once every band matches its target and no team
- * is left in the unsorted pool (see CLAUDE.md's "flagged and fixed" rule).
+ * Submission never blocks on the result -- a mismatch only means the Band
+ * Bonus for that Band is forfeited (docs/adr/0008-predict-the-table-group-fill-capture.md).
  */
 export function validateBandCounts(
   counts: Partial<Record<BandKey, number>>,
