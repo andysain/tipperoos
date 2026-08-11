@@ -731,7 +731,7 @@ export function PredictTableFlow({
 
   if (locked) {
     return (
-      <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4 pr-14">
+      <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4">
         <h1 className="text-[1.9rem] font-extrabold text-ink">
           Predict the Table
         </h1>
@@ -747,7 +747,7 @@ export function PredictTableFlow({
 
   if (isSkipped) {
     return (
-      <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4 pr-14">
+      <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4">
         <h1 className="text-[1.9rem] font-extrabold text-ink">
           You skipped Predict the Table
         </h1>
@@ -768,7 +768,7 @@ export function PredictTableFlow({
   const doneCalling = unsortedQueue.length === 0;
 
   return (
-    <main className="relative mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4 pr-14">
+    <main className="relative mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4">
       <h1 className="text-[1.9rem] font-extrabold text-ink">
         Predict the Table
       </h1>
