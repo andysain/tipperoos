@@ -1,4 +1,4 @@
-import { type ButtonHTMLAttributes } from "react";
+import { type ButtonHTMLAttributes, type Ref } from "react";
 import { tv, type VariantProps } from "tailwind-variants";
 
 const button = tv({
@@ -26,17 +26,23 @@ const button = tv({
 type ButtonVariants = VariantProps<typeof button>;
 
 export interface ButtonProps
-  extends ButtonHTMLAttributes<HTMLButtonElement>, ButtonVariants {}
+  extends ButtonHTMLAttributes<HTMLButtonElement>, ButtonVariants {
+  ref?: Ref<HTMLButtonElement>;
+}
 
+// React 19 passes `ref` through as a regular prop on function components --
+// no forwardRef wrapper needed.
 export function Button({
   className,
   intent,
   size,
   fullWidth,
+  ref,
   ...props
 }: ButtonProps) {
   return (
     <button
+      ref={ref}
       className={button({ intent, size, fullWidth, className })}
       {...props}
     />

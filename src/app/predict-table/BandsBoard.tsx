@@ -12,10 +12,35 @@ import {
   DropDivider,
   FILL_COUNT_TEXT,
   FILL_GROUND,
+  HEADER_BACKGROUND,
   bandGridCols,
   teamFill,
   type Team,
 } from "./shared";
+
+interface UndoState {
+  teamId: string;
+  band: BandKey;
+  label: string;
+}
+
+/** The undo affordance for the move that just happened, shown inside the
+ * Band the team landed in -- not as a page-level banner, so it reads next
+ * to the thing it's talking about. */
+function UndoRow({ undo, onUndo }: { undo: UndoState; onUndo: () => void }) {
+  return (
+    <div className="mb-2 flex items-center justify-between gap-2 rounded-btn-sm bg-ink/[0.06] px-3 py-2 text-xs text-ink/70">
+      <span className="truncate">{undo.label}</span>
+      <button
+        type="button"
+        onClick={onUndo}
+        className="shrink-0 font-extrabold text-ink underline"
+      >
+        Undo
+      </button>
+    </div>
+  );
+}
 
 /** A placed team's card inside an open or expanded Band. Tapping it acts on
  * the team; which action depends on the phase (see PredictTableFlow). */
@@ -38,7 +63,7 @@ function PlacedTeamCard({
       type="button"
       onClick={onTap}
       disabled={disabled}
-      className={`group flex items-stretch gap-2 overflow-hidden rounded-btn border py-1.5 pr-2 pl-1.5 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
+      className={`group flex items-stretch gap-2.5 overflow-hidden rounded-btn border py-2.5 pr-2.5 pl-2 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
         emphasis ? "col-span-full border-accent bg-accent/10 ring-1 ring-accent/40" : ""
       } ${liftedHere ? "border-accent bg-accent/10 ring-2 ring-accent/50" : !emphasis ? "border-paper-line bg-white hover:border-accent/50" : ""}`}
     >
@@ -86,7 +111,7 @@ function RosterChip({
           ? `Move ${team.name} out of ${BAND_LABEL[band]}`
           : `Place ${team.name}`
       }
-      className={`flex items-stretch gap-1.5 overflow-hidden rounded-btn-sm border px-1.5 py-1.5 text-left transition disabled:cursor-not-allowed disabled:opacity-40 ${
+      className={`flex items-stretch gap-2 overflow-hidden rounded-btn-sm border px-2 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-40 ${
         band
           ? "border-paper-line bg-ink/[0.03] opacity-70 hover:opacity-100"
           : "border-paper-line bg-white hover:border-accent/50"
@@ -98,10 +123,10 @@ function RosterChip({
         style={{ background: fill }}
       />
       <span className="min-w-0">
-        <span className="block truncate text-[0.72rem] leading-tight font-extrabold text-ink">
+        <span className="block truncate text-[0.76rem] leading-tight font-extrabold text-ink">
           {team.shortCode ?? team.name.slice(0, 3).toUpperCase()}
         </span>
-        <span className="block truncate text-[0.62rem] leading-tight text-ink/50">
+        <span className="block truncate text-[0.66rem] leading-tight text-ink/50">
           {band
             ? BAND_LABEL[band]
             : (team.previousSeasonPosition ? `#${team.previousSeasonPosition}` : "Promoted")}
@@ -181,9 +206,11 @@ export function BandsBoard({
   openBand,
   lifted,
   busyTeamId,
+  undo,
   onOpenBand,
   onTapTeam,
   onDropInto,
+  onUndo,
 }: {
   mode: Mode;
   teams: Team[];
@@ -192,21 +219,28 @@ export function BandsBoard({
   openBand: BandKey;
   lifted: string | null;
   busyTeamId: string | null;
+  undo: UndoState | null;
   onOpenBand: (band: BandKey) => void;
   onTapTeam: (teamId: string) => void;
   onDropInto: (band: BandKey) => void;
+  onUndo: () => void;
 }) {
   const teamsInBand = (band: BandKey) =>
     teams.filter((t) => assignments[t.id] === band);
   const liftedBand = lifted ? (assignments[lifted] ?? null) : null;
+  // The undo affordance shows inside whichever Band the team just landed
+  // in -- that Band is always the one currently expanded (it's either
+  // `openBand` while filling, or every Band is expanded in review).
+  const undoBand = undo ? (assignments[undo.teamId] ?? null) : null;
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
       {TABLE_BANDS.map((band) => {
         const inBand = teamsInBand(band.key);
         const meta = BAND_META[band.key];
         const isChampionSingle = band.key === "champion" && inBand.length === 1;
         const tone = fillTone(inBand.length, band.target);
+        const headerBackground = HEADER_BACKGROUND[tone];
 
         const isOpen = mode === "filling" && band.key === openBand;
         const expanded = mode === "review" || isOpen;
@@ -237,7 +271,9 @@ export function BandsBoard({
                 isOpen ? "ring-2 ring-accent ring-offset-2 ring-offset-paper" : ""
               }
             >
-              <CardShellHeader>
+              <CardShellHeader
+                style={headerBackground ? { background: headerBackground } : undefined}
+              >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span className="inline-flex shrink-0 items-center justify-center rounded-badge bg-paper/15 px-2 py-1 text-[0.7rem] font-extrabold text-paper tabular-nums">
@@ -248,15 +284,17 @@ export function BandsBoard({
                       {band.label}
                     </h2>
                   </div>
-                  <span
-                    className={`shrink-0 text-xs tabular-nums ${tone === "over" ? "font-bold text-danger" : "font-bold text-paper/70"}`}
-                  >
+                  <span className="shrink-0 text-xs font-bold tabular-nums text-paper/85">
                     {countRead(inBand.length, band.target)}
                   </span>
                 </div>
               </CardShellHeader>
               <CardShellBody>
-                <div className={`grid ${bandGridCols(band)} gap-1.5`}>
+                {undo && undoBand === band.key ? (
+                  <UndoRow undo={undo} onUndo={onUndo} />
+                ) : null}
+
+                <div className={`grid ${bandGridCols(band)} gap-2`}>
                   {inBand.length === 0 ? (
                     <p className="col-span-full text-sm text-ink/40">
                       {band.key === "champion"
@@ -289,10 +327,10 @@ export function BandsBoard({
 
                 {isOpen ? (
                   <>
-                    <p className="mt-3 mb-1.5 px-0.5 text-[0.68rem] font-bold tracking-[0.12em] text-ink/40 uppercase">
+                    <p className="mt-3 mb-2 px-0.5 text-[0.68rem] font-bold tracking-[0.12em] text-ink/40 uppercase">
                       Last season&apos;s table
                     </p>
-                    <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-5">
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
                       {teams.map((team) => (
                         <RosterChip
                           key={team.id}

@@ -82,6 +82,17 @@ export const FILL_COUNT_TEXT: Record<FillTone, string> = {
   over: "text-danger font-bold",
 };
 
+// An expanded Band's ink header switches away from plain ink when its count
+// is wrong, so the state reads at the header's full width rather than only
+// in the small count chip -- "under" warms toward the warning tone, "over"
+// goes to the danger tone outright (an over-filled Band is actively wrong,
+// not just incomplete). "ok" keeps the default ink from CardShellHeader.
+export const HEADER_BACKGROUND: Record<FillTone, string | undefined> = {
+  under: "color-mix(in oklab, var(--color-ink) 72%, var(--color-warning) 28%)",
+  ok: undefined,
+  over: "var(--color-danger)",
+};
+
 // A visual divider for the one boundary in this table that isn't just
 // another Band change -- the real cliff-edge of a Premier League season.
 export function DropDivider() {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CircleCheck } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import {
@@ -104,14 +104,6 @@ export function PredictTableFlow({
     const id = setInterval(() => setNow(Date.now()), 60_000);
     return () => clearInterval(id);
   }, []);
-
-  const sealedTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(
-    () => () => {
-      if (sealedTimeout.current) clearTimeout(sealedTimeout.current);
-    },
-    [],
-  );
 
   const teamsById = useMemo(
     () => new Map(teams.map((team) => [team.id, team])),
@@ -255,9 +247,7 @@ export function PredictTableFlow({
     const { ok, data } = await postJson("/api/table-predictions/submit");
     if (ok) {
       setSubmittedAt(data.submittedAt);
-      if (sealedTimeout.current) clearTimeout(sealedTimeout.current);
       setJustSealed(true);
-      sealedTimeout.current = setTimeout(() => setJustSealed(false), 2400);
     } else {
       setActionError(data.error ?? "Couldn't submit -- try again.");
     }
@@ -386,19 +376,6 @@ export function PredictTableFlow({
         </p>
       ) : null}
 
-      {undo ? (
-        <div className="-mt-2 flex items-center justify-between gap-2 rounded-btn-sm bg-ink/[0.06] px-3 py-1.5 text-xs text-ink/70">
-          <span className="truncate">{undo.label}</span>
-          <button
-            type="button"
-            onClick={handleUndo}
-            className="shrink-0 font-extrabold text-ink underline"
-          >
-            Undo
-          </button>
-        </div>
-      ) : null}
-
       <BandsBoard
         mode={mode}
         teams={roster}
@@ -407,9 +384,11 @@ export function PredictTableFlow({
         openBand={openBand}
         lifted={lifted}
         busyTeamId={busyTeamId}
+        undo={undo}
         onOpenBand={setOpenBand}
         onTapTeam={handleTeamTap}
         onDropInto={handleDropInto}
+        onUndo={handleUndo}
       />
 
       {actionError ? (

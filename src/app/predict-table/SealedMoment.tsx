@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Trophy } from "lucide-react";
 import { tv } from "tailwind-variants";
+import { Button } from "@/components/ui/Button";
 import { type BandKey } from "@/lib/table-predictions/rules";
 import { TeamIdentity, type Team } from "./shared";
 
@@ -34,6 +35,9 @@ const confettiPiece = tv({
   },
 });
 
+// Stays on screen until the player explicitly dismisses it -- no
+// auto-timeout. This is a "you're locked in" confirmation, not a passive
+// toast; a player who glances away shouldn't come back to it already gone.
 export function SealedMoment({
   assignments,
   teamsById,
@@ -47,7 +51,7 @@ export function SealedMoment({
   const dismissButtonRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     const id = requestAnimationFrame(() => setShown(true));
-    // Moves focus onto the overlay so screen readers announce the
+    // Moves focus onto the dismiss button so screen readers announce the
     // celebration text as soon as it appears, since it's inserted
     // dynamically rather than being part of the initial page load.
     dismissButtonRef.current?.focus();
@@ -60,12 +64,7 @@ export function SealedMoment({
   const champion = championId ? teamsById.get(championId) : undefined;
 
   return (
-    <button
-      ref={dismissButtonRef}
-      type="button"
-      onClick={onDismiss}
-      className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-1 overflow-hidden rounded-card bg-paper/95 text-center backdrop-blur-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-    >
+    <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-1 overflow-hidden rounded-card bg-paper/95 text-center backdrop-blur-sm">
       <div className="pointer-events-none absolute inset-x-0 top-0 motion-reduce:hidden">
         {CONFETTI.map((piece, i) => (
           <span
@@ -81,7 +80,7 @@ export function SealedMoment({
       </div>
 
       <div
-        className={`transition motion-reduce:transition-none motion-safe:duration-500 ${
+        className={`flex flex-col items-center transition motion-reduce:transition-none motion-safe:duration-500 ${
           shown ? "scale-100 opacity-100" : "scale-75 opacity-0"
         }`}
       >
@@ -98,7 +97,15 @@ export function SealedMoment({
             <TeamIdentity team={champion} /> to win it all
           </div>
         ) : null}
+        <Button
+          ref={dismissButtonRef}
+          type="button"
+          onClick={onDismiss}
+          className="mt-5 max-w-[10rem]"
+        >
+          Got it
+        </Button>
       </div>
-    </button>
+    </div>
   );
 }
