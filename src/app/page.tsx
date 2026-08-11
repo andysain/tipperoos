@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSessionPlayerId } from "@/app/_lib/session-cookie";
 import {
@@ -17,13 +18,15 @@ import { PickBoardSlotCard } from "@/components/pick-board/PickBoardSlotCard";
 import { SeasonStatsBlock } from "@/components/pick-board/SeasonStatsBlock";
 import { StatsStrip } from "@/components/pick-board/StatsStrip";
 import { TablePredictionPrompt } from "@/components/pick-board/TablePredictionPrompt";
-
-// Hardcoded pending issue #93 (resolve from the viewer's browser) -- same
-// value src/app/login/page.tsx already uses.
-const TIME_ZONE = "Australia/Sydney";
+import {
+  DEFAULT_TIME_ZONE,
+  TIMEZONE_COOKIE_NAME,
+} from "@/components/nav/timezone-cookie";
 
 // The current gameweek is derived per request (docs/adr/0007), never
-// cached -- this route has to be as fresh as the resolver it calls.
+// cached -- this route has to be as fresh as the resolver it calls. Also
+// what makes reading the `tz` cookie below free: this route was already
+// opting out of static rendering for an unrelated reason.
 export const dynamic = "force-dynamic";
 
 // `/` is the Pick Board itself, per docs/adr/0007-home-surface-and-pick-entry.md
@@ -44,6 +47,9 @@ export default async function PickBoardPage() {
   }
 
   const now = new Date();
+  const cookieStore = await cookies();
+  const timeZone =
+    cookieStore.get(TIMEZONE_COOKIE_NAME)?.value ?? DEFAULT_TIME_ZONE;
 
   const [gameweek, seasonStats, tablePrediction, gameweekOneKickoff] =
     await Promise.all([
@@ -89,7 +95,7 @@ export default async function PickBoardPage() {
           <GameweekHeader
             gameweekNumber={gameweek.number}
             earliestOpenKickoffUtcIso={gameweek.earliestOpenKickoffUtcIso}
-            timeZone={TIME_ZONE}
+            timeZone={timeZone}
           />
           <div className="flex flex-col gap-3 md:grid md:grid-cols-2 md:items-start md:gap-4">
             {gameweek.slots.map((slot, index) => (
@@ -102,7 +108,7 @@ export default async function PickBoardPage() {
                     : false
                 }
                 nowIso={now.toISOString()}
-                timeZone={TIME_ZONE}
+                timeZone={timeZone}
               />
             ))}
           </div>
