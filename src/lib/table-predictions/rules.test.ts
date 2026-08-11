@@ -113,6 +113,16 @@ describe("validateBandCounts", () => {
     expect(result.unsortedCount).toBe(20);
     expect(result.mismatches.length).toBe(7);
   });
+
+  // Submission never blocks on this result (docs/adr/0008-predict-the-table-group-fill-capture.md)
+  // -- validateBandCounts just reports, however wrong the board is; it
+  // never throws or refuses to compute a result.
+  it("reports cleanly on a maximally-wrong assignment instead of throwing", () => {
+    const result = validateBandCounts({ champion: 20 });
+    expect(result.ok).toBe(false);
+    expect(result.unsortedCount).toBe(0);
+    expect(result.mismatches.length).toBe(7);
+  });
 });
 
 // Golden values hand-derived from CLAUDE.md -> "Late joiners": "a player who
