@@ -52,7 +52,7 @@ SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node scripts/bootstrap-competitio
 ```
 
 It prompts interactively for the competition name, the plaintext competition code (hidden
-input), the admin's display name, their PIN (entered twice), and an optional emoji, then creates
+input), the admin's display name, their PIN (entered twice), and a chosen emoji, then creates
 both rows in one atomic call. The admin can log in immediately — no forced-PIN-reset flag is set,
 since at bootstrap the operator and the account holder are the same person at the same keyboard.
 Refuses to create a competition whose code is already used by another competition in the same

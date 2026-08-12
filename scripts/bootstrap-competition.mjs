@@ -87,9 +87,12 @@ async function promptAdminPin() {
 }
 
 async function promptAdminEmoji() {
-  const raw = await prompt("Admin emoji (optional, press Enter to skip): ");
+  const raw = await prompt("Admin emoji: ");
   const trimmed = raw.trim();
-  return trimmed === "" ? null : trimmed;
+  if (!trimmed) {
+    throw new Error("Admin emoji cannot be empty.");
+  }
+  return trimmed;
 }
 
 async function main() {
