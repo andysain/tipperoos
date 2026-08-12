@@ -64,7 +64,18 @@ export function SealedMoment({
   const champion = championId ? teamsById.get(championId) : undefined;
 
   return (
-    <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-1 overflow-hidden rounded-card bg-paper/95 text-center backdrop-blur-sm">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="sealed-moment-title"
+      onKeyDown={(event) => {
+        if (event.key === "Tab") {
+          event.preventDefault();
+          dismissButtonRef.current?.focus();
+        }
+      }}
+      className="fixed inset-0 z-30 flex flex-col items-center justify-center gap-1 overflow-auto bg-paper/95 p-4 text-center backdrop-blur-sm"
+    >
       <div className="pointer-events-none absolute inset-x-0 top-0 motion-reduce:hidden">
         {CONFETTI.map((piece, i) => (
           <span
@@ -85,7 +96,10 @@ export function SealedMoment({
         }`}
       >
         <Trophy className="mx-auto size-12 text-accent" aria-hidden />
-        <p className="mt-2 text-xl font-extrabold text-ink">
+        <p
+          id="sealed-moment-title"
+          className="mt-2 text-xl font-extrabold text-ink"
+        >
           You&apos;re locked in!
         </p>
         <p className="mt-1 max-w-[26ch] text-sm text-ink/70">
