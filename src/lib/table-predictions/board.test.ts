@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  bandPosition,
   type BoardState,
   countRead,
   dropInto,
   fillTone,
   modeFor,
+  nextUnfilledBand,
   rosterOrder,
   startAgain,
   tapWhileFilling,
@@ -109,6 +111,47 @@ describe("modeFor", () => {
 
   it("is review once every team is placed", () => {
     expect(modeFor(20, 20)).toBe("review");
+  });
+});
+
+describe("nextUnfilledBand", () => {
+  it("finds the next Band ahead that's still under target", () => {
+    expect(nextUnfilledBand("champion", {})).toBe("champions_league");
+  });
+
+  it("skips over Bands that are already exactly filled", () => {
+    expect(
+      nextUnfilledBand("champion", { champions_league: 4, europe: 1 }),
+    ).toBe("europe");
+  });
+
+  it("skips over Bands that are over-filled -- not 'unfilled'", () => {
+    expect(nextUnfilledBand("champion", { champions_league: 6 })).toBe(
+      "europe",
+    );
+  });
+
+  it("never looks backward, even if an earlier Band is still empty", () => {
+    // Champion itself unfilled doesn't matter -- search starts after it.
+    expect(nextUnfilledBand("europe", {})).toBe("mid_table");
+  });
+
+  it("returns null once every Band ahead is exactly filled", () => {
+    expect(
+      nextUnfilledBand("relegation_battle", { relegated: 3 }),
+    ).toBeNull();
+  });
+
+  it("returns null from the last Band -- nothing ahead to search", () => {
+    expect(nextUnfilledBand("relegated", {})).toBeNull();
+  });
+});
+
+describe("bandPosition", () => {
+  it("is 1-based, in canonical table order", () => {
+    expect(bandPosition("champion")).toBe(1);
+    expect(bandPosition("europe")).toBe(3);
+    expect(bandPosition("relegated")).toBe(7);
   });
 });
 

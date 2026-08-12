@@ -4,15 +4,21 @@ import { useEffect, useMemo, useState } from "react";
 import { CircleCheck } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import {
+  bandPosition,
   dropInto,
   modeFor,
+  nextUnfilledBand,
   rosterOrder,
   startAgain as startAgainBoard,
   tapWhileFilling,
   type Assignments,
   type PriorBandByTeam,
 } from "@/lib/table-predictions/board";
-import { type BandKey, validateBandCounts } from "@/lib/table-predictions/rules";
+import {
+  TABLE_BANDS,
+  type BandKey,
+  validateBandCounts,
+} from "@/lib/table-predictions/rules";
 import { BandSummary } from "./BandSummary";
 import { BandsBoard } from "./BandsBoard";
 import { SealedMoment } from "./SealedMoment";
@@ -126,6 +132,11 @@ export function PredictTableFlow({
     return result;
   }, [assignments]);
   const validation = useMemo(() => validateBandCounts(counts), [counts]);
+
+  // Only meaningful while filling -- review mode has no single open Band to
+  // report a position for or advance from (issue #130).
+  const nextBand =
+    mode === "filling" ? nextUnfilledBand(openBand, counts) : null;
 
   // Applies a tap's computed board change optimistically, fires the one
   // request it implies (assign if the team landed in a Band, unassign if
@@ -315,6 +326,14 @@ export function PredictTableFlow({
           <span>
             {placedCount} of {teams.length} placed
           </span>
+          {mode === "filling" ? (
+            <>
+              <span aria-hidden>&middot;</span>
+              <span>
+                Band {bandPosition(openBand)} of {TABLE_BANDS.length}
+              </span>
+            </>
+          ) : null}
           {!locked && !isLateJoiner && gameweekOneKickoff ? (
             <>
               <span aria-hidden>&middot;</span>
@@ -382,6 +401,7 @@ export function PredictTableFlow({
         teamsById={teamsById}
         assignments={assignments}
         openBand={openBand}
+        nextBand={nextBand}
         lifted={lifted}
         busyTeamId={busyTeamId}
         undo={undo}

@@ -33,6 +33,25 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+**Working from a git worktree (e.g. `orca/workspaces/...`) whose `node_modules` is a
+symlink out to the main checkout?** `next dev`'s default Turbopack panics on that layout:
+
+```
+FATAL: An unexpected Turbopack error occurred.
+Error [TurbopackInternalError]: Symlink [project]/node_modules is invalid, it points out of the filesystem root
+```
+
+Turbopack refuses a `node_modules` symlink that resolves outside the worktree's own
+directory tree. Run webpack instead, which handles it fine — no functional difference for
+local dev:
+
+```bash
+npx next dev --webpack
+```
+
+(or `npm run dev -- --webpack`, equivalent). Only needed in a symlinked-`node_modules`
+worktree; a normal clone with its own `npm install` never hits this.
+
 ## Database schema
 
 Schema is managed as Supabase CLI migrations under `supabase/migrations/`. To apply the

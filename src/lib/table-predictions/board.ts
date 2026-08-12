@@ -3,7 +3,7 @@
 // rules for both phases -- the actual product behaviour -- can be unit
 // tested directly, without rendering anything.
 
-import { type BandKey } from "./rules";
+import { TABLE_BANDS, type BandKey } from "./rules";
 
 export type Assignments = Record<string, BandKey>;
 /** The Band each team most recently came from, one level deep -- what the
@@ -90,6 +90,32 @@ export function countRead(filled: number, target: number): string {
   }
   const toGo = target - filled;
   return `${filled}/${target} · ${toGo} to go`;
+}
+
+/**
+ * The next Band, in canonical table order, that still has room -- searched
+ * forward from `currentBand` only, never wrapping and never looking back.
+ * Over-filled Bands are skipped past (issue #130): they don't need the
+ * advance prompt's help, so "unfilled" here means strictly under target.
+ * Distinct from #118's return-visit landing, which searches from the very
+ * start of the sequence for the first *incorrectly* filled Band instead.
+ */
+export function nextUnfilledBand(
+  currentBand: BandKey,
+  counts: Partial<Record<BandKey, number>>,
+): BandKey | null {
+  const currentIndex = TABLE_BANDS.findIndex((b) => b.key === currentBand);
+  for (let i = currentIndex + 1; i < TABLE_BANDS.length; i++) {
+    const band = TABLE_BANDS[i];
+    if ((counts[band.key] ?? 0) < band.target) return band.key;
+  }
+  return null;
+}
+
+/** 1-based position of `band` in the canonical 7-Band sequence, for the
+ * "Band 3 of 7" progress readout. */
+export function bandPosition(band: BandKey): number {
+  return TABLE_BANDS.findIndex((b) => b.key === band) + 1;
 }
 
 export type Mode = "filling" | "review";
