@@ -14,6 +14,7 @@ import {
   tapWhileFilling,
   type Assignments,
   type PriorBandByTeam,
+  type SwapResult,
 } from "@/lib/table-predictions/board";
 import {
   TABLE_BANDS,
@@ -197,15 +198,11 @@ export function PredictTableFlow({
   async function persistSwap(
     teamAId: string,
     teamBId: string,
-    result: {
-      assignments: Assignments;
-      previous: PriorBandByTeam;
-      swapped: [
-        { teamId: string; movedFrom: BandKey },
-        { teamId: string; movedFrom: BandKey },
-      ];
-    },
+    result: SwapResult,
   ) {
+    if (busyTeamIds.includes(teamAId) || busyTeamIds.includes(teamBId)) {
+      return;
+    }
     setBusyTeamIds((prev) => [...prev, teamAId, teamBId]);
     setSaveError(null);
     const prevAssignments = assignments;
@@ -261,9 +258,16 @@ export function PredictTableFlow({
       if (lifted) {
         // Every team visible in review is already placed (review mode
         // only exists once all 20 are), so a second tap on a different
-        // placed team is always a swap, not a move (issue #131).
+        // placed team is a swap, not a move (issue #131) -- unless the two
+        // are already in the same Band, in which case swapping would be a
+        // no-op: nothing to persist, animate, or offer an undo for. Treat
+        // that tap as just re-lifting the newly tapped team instead.
         const teamAId = lifted;
         const teamBId = teamId;
+        if (assignments[teamAId] === assignments[teamBId]) {
+          setLifted(teamBId);
+          return;
+        }
         setLifted(null);
         const result = swapBands({ assignments, previous }, teamAId, teamBId);
         void persistSwap(teamAId, teamBId, result);
