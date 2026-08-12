@@ -526,7 +526,8 @@ export function isEmojiInLibrary(emoji: string): boolean {
  * A uniform random draw from EMOJI_LIBRARY, never returning `current`.
  * `random` is injectable for deterministic tests (same convention as the
  * Match 2 picker); plain Math.random is fine at the call site -- this is a
- * personalization draw, not a security one.
+ * personalization draw, not a security one. Clamped so an injected
+ * `random` of exactly 1 can't index past the end of the pool.
  */
 export function pickRandomEmoji(
   current: string | null,
@@ -536,5 +537,6 @@ export function pickRandomEmoji(
     current === null
       ? EMOJI_LIBRARY
       : EMOJI_LIBRARY.filter((emoji) => emoji !== current);
-  return pool[Math.floor(random() * pool.length)];
+  const index = Math.min(pool.length - 1, Math.floor(random() * pool.length));
+  return pool[index];
 }

@@ -74,4 +74,14 @@ describe("pickRandomEmoji", () => {
       EMOJI_LIBRARY[EMOJI_LIBRARY.length - 2],
     );
   });
+
+  it("clamps a hostile random() of exactly 1 to the last eligible member", () => {
+    expect(pickRandomEmoji(null, () => 1)).toBe(
+      EMOJI_LIBRARY[EMOJI_LIBRARY.length - 1],
+    );
+    const last = EMOJI_LIBRARY[EMOJI_LIBRARY.length - 1];
+    expect(pickRandomEmoji(last, () => 1)).toBe(
+      EMOJI_LIBRARY[EMOJI_LIBRARY.length - 2],
+    );
+  });
 });
