@@ -5,6 +5,7 @@ import { resolveCompetitionByCode } from "@/lib/auth/competitions";
 import { hashSecret } from "@/lib/auth/scrypt-secret";
 import {
   validateDisplayName,
+  validateEmoji,
   validatePinFormat,
 } from "@/lib/auth/signup-validation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -67,6 +68,11 @@ export async function POST(request: Request) {
     );
   }
 
+  const emojiResult = validateEmoji(emoji);
+  if (!emojiResult.ok) {
+    return NextResponse.json({ error: emojiResult.reason }, { status: 400 });
+  }
+
   const { data: existing, error: lookupError } = await supabase
     .from("players")
     .select("id")
@@ -96,7 +102,7 @@ export async function POST(request: Request) {
       display_name: displayNameResult.normalized,
       pin_hash: pinHash,
       email: email || null,
-      emoji: emoji || null,
+      emoji: emojiResult.normalized,
     })
     .select("id, display_name, emoji")
     .single();
