@@ -22,8 +22,8 @@ const WEEKDAY_SHORT = [
 const OVERNIGHT_HOUR_CUTOFF = 6;
 
 /**
- * Absolute kickoff label in the given IANA timezone, e.g. "Sat 7:30pm" or,
- * for the overnight case, "Sun 12:00am (Sat night)".
+ * Absolute kickoff label in the given IANA timezone, e.g. "Sat 12 Sep, 7:30pm"
+ * or, for the overnight case, "Sun 13 Sep, 12:00am (Sat night)".
  */
 export function formatKickoffInTimeZone(
   kickoffUtcIso: string,

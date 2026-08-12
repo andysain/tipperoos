@@ -6,7 +6,7 @@ import {
 } from "./kickoff-format";
 
 // Golden values hand-derived per docs/adr/0007-home-surface-and-pick-entry.md
-// ("Sun 12:00am (Sat night)" is the ADR's own literal example) and verified
+// ("Sun 13 Sep, 12:00am (Sat night)" is the ADR's own literal example) and verified
 // against Intl.DateTimeFormat's real IANA tzdata output before being pinned
 // here -- see issue #87's decision log for how each instant was chosen.
 describe("formatKickoffInTimeZone", () => {
