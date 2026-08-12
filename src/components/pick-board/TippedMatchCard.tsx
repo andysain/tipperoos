@@ -519,9 +519,21 @@ export function TippedMatchCard({
   // supports it; only the "Change" affordance to reach it was missing.
   const [editingFiled, setEditingFiled] = useState(false);
 
+  // Header + seam sit on the card's ink ground, so this pair is floored
+  // against both ink and white (matchBadgeColors()'s default).
   const { home: homeFill, away: awayFill } = matchBadgeColors(
     home.shortCode,
     away.shortCode,
+  );
+  // DigitRow's rail sits on the white CardShellBody only -- flooring it
+  // against ink too would needlessly wash a dark, saturated kit colour
+  // toward pink even though it already reads fine here (the Predict the
+  // Table bug this mirrors: a shared ink+white fill reused on a white-only
+  // ground).
+  const { home: bodyHomeFill, away: bodyAwayFill } = matchBadgeColors(
+    home.shortCode,
+    away.shortCode,
+    ["#ffffff"],
   );
 
   async function fileIfComplete(
@@ -629,7 +641,7 @@ export function TippedMatchCard({
           <DigitRow
             team={home}
             homeAwayLabel="Home"
-            fill={homeFill}
+            fill={bodyHomeFill}
             selected={homeSelected}
             expanded={homeExpanded}
             disabled={saving}
@@ -642,7 +654,7 @@ export function TippedMatchCard({
           <DigitRow
             team={away}
             homeAwayLabel="Away"
-            fill={awayFill}
+            fill={bodyAwayFill}
             selected={awaySelected}
             expanded={awayExpanded}
             disabled={saving}

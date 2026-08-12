@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { ClubCodeBadge } from "@/components/ui/ClubCodeBadge";
 import { type BandKey, TABLE_BANDS } from "@/lib/table-predictions/rules";
-import { applyContrastFloor, INK, kitColors } from "@/lib/teams/kit-colors";
+import { applyContrastFloor, kitColors } from "@/lib/teams/kit-colors";
 import { type FillTone } from "@/lib/table-predictions/board";
 
 export interface Team {
@@ -48,12 +48,14 @@ export const BAND_LABEL: Record<BandKey, string> = Object.fromEntries(
 ) as Record<BandKey, string>;
 
 // A team's identity fill for its rail + ClubCodeBadge -- contrast-floored
-// against both grounds it can be drawn on (an ink header, a white card
-// body), same grounds matchBadgeColors() defaults to for the Tipped Match
-// card, since a team card here only ever shows one club at a time (no
-// clash rule needed -- that's a two-club-in-one-row concern).
+// against white, the only ground it's ever drawn on across this feature
+// (BandsBoard's cards, BandSummary's rows, SealedMoment/TeamIdentity's
+// occupant rows). Unlike the Tipped Match card, nothing here draws a kit
+// colour on an ink ground -- flooring against ink too would needlessly
+// wash a dark, saturated kit colour toward pink (issue: Aston Villa
+// reading as pink, Liverpool not reading as Liverpool red).
 export function teamFill(shortCode: string | null): string {
-  return applyContrastFloor(kitColors(shortCode)[0], [INK, "#ffffff"]);
+  return applyContrastFloor(kitColors(shortCode)[0], ["#ffffff"]);
 }
 
 // Full team names don't survive being packed target-many-per-row on a
@@ -127,7 +129,10 @@ export function TeamIdentity({
 }) {
   return (
     <span className="flex min-w-0 items-center gap-2">
-      <ClubCodeBadge shortCode={team.shortCode} fill={teamFill(team.shortCode)} />
+      <ClubCodeBadge
+        shortCode={team.shortCode}
+        fill={teamFill(team.shortCode)}
+      />
       <span className={`min-w-0 truncate font-bold ${toneClassName}`}>
         {team.name}
       </span>
