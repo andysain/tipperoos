@@ -77,8 +77,63 @@ describe("POST /api/auth/signup", () => {
       error: null,
     });
     insertSelectChain.single.mockResolvedValue({
-      data: { id: "player-1", display_name: "Andy", emoji: null },
+      data: { id: "player-1", display_name: "Andy", emoji: "🦊" },
       error: null,
+    });
+
+    const response = await POST(
+      request({
+        competitionCode: "real-code",
+        displayName: "Andy",
+        pin: "1234",
+        emoji: "🦊",
+      }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(existingLookupChain.eq).toHaveBeenCalledWith(
+      "competition_id",
+      "comp-1",
+    );
+    expect(insertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ competition_id: "comp-1", emoji: "🦊" }),
+    );
+    expect(body.displayName).toBe("Andy");
+    expect(body.emoji).toBe("🦊");
+  });
+
+  it("trims whitespace around the emoji before storing it", async () => {
+    competitionsSelectMock.mockResolvedValue({
+      data: [{ id: "comp-1", code_hash: await hashSecret("real-code") }],
+    });
+    existingLookupChain.maybeSingle.mockResolvedValue({
+      data: null,
+      error: null,
+    });
+    insertSelectChain.single.mockResolvedValue({
+      data: { id: "player-1", display_name: "Andy", emoji: "🦊" },
+      error: null,
+    });
+
+    const response = await POST(
+      request({
+        competitionCode: "real-code",
+        displayName: "Andy",
+        pin: "1234",
+        emoji: "  🦊  ",
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    expect(insertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ emoji: "🦊" }),
+    );
+  });
+
+  it("rejects a signup with no emoji (mandatory at signup, issue #127)", async () => {
+    competitionsSelectMock.mockResolvedValue({
+      data: [{ id: "comp-1", code_hash: await hashSecret("real-code") }],
     });
 
     const response = await POST(
@@ -90,14 +145,26 @@ describe("POST /api/auth/signup", () => {
     );
     const body = await response.json();
 
-    expect(response.status).toBe(201);
-    expect(existingLookupChain.eq).toHaveBeenCalledWith(
-      "competition_id",
-      "comp-1",
+    expect(response.status).toBe(400);
+    expect(body.error).toBe("Pick an emoji.");
+    expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects an emoji that is not in the curated library", async () => {
+    competitionsSelectMock.mockResolvedValue({
+      data: [{ id: "comp-1", code_hash: await hashSecret("real-code") }],
+    });
+
+    const response = await POST(
+      request({
+        competitionCode: "real-code",
+        displayName: "Andy",
+        pin: "1234",
+        emoji: "💩",
+      }),
     );
-    expect(insertMock).toHaveBeenCalledWith(
-      expect.objectContaining({ competition_id: "comp-1" }),
-    );
-    expect(body.displayName).toBe("Andy");
+
+    expect(response.status).toBe(400);
+    expect(insertMock).not.toHaveBeenCalled();
   });
 });
