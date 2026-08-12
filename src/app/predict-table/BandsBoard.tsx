@@ -1,3 +1,4 @@
+import { ChevronRight } from "lucide-react";
 import {
   CardShell,
   CardShellBody,
@@ -188,6 +189,7 @@ export function BandsBoard({
   teamsById,
   assignments,
   openBand,
+  nextBand,
   lifted,
   busyTeamId,
   undo,
@@ -201,6 +203,10 @@ export function BandsBoard({
   teamsById: Map<string, Team>;
   assignments: Record<string, BandKey>;
   openBand: BandKey;
+  /** The Band the "Next: [Band] →" prompt advances to, once the open Band
+   * is exactly filled -- null while there's nothing under-filled ahead
+   * (issue #130). Always null outside filling mode. */
+  nextBand: BandKey | null;
   lifted: string | null;
   busyTeamId: string | null;
   undo: UndoState | null;
@@ -304,6 +310,17 @@ export function BandsBoard({
                     className="mt-2 w-full rounded-btn border-2 border-dashed border-accent bg-accent/10 px-3 py-2.5 text-sm font-extrabold text-ink transition hover:bg-accent/20"
                   >
                     Move {teamsById.get(lifted!)?.shortCode ?? "here"} here
+                  </button>
+                ) : null}
+
+                {isOpen && tone === "ok" && nextBand ? (
+                  <button
+                    type="button"
+                    onClick={() => onOpenBand(nextBand)}
+                    className="mt-3 flex w-full items-center justify-center gap-1 rounded-btn border-2 border-accent bg-accent/10 px-3 py-2.5 text-sm font-extrabold text-ink transition hover:bg-accent/20"
+                  >
+                    Next: {BAND_LABEL[nextBand]}
+                    <ChevronRight className="size-4" aria-hidden />
                   </button>
                 ) : null}
 
