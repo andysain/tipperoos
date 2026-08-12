@@ -33,6 +33,8 @@ export function formatKickoffInTimeZone(
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,
     weekday: "short",
+    day: "numeric",
+    month: "short",
     hour: "numeric",
     minute: "2-digit",
     hourCycle: "h23",
@@ -40,6 +42,7 @@ export function formatKickoffInTimeZone(
   const get = (type: string) => parts.find((p) => p.type === type)!.value;
 
   const weekday = get("weekday");
+  const dateLabel = `${get("day")} ${get("month")}`;
   const hour24 = Number(get("hour"));
   const minute = get("minute");
   const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
@@ -51,9 +54,9 @@ export function formatKickoffInTimeZone(
       weekday as (typeof WEEKDAY_SHORT)[number],
     );
     const previousWeekday = WEEKDAY_SHORT[(weekdayIndex + 6) % 7];
-    return `${weekday} ${timeLabel} (${previousWeekday} night)`;
+    return `${weekday} ${dateLabel}, ${timeLabel} (${previousWeekday} night)`;
   }
-  return `${weekday} ${timeLabel}`;
+  return `${weekday} ${dateLabel}, ${timeLabel}`;
 }
 
 const MS_PER_MINUTE = 60_000;
