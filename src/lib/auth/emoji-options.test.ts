@@ -19,6 +19,7 @@ describe("EMOJI_OPTIONS vs EMOJI_LIBRARY", () => {
       "🎉",
       "🍕",
     ]);
+    expect(EMOJI_OPTIONS.length).toBe(10);
   });
 
   it("every grid option is a member of the library", () => {
@@ -29,12 +30,12 @@ describe("EMOJI_OPTIONS vs EMOJI_LIBRARY", () => {
 });
 
 describe("EMOJI_LIBRARY", () => {
-  it("holds at least 200 curated emojis", () => {
-    expect(EMOJI_LIBRARY.length).toBeGreaterThanOrEqual(200);
+  it("holds the curated count of 475 emojis (golden value -- changing the curation deliberately updates this)", () => {
+    expect(EMOJI_LIBRARY.length).toBe(475);
   });
 
   it("has no duplicates", () => {
-    expect(new Set(EMOJI_LIBRARY).size).toBe(EMOJI_LIBRARY.length);
+    expect(new Set(EMOJI_LIBRARY).size).toBe(475);
   });
 
   // The curation's mechanical acceptance bar (issue #127, deliverable 4):
@@ -42,6 +43,10 @@ describe("EMOJI_LIBRARY", () => {
   // indicators), skin tones, keycaps and ZWJ sequences, which render
   // inconsistently across platforms. A multi-code-point entry is a bug.
   it("every entry is a single Unicode code point", () => {
+    const multiCodePoint = EMOJI_LIBRARY.filter(
+      (emoji) => [...emoji].length !== 1,
+    );
+    expect(multiCodePoint.length).toBe(0);
     for (const emoji of EMOJI_LIBRARY) {
       expect([...emoji].length, `entry ${emoji}`).toBe(1);
     }
@@ -55,9 +60,10 @@ describe("pickRandomEmoji", () => {
 
   it("never returns the current selection", () => {
     const current = EMOJI_LIBRARY[0];
-    for (let i = 0; i < 500; i++) {
-      expect(pickRandomEmoji(current)).not.toBe(current);
-    }
+    const violations = Array.from({ length: 500 }, () =>
+      pickRandomEmoji(current),
+    ).filter((pick) => pick === current);
+    expect(violations.length).toBe(0);
   });
 
   it("maps a zero random() to the first eligible member", () => {
