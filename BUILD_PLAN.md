@@ -139,7 +139,7 @@ Supersedes the Aug 1–21 week plan above for what remains, per decision 42. Tra
 In dependency order:
 
 1. **Shared `resolveCurrentGameweek` helper** — the derived rule from decision 41. Pure logic, tested, used by every surface that asks "which week is it".
-2. **Kickoff display formatting** — Sydney rendering of UK kickoffs, including the overnight case (`Sun 12:00am (Sat night)`) and relative countdowns. Non-trivial across two DST regimes, and it feeds both the card and the Gameweek header.
+2. **Kickoff display formatting** — viewer-local rendering of UK kickoffs, including the calendar date, overnight case (`Sun 13 Sep, 12:00am (Sat night)`), and relative countdowns. Non-trivial across two DST regimes, and it feeds both the card and the Gameweek header.
 3. **Team league-position store + standings fetch** — nothing in the schema holds team positions today (`standings_snapshots` is the per-Player table). Shared with Predict the Table's continuous scoring.
 4. **Gameweek 1 selection seed script** — runs the decision-40 rules once, from last season's table, no live data needed.
 5. **Pick save/edit route + the Tipped Match card** — the entry mechanic and its states, returning only the caller's own pick.
