@@ -9,6 +9,7 @@ import {
   nextUnfilledBand,
   rosterOrder,
   startAgain,
+  swapBands,
   tapWhileFilling,
 } from "./board";
 
@@ -69,6 +70,57 @@ describe("dropInto", () => {
     expect(Object.keys(result.assignments).length).toBe(1);
     expect(result.previous).toEqual({ arsenal: "europe" });
     expect(result.movedFrom).toBe("europe");
+  });
+});
+
+describe("swapBands", () => {
+  it("exchanges two placed teams' bands", () => {
+    const state: BoardState = {
+      assignments: { arsenal: "champion", chelsea: "europe" },
+      previous: { arsenal: null, chelsea: null },
+    };
+    const result = swapBands(state, "arsenal", "chelsea");
+    expect(result.assignments).toEqual({
+      arsenal: "europe",
+      chelsea: "champion",
+    });
+    expect(Object.keys(result.assignments).length).toBe(2);
+    expect(result.swapped[0]).toEqual({
+      teamId: "arsenal",
+      movedFrom: "champion",
+    });
+    expect(result.swapped[1]).toEqual({
+      teamId: "chelsea",
+      movedFrom: "europe",
+    });
+  });
+
+  it("records each team's prior band, for the swap undo affordance", () => {
+    const state: BoardState = {
+      assignments: { arsenal: "champion", chelsea: "europe" },
+      previous: { arsenal: null, chelsea: null },
+    };
+    const result = swapBands(state, "arsenal", "chelsea");
+    expect(result.previous.arsenal).toBe("champion");
+    expect(result.previous.chelsea).toBe("europe");
+  });
+
+  it("swapping the same pair twice restores their original bands", () => {
+    const state: BoardState = {
+      assignments: { arsenal: "champion", chelsea: "europe" },
+      previous: { arsenal: null, chelsea: null },
+    };
+    const first = swapBands(state, "arsenal", "chelsea");
+    const second = swapBands(
+      { assignments: first.assignments, previous: first.previous },
+      "arsenal",
+      "chelsea",
+    );
+    expect(second.assignments).toEqual({
+      arsenal: "champion",
+      chelsea: "europe",
+    });
+    expect(Object.keys(second.assignments).length).toBe(2);
   });
 });
 

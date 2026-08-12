@@ -66,6 +66,49 @@ export function dropInto(
   return { assignments, previous, movedFrom: current };
 }
 
+export interface SwapResult {
+  assignments: Assignments;
+  previous: PriorBandByTeam;
+  /** Each team's Band before the swap, for the swap undo affordance. */
+  swapped: [
+    { teamId: string; movedFrom: BandKey },
+    { teamId: string; movedFrom: BandKey },
+  ];
+}
+
+/**
+ * Review-phase swap (team-first): exchange the Bands of two already-placed
+ * teams in one move (issue #131). Both teams are assumed already placed --
+ * the review-mode tap grammar only ever calls this with two placed teams,
+ * since review mode itself only exists once all 20 teams are placed.
+ *
+ * Symmetric: calling swapBands again with the same two ids restores both
+ * teams to their pre-swap Bands, which is what the swap undo affordance
+ * relies on instead of a separate undo primitive.
+ */
+export function swapBands(
+  state: BoardState,
+  teamA: string,
+  teamB: string,
+): SwapResult {
+  const bandA = state.assignments[teamA];
+  const bandB = state.assignments[teamB];
+  const assignments = {
+    ...state.assignments,
+    [teamA]: bandB,
+    [teamB]: bandA,
+  };
+  const previous = { ...state.previous, [teamA]: bandA, [teamB]: bandB };
+  return {
+    assignments,
+    previous,
+    swapped: [
+      { teamId: teamA, movedFrom: bandA },
+      { teamId: teamB, movedFrom: bandB },
+    ],
+  };
+}
+
 /** Start again: every club back to the roster. The only escape from a
  * table a player wants to bin, and the only operation that can't be
  * reconstructed from cheap individual moves. */
