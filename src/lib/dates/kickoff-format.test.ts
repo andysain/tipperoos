@@ -6,48 +6,54 @@ import {
 } from "./kickoff-format";
 
 // Golden values hand-derived per docs/adr/0007-home-surface-and-pick-entry.md
-// ("Sun 12:00am (Sat night)" is the ADR's own literal example) and verified
+// ("Sun 13 Sep, 12:00am (Sat night)" is the ADR's own literal example) and verified
 // against Intl.DateTimeFormat's real IANA tzdata output before being pinned
 // here -- see issue #87's decision log for how each instant was chosen.
 describe("formatKickoffInTimeZone", () => {
   it("spells out the overnight case: UK Saturday afternoon is Sydney's small hours of Sunday", () => {
     expect(
       formatKickoffInTimeZone("2026-09-12T14:00:00Z", "Australia/Sydney"),
-    ).toBe("Sun 12:00am (Sat night)");
+    ).toBe("Sun 13 Sep, 12:00am (Sat night)");
   });
 
   it("renders a plain daytime kickoff without the overnight parenthetical", () => {
     expect(
       formatKickoffInTimeZone("2026-09-12T18:30:00Z", "America/New_York"),
-    ).toBe("Sat 2:30pm");
+    ).toBe("Sat 12 Sep, 2:30pm");
   });
 
   it("is correct on both sides of the UK BST->GMT transition (2026-10-25)", () => {
     expect(
       formatKickoffInTimeZone("2026-10-24T15:00:00Z", "Europe/London"),
-    ).toBe("Sat 4:00pm");
+    ).toBe("Sat 24 Oct, 4:00pm");
     expect(
       formatKickoffInTimeZone("2026-10-26T15:00:00Z", "Europe/London"),
-    ).toBe("Mon 3:00pm");
+    ).toBe("Mon 26 Oct, 3:00pm");
   });
 
   it("is correct on both sides of the Sydney AEST->AEDT transition (2026-10-04), including the overnight case it produces", () => {
     expect(
       formatKickoffInTimeZone("2026-10-03T15:00:00Z", "Australia/Sydney"),
-    ).toBe("Sun 1:00am (Sat night)");
+    ).toBe("Sun 4 Oct, 1:00am (Sat night)");
     expect(
       formatKickoffInTimeZone("2026-10-04T15:00:00Z", "Australia/Sydney"),
-    ).toBe("Mon 2:00am (Sun night)");
+    ).toBe("Mon 5 Oct, 2:00am (Sun night)");
   });
 
   it("takes timeZone as a real parameter, not a hardcoded Sydney assumption (#93)", () => {
     const kickoff = "2026-09-12T18:30:00Z";
     expect(formatKickoffInTimeZone(kickoff, "America/New_York")).toBe(
-      "Sat 2:30pm",
+      "Sat 12 Sep, 2:30pm",
     );
     expect(formatKickoffInTimeZone(kickoff, "Australia/Sydney")).toBe(
-      "Sun 4:30am (Sat night)",
+      "Sun 13 Sep, 4:30am (Sat night)",
     );
+  });
+
+  it("uses the local calendar date when the timezone crosses UTC midnight", () => {
+    expect(
+      formatKickoffInTimeZone("2026-09-12T23:30:00Z", "Australia/Sydney"),
+    ).toBe("Sun 13 Sep, 9:30am");
   });
 });
 

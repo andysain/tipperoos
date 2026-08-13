@@ -76,7 +76,7 @@ a link out. Home stays a task surface plus personal outcome.
 **Times render in the viewer's local timezone, with the overnight case spelled
 out** — a UK Saturday afternoon kickoff can genuinely be the small hours of
 the following day wherever the viewer actually is, so, e.g. for a
-Sydney-based viewer, `Sun 12:00am (Sat night)` rather than a bare weekday that
+Sydney-based viewer, `Sun 13 Sep, 12:00am (Sat night)` rather than a bare weekday that
 reads as the wrong night (see issue #93 for how the viewer's timezone is
 resolved). The Gameweek header shows the earliest lock across the board.
 

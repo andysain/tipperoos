@@ -1,5 +1,6 @@
 "use client";
 
+import { Dices } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
@@ -7,21 +8,9 @@ import { Card } from "@/components/ui/Card";
 import { PinInput } from "@/components/ui/PinInput";
 import { TextField } from "@/components/ui/TextField";
 import { detectBrowserTimeZone } from "@/components/nav/timezone-cookie";
+import { EMOJI_OPTIONS, pickRandomEmoji } from "@/lib/auth/emoji-options";
 
 const STORED_CODE_KEY = "tipperoos.competitionCode";
-
-const EMOJI_OPTIONS = [
-  "⚽",
-  "🏆",
-  "🔥",
-  "🌟",
-  "🦁",
-  "🐯",
-  "🐶",
-  "🐱",
-  "🎉",
-  "🍕",
-];
 
 interface Player {
   displayName: string;
@@ -96,7 +85,6 @@ function LoginFlow() {
   const [joinDisplayName, setJoinDisplayName] = useState("");
   const [joinPin, setJoinPin] = useState("");
   const [joinPinResetKey, setJoinPinResetKey] = useState(0);
-  const [joinEmail, setJoinEmail] = useState("");
   const [joinEmoji, setJoinEmoji] = useState<string | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [joinSubmitting, setJoinSubmitting] = useState(false);
@@ -231,6 +219,10 @@ function LoginFlow() {
       setJoinError("Your PIN needs to be 4 digits.");
       return;
     }
+    if (!joinEmoji) {
+      setJoinError("Pick an emoji first.");
+      return;
+    }
 
     setJoinSubmitting(true);
     try {
@@ -244,7 +236,6 @@ function LoginFlow() {
           competitionCode,
           displayName: joinDisplayName,
           pin: joinPin,
-          email: joinEmail.trim() || undefined,
           emoji: joinEmoji ?? undefined,
         }),
       });
@@ -369,6 +360,7 @@ function LoginFlow() {
             <PinInput
               key={pinResetKey}
               label="PIN"
+              masked
               onComplete={handlePinComplete}
               error={pinError ?? undefined}
             />
@@ -407,29 +399,17 @@ function LoginFlow() {
                 label="Choose a 4-digit PIN"
                 onComplete={setJoinPin}
               />
-              <TextField
-                label="Email (optional)"
-                type="email"
-                value={joinEmail}
-                onChange={(e) => setJoinEmail(e.target.value)}
-                autoComplete="email"
-                hint="Only used for gameweek reminders — totally optional."
-              />
 
               <div className="flex flex-col gap-1.5">
                 <span className="text-[0.8rem] font-bold tracking-[0.08em] text-ink uppercase">
-                  Pick an emoji (optional)
+                  Pick an emoji
                 </span>
                 <div className="flex flex-wrap gap-2">
                   {EMOJI_OPTIONS.map((option) => (
                     <button
                       key={option}
                       type="button"
-                      onClick={() =>
-                        setJoinEmoji((current) =>
-                          current === option ? null : option,
-                        )
-                      }
+                      onClick={() => setJoinEmoji(option)}
                       aria-pressed={joinEmoji === option}
                       className={`flex h-11 w-11 items-center justify-center rounded-btn-sm border text-xl transition ${
                         joinEmoji === option
@@ -440,6 +420,22 @@ function LoginFlow() {
                       {option}
                     </button>
                   ))}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    intent="ghost"
+                    size="sm"
+                    onClick={() => setJoinEmoji(pickRandomEmoji(joinEmoji))}
+                  >
+                    <Dices className="h-4 w-4" />
+                    Surprise me
+                  </Button>
+                  {joinEmoji && !EMOJI_OPTIONS.includes(joinEmoji) ? (
+                    <span className="text-sm text-ink/70">
+                      Your pick: <span className="text-xl">{joinEmoji}</span>
+                    </span>
+                  ) : null}
                 </div>
               </div>
 

@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  bandPosition,
   type BoardState,
   countRead,
   dropInto,
   fillTone,
   modeFor,
+  nextUnfilledBand,
   rosterOrder,
   startAgain,
+  swapBands,
   tapWhileFilling,
 } from "./board";
 
@@ -70,6 +73,57 @@ describe("dropInto", () => {
   });
 });
 
+describe("swapBands", () => {
+  it("exchanges two placed teams' bands", () => {
+    const state: BoardState = {
+      assignments: { arsenal: "champion", chelsea: "europe" },
+      previous: { arsenal: null, chelsea: null },
+    };
+    const result = swapBands(state, "arsenal", "chelsea");
+    expect(result.assignments).toEqual({
+      arsenal: "europe",
+      chelsea: "champion",
+    });
+    expect(Object.keys(result.assignments).length).toBe(2);
+    expect(result.swapped[0]).toEqual({
+      teamId: "arsenal",
+      movedFrom: "champion",
+    });
+    expect(result.swapped[1]).toEqual({
+      teamId: "chelsea",
+      movedFrom: "europe",
+    });
+  });
+
+  it("records each team's prior band, for the swap undo affordance", () => {
+    const state: BoardState = {
+      assignments: { arsenal: "champion", chelsea: "europe" },
+      previous: { arsenal: null, chelsea: null },
+    };
+    const result = swapBands(state, "arsenal", "chelsea");
+    expect(result.previous.arsenal).toBe("champion");
+    expect(result.previous.chelsea).toBe("europe");
+  });
+
+  it("swapping the same pair twice restores their original bands", () => {
+    const state: BoardState = {
+      assignments: { arsenal: "champion", chelsea: "europe" },
+      previous: { arsenal: null, chelsea: null },
+    };
+    const first = swapBands(state, "arsenal", "chelsea");
+    const second = swapBands(
+      { assignments: first.assignments, previous: first.previous },
+      "arsenal",
+      "chelsea",
+    );
+    expect(second.assignments).toEqual({
+      arsenal: "champion",
+      chelsea: "europe",
+    });
+    expect(Object.keys(second.assignments).length).toBe(2);
+  });
+});
+
 describe("startAgain", () => {
   it("clears every assignment and history", () => {
     const state: BoardState = {
@@ -109,6 +163,47 @@ describe("modeFor", () => {
 
   it("is review once every team is placed", () => {
     expect(modeFor(20, 20)).toBe("review");
+  });
+});
+
+describe("nextUnfilledBand", () => {
+  it("finds the next Band ahead that's still under target", () => {
+    expect(nextUnfilledBand("champion", {})).toBe("champions_league");
+  });
+
+  it("skips over Bands that are already exactly filled", () => {
+    expect(
+      nextUnfilledBand("champion", { champions_league: 4, europe: 1 }),
+    ).toBe("europe");
+  });
+
+  it("skips over Bands that are over-filled -- not 'unfilled'", () => {
+    expect(nextUnfilledBand("champion", { champions_league: 6 })).toBe(
+      "europe",
+    );
+  });
+
+  it("never looks backward, even if an earlier Band is still empty", () => {
+    // Champion itself unfilled doesn't matter -- search starts after it.
+    expect(nextUnfilledBand("europe", {})).toBe("mid_table");
+  });
+
+  it("returns null once every Band ahead is exactly filled", () => {
+    expect(
+      nextUnfilledBand("relegation_battle", { relegated: 3 }),
+    ).toBeNull();
+  });
+
+  it("returns null from the last Band -- nothing ahead to search", () => {
+    expect(nextUnfilledBand("relegated", {})).toBeNull();
+  });
+});
+
+describe("bandPosition", () => {
+  it("is 1-based, in canonical table order", () => {
+    expect(bandPosition("champion")).toBe(1);
+    expect(bandPosition("europe")).toBe(3);
+    expect(bandPosition("relegated")).toBe(7);
   });
 });
 

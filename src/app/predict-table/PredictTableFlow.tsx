@@ -4,19 +4,32 @@ import { useEffect, useMemo, useState } from "react";
 import { CircleCheck } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import {
+  bandPosition,
   dropInto,
   modeFor,
+  nextUnfilledBand,
   rosterOrder,
   startAgain as startAgainBoard,
+  swapBands,
   tapWhileFilling,
   type Assignments,
   type PriorBandByTeam,
+  type SwapResult,
 } from "@/lib/table-predictions/board";
-import { type BandKey, validateBandCounts } from "@/lib/table-predictions/rules";
+import {
+  TABLE_BANDS,
+  type BandKey,
+  validateBandCounts,
+} from "@/lib/table-predictions/rules";
 import { BandSummary } from "./BandSummary";
-import { BandsBoard } from "./BandsBoard";
+import { BandsBoard, type UndoState } from "./BandsBoard";
 import { SealedMoment } from "./SealedMoment";
 import { BAND_LABEL, type Team } from "./shared";
+
+// How long the swap-pulse animation (globals.css) plays before its
+// justSwapped flag clears -- kept in one place so the state timeout and
+// the CSS duration can't drift apart.
+const SWAP_PULSE_MS = 500;
 
 function formatCountdown(msRemaining: number): string {
   const totalMinutes = Math.max(0, Math.floor(msRemaining / 60000));
@@ -82,11 +95,10 @@ export function PredictTableFlow({
   // this one's.
   const [openBand, setOpenBand] = useState<BandKey>("champion");
   const [lifted, setLifted] = useState<string | null>(null);
-  const [undo, setUndo] = useState<{
-    teamId: string;
-    band: BandKey;
-    label: string;
-  } | null>(null);
+  const [undo, setUndo] = useState<UndoState | null>(null);
+  const [justSwapped, setJustSwapped] = useState<[string, string] | null>(
+    null,
+  );
 
   const [isSkipped, setIsSkipped] = useState(initialIsSkipped);
   const [submittedAt, setSubmittedAt] = useState(initialSubmittedAt);
@@ -95,7 +107,7 @@ export function PredictTableFlow({
   const [busy, setBusy] = useState(false);
   const [justSealed, setJustSealed] = useState(false);
   const [now, setNow] = useState(() => Date.now());
-  const [busyTeamId, setBusyTeamId] = useState<string | null>(null);
+  const [busyTeamIds, setBusyTeamIds] = useState<string[]>([]);
   const [warnedIncomplete, setWarnedIncomplete] = useState(false);
   const [confirmingStartAgain, setConfirmingStartAgain] = useState(false);
   const [startingAgain, setStartingAgain] = useState(false);
@@ -127,6 +139,11 @@ export function PredictTableFlow({
   }, [assignments]);
   const validation = useMemo(() => validateBandCounts(counts), [counts]);
 
+  // Only meaningful while filling -- review mode has no single open Band to
+  // report a position for or advance from (issue #130).
+  const nextBand =
+    mode === "filling" ? nextUnfilledBand(openBand, counts) : null;
+
   // Applies a tap's computed board change optimistically, fires the one
   // request it implies (assign if the team landed in a Band, unassign if
   // it landed back in the roster), and rolls the change back on failure.
@@ -138,8 +155,8 @@ export function PredictTableFlow({
       movedFrom: BandKey | null;
     },
   ) {
-    if (busyTeamId === teamId) return;
-    setBusyTeamId(teamId);
+    if (busyTeamIds.includes(teamId)) return;
+    setBusyTeamIds((prev) => [...prev, teamId]);
     setSaveError(null);
     const prevAssignments = assignments;
     const prevPrevious = previous;
@@ -148,6 +165,7 @@ export function PredictTableFlow({
     if (result.movedFrom) {
       const team = teamsById.get(teamId);
       setUndo({
+        kind: "move",
         teamId,
         band: result.movedFrom,
         label: `${team?.name ?? "That team"} moved from ${BAND_LABEL[result.movedFrom]}`,
@@ -172,12 +190,90 @@ export function PredictTableFlow({
     } else {
       setIsSkipped(false);
     }
-    setBusyTeamId(null);
+    setBusyTeamIds((prev) => prev.filter((id) => id !== teamId));
+  }
+
+  // Swap is always two assigns (both teams are already placed -- review
+  // mode only exists once all 20 are), never an unassign.
+  async function persistSwap(
+    teamAId: string,
+    teamBId: string,
+    result: SwapResult,
+  ) {
+    if (busyTeamIds.includes(teamAId) || busyTeamIds.includes(teamBId)) {
+      return;
+    }
+    setBusyTeamIds((prev) => [...prev, teamAId, teamBId]);
+    setSaveError(null);
+    const prevAssignments = assignments;
+    const prevPrevious = previous;
+    setAssignments(result.assignments);
+    setPrevious(result.previous);
+
+    const teamAName = teamsById.get(teamAId)?.name ?? "That team";
+    const teamBName = teamsById.get(teamBId)?.name ?? "that team";
+    setUndo({
+      kind: "swap",
+      teamA: { teamId: teamAId, band: result.swapped[0].movedFrom },
+      teamB: { teamId: teamBId, band: result.swapped[1].movedFrom },
+      label: `${teamAName} and ${teamBName} swapped Bands`,
+    });
+    setJustSwapped([teamAId, teamBId]);
+    setTimeout(() => setJustSwapped(null), SWAP_PULSE_MS);
+
+    const [aResult, bResult] = await Promise.all([
+      postJson("/api/table-predictions/assign", {
+        teamId: teamAId,
+        band: result.assignments[teamAId],
+      }),
+      postJson("/api/table-predictions/assign", {
+        teamId: teamBId,
+        band: result.assignments[teamBId],
+      }),
+    ]);
+
+    if (!aResult.ok || !bResult.ok) {
+      setAssignments(prevAssignments);
+      setPrevious(prevPrevious);
+      setUndo(null);
+      setJustSwapped(null);
+      setSaveError(
+        (!aResult.ok ? aResult.data.error : bResult.data.error) ??
+          "Couldn't save that swap -- try again.",
+      );
+    } else {
+      setIsSkipped(false);
+    }
+    setBusyTeamIds((prev) =>
+      prev.filter((id) => id !== teamAId && id !== teamBId),
+    );
   }
 
   function handleTeamTap(teamId: string) {
     if (mode === "review") {
-      setLifted((prev) => (prev === teamId ? null : teamId));
+      if (lifted === teamId) {
+        setLifted(null);
+        return;
+      }
+      if (lifted) {
+        // Every team visible in review is already placed (review mode
+        // only exists once all 20 are), so a second tap on a different
+        // placed team is a swap, not a move (issue #131) -- unless the two
+        // are already in the same Band, in which case swapping would be a
+        // no-op: nothing to persist, animate, or offer an undo for. Treat
+        // that tap as just re-lifting the newly tapped team instead.
+        const teamAId = lifted;
+        const teamBId = teamId;
+        if (assignments[teamAId] === assignments[teamBId]) {
+          setLifted(teamBId);
+          return;
+        }
+        setLifted(null);
+        const result = swapBands({ assignments, previous }, teamAId, teamBId);
+        void persistSwap(teamAId, teamBId, result);
+        return;
+      }
+      setLifted(teamId);
       return;
     }
     const result = tapWhileFilling({ assignments, previous }, teamId, openBand);
@@ -194,10 +290,22 @@ export function PredictTableFlow({
 
   function handleUndo() {
     if (!undo) return;
-    const { teamId, band } = undo;
     setUndo(null);
-    const result = dropInto({ assignments, previous }, teamId, band);
-    void persistTap(teamId, result);
+    if (undo.kind === "move") {
+      const { teamId, band } = undo;
+      const result = dropInto({ assignments, previous }, teamId, band);
+      void persistTap(teamId, result);
+      return;
+    }
+    // Swap undo: swapBands is symmetric, so swapping the same pair again
+    // restores both teams to their pre-swap Bands.
+    const { teamA, teamB } = undo;
+    const result = swapBands(
+      { assignments, previous },
+      teamA.teamId,
+      teamB.teamId,
+    );
+    void persistSwap(teamA.teamId, teamB.teamId, result);
   }
 
   async function handleStartAgain() {
@@ -315,6 +423,14 @@ export function PredictTableFlow({
           <span>
             {placedCount} of {teams.length} placed
           </span>
+          {mode === "filling" ? (
+            <>
+              <span aria-hidden>&middot;</span>
+              <span>
+                Band {bandPosition(openBand)} of {TABLE_BANDS.length}
+              </span>
+            </>
+          ) : null}
           {!locked && !isLateJoiner && gameweekOneKickoff ? (
             <>
               <span aria-hidden>&middot;</span>
@@ -382,9 +498,11 @@ export function PredictTableFlow({
         teamsById={teamsById}
         assignments={assignments}
         openBand={openBand}
+        nextBand={nextBand}
         lifted={lifted}
-        busyTeamId={busyTeamId}
+        busyTeamIds={busyTeamIds}
         undo={undo}
+        justSwapped={justSwapped}
         onOpenBand={setOpenBand}
         onTapTeam={handleTeamTap}
         onDropInto={handleDropInto}

@@ -1,7 +1,7 @@
 import readline from "node:readline";
 
 // Plain interactive prompt (input echoed normally) -- for non-secret values
-// like a name or an optional emoji, where promptHidden's masking would just
+// like a name or an emoji, where promptHidden's masking would just
 // be confusing.
 export function prompt(question) {
   return new Promise((resolve) => {

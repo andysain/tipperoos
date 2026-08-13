@@ -1,3 +1,4 @@
+import { ChevronRight, X } from "lucide-react";
 import {
   CardShell,
   CardShellBody,
@@ -18,11 +19,24 @@ import {
   type Team,
 } from "./shared";
 
-interface UndoState {
+interface MoveUndo {
+  kind: "move";
   teamId: string;
   band: BandKey;
   label: string;
 }
+
+interface SwapUndo {
+  kind: "swap";
+  teamA: { teamId: string; band: BandKey };
+  teamB: { teamId: string; band: BandKey };
+  label: string;
+}
+
+/** What the undo affordance replays: a single move (dropInto back to
+ * `band`), or a swap pair (dropInto both teams back to their prior Bands).
+ * See PredictTableFlow's handleUndo for the replay logic. */
+export type UndoState = MoveUndo | SwapUndo;
 
 /** The undo affordance for the move that just happened, shown inside the
  * Band the team landed in -- not as a page-level banner, so it reads next
@@ -50,12 +64,16 @@ function PlacedTeamCard({
   onTap,
   disabled,
   liftedHere,
+  justSwapped,
 }: {
   team: Team;
   emphasis?: boolean;
   onTap: () => void;
   disabled?: boolean;
   liftedHere?: boolean;
+  /** True for the two rows of a swap that just landed -- a brief pulse in
+   * place of a confirm dialog (issue #131, ADR 0008). */
+  justSwapped?: boolean;
 }) {
   const fill = teamFill(team.shortCode);
   return (
@@ -65,7 +83,7 @@ function PlacedTeamCard({
       disabled={disabled}
       className={`group flex items-stretch gap-3 overflow-hidden rounded-btn border py-3 pr-3 pl-2.5 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
         emphasis ? "border-accent bg-accent/10 ring-1 ring-accent/40" : ""
-      } ${liftedHere ? "border-accent bg-accent/10 ring-2 ring-accent/50" : !emphasis ? "border-paper-line bg-white hover:border-accent/50" : ""}`}
+      } ${liftedHere ? "border-accent bg-accent/10 ring-2 ring-accent/50" : !emphasis ? "border-paper-line bg-white hover:border-accent/50" : ""} ${justSwapped ? "motion-safe:animate-swap-pulse" : ""}`}
     >
       <span
         aria-hidden
@@ -81,6 +99,10 @@ function PlacedTeamCard({
           {team.name}
         </span>
       </span>
+      <X
+        aria-hidden
+        className="size-4 shrink-0 self-center text-ink/30"
+      />
     </button>
   );
 }
@@ -122,11 +144,16 @@ function RosterChip({
         className={`w-1 shrink-0 rounded-full ${band ? "bg-ink/20" : ""}`}
         style={band ? undefined : { background: fill }}
       />
-      <span className="min-w-0">
-        <span
-          className={`block truncate text-[0.76rem] leading-tight font-extrabold ${band ? "text-ink/60" : "text-ink"}`}
-        >
-          {team.shortCode ?? team.name.slice(0, 3).toUpperCase()}
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1">
+          <span
+            className={`block truncate text-[0.76rem] leading-tight font-extrabold ${band ? "text-ink/60" : "text-ink"}`}
+          >
+            {team.shortCode ?? team.name.slice(0, 3).toUpperCase()}
+          </span>
+          {band ? (
+            <X aria-hidden className="size-3 shrink-0 text-ink/40" />
+          ) : null}
         </span>
         <span className="block truncate text-[0.66rem] leading-tight text-ink/50">
           {band
@@ -188,9 +215,11 @@ export function BandsBoard({
   teamsById,
   assignments,
   openBand,
+  nextBand,
   lifted,
-  busyTeamId,
+  busyTeamIds,
   undo,
+  justSwapped,
   onOpenBand,
   onTapTeam,
   onDropInto,
@@ -201,9 +230,16 @@ export function BandsBoard({
   teamsById: Map<string, Team>;
   assignments: Record<string, BandKey>;
   openBand: BandKey;
+  /** The Band the "Next: [Band] →" prompt advances to, once the open Band
+   * is exactly filled -- null while there's nothing under-filled ahead
+   * (issue #130). Always null outside filling mode. */
+  nextBand: BandKey | null;
   lifted: string | null;
-  busyTeamId: string | null;
+  busyTeamIds: string[];
   undo: UndoState | null;
+  /** The two teams a swap just landed, for the swap-pulse animation --
+   * null once it's played (issue #131). */
+  justSwapped: [string, string] | null;
   onOpenBand: (band: BandKey) => void;
   onTapTeam: (teamId: string) => void;
   onDropInto: (band: BandKey) => void;
@@ -212,10 +248,18 @@ export function BandsBoard({
   const teamsInBand = (band: BandKey) =>
     teams.filter((t) => assignments[t.id] === band);
   const liftedBand = lifted ? (assignments[lifted] ?? null) : null;
-  // The undo affordance shows inside whichever Band the team just landed
-  // in -- that Band is always the one currently expanded (it's either
-  // `openBand` while filling, or every Band is expanded in review).
-  const undoBand = undo ? (assignments[undo.teamId] ?? null) : null;
+  // The undo affordance shows inside whichever Band(s) the move landed in --
+  // one Band for a plain move, two for a swap (each team's new Band).
+  // That's always a currently-expanded Band (it's either `openBand` while
+  // filling, or every Band is expanded in review).
+  const undoBands: BandKey[] = undo
+    ? undo.kind === "move"
+      ? [assignments[undo.teamId] ?? undo.band]
+      : [
+          assignments[undo.teamA.teamId] ?? undo.teamA.band,
+          assignments[undo.teamB.teamId] ?? undo.teamB.band,
+        ]
+    : [];
 
   return (
     <div className="flex flex-col gap-3">
@@ -272,7 +316,7 @@ export function BandsBoard({
                 </div>
               </CardShellHeader>
               <CardShellBody>
-                {undo && undoBand === band.key ? (
+                {undo && undoBands.includes(band.key) ? (
                   <UndoRow undo={undo} onUndo={onUndo} />
                 ) : null}
 
@@ -289,8 +333,13 @@ export function BandsBoard({
                         key={team.id}
                         team={team}
                         emphasis={isChampionSingle}
-                        disabled={busyTeamId === team.id}
+                        disabled={busyTeamIds.includes(team.id)}
                         liftedHere={lifted === team.id}
+                        justSwapped={
+                          justSwapped != null &&
+                          (justSwapped[0] === team.id ||
+                            justSwapped[1] === team.id)
+                        }
                         onTap={() => onTapTeam(team.id)}
                       />
                     ))
@@ -307,6 +356,17 @@ export function BandsBoard({
                   </button>
                 ) : null}
 
+                {isOpen && tone === "ok" && nextBand ? (
+                  <button
+                    type="button"
+                    onClick={() => onOpenBand(nextBand)}
+                    className="mt-3 flex w-full items-center justify-center gap-1 rounded-btn border-2 border-accent bg-accent/10 px-3 py-2.5 text-sm font-extrabold text-ink transition hover:bg-accent/20"
+                  >
+                    Next: {BAND_LABEL[nextBand]}
+                    <ChevronRight className="size-4" aria-hidden />
+                  </button>
+                ) : null}
+
                 {isOpen ? (
                   <>
                     <p className="mt-3 mb-2 px-0.5 text-[0.68rem] font-bold tracking-[0.12em] text-ink/40 uppercase">
@@ -318,7 +378,7 @@ export function BandsBoard({
                           key={team.id}
                           team={team}
                           band={assignments[team.id] ?? null}
-                          busy={busyTeamId === team.id}
+                          busy={busyTeamIds.includes(team.id)}
                           onTap={() => onTapTeam(team.id)}
                         />
                       ))}

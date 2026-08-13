@@ -4,6 +4,7 @@ import {
   DISPLAY_NAME_MIN_LENGTH,
   PIN_LENGTH,
   validateDisplayName,
+  validateEmoji,
   validatePinFormat,
 } from "./signup-validation";
 
@@ -98,5 +99,40 @@ describe("validatePinFormat", () => {
 
   it("rejects an empty string", () => {
     expect(validatePinFormat("")).toBe(false);
+  });
+});
+
+describe("validateEmoji", () => {
+  it("rejects an empty string (emoji is mandatory at signup, issue #127)", () => {
+    const result = validateEmoji("");
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe("Pick an emoji.");
+    }
+  });
+
+  it("rejects a string that is only whitespace", () => {
+    expect(validateEmoji("   ").ok).toBe(false);
+  });
+
+  it("rejects an emoji that is not in the curated library", () => {
+    expect(validateEmoji("💩").ok).toBe(false);
+    expect(validateEmoji("not-an-emoji").ok).toBe(false);
+  });
+
+  it("accepts a library member", () => {
+    const result = validateEmoji("🦊");
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.normalized).toBe("🦊");
+    }
+  });
+
+  it("trims surrounding whitespace and normalizes to the trimmed value", () => {
+    const result = validateEmoji("  🦊  ");
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.normalized).toBe("🦊");
+    }
   });
 });
