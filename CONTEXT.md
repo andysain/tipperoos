@@ -37,8 +37,18 @@ _Avoid_: Round, Week
 **Gameweek Score**:
 The points a Player earned in one specific Gameweek, from that Gameweek's Tipped Matches only. Distinct from Season Total.
 
+**Match Score**:
+The points one Player earned on one Tipped Match: 0–7, drawn from `{0, 1, 3, 4, 5, 7}`. A pure function of that Player's own Pick and the match's authoritative result — it never reads other Players' Picks or their ranking. See `CLAUDE.md` → _Scoring_.
+
+**Wrong Way Round**:
+A Pick that names the exact scoreline with the sides swapped (called 2–1, it finished 1–2). Worth +1, and mutually exclusive with every other scoring term by construction. Can never occur on a draw.
+_Avoid_: Reversed, Flipped (both read as an admin action on a result, not a Player's outcome)
+
+**Benchmark Line**:
+The Median Bot's Season Total, shown on the leaderboard as a bar to clear rather than a rival to beat — Bots can't win. Beating the crowd's own consensus over a full season is the app's one comparison that reflects skill rather than luck.
+
 **Season Total**:
-A Player's cumulative points across all Gameweeks played so far.
+A Player's cumulative points across all Gameweeks played so far. Shown alongside **points-per-Gameweek-played**, so a Late Joiner or a Player who missed Gameweeks isn't visually buried by a total covering weeks they weren't in.
 
 **Season Standing**:
 A Player's rank among all Players by Season Total, as of a given Gameweek. Worst standing = highest rank number (closest to the bottom of the table), not lowest — this was the Picker tiebreak's second signal, and remains the leaderboard's ordering.
@@ -68,10 +78,10 @@ _Avoid_: Admin alone (ambiguous now that the role is split — always say Compet
 A documented role, deliberately not built yet: a Player with cross-Competition match-result/kickoff-time correction rights — the only capability that would ever span every Competition, since Fixtures/Matches are shared, global facts with no Competition of their own. Would never partake in any Competition's gameplay (a pure administrative role) and would be excluded from every Competition's login roster via a separate gate. Not needed while one person administers every Competition that exists — see `docs/adr/0004-multi-competition-foundational-scope.md` decision 6. Match-result correction is, for now, a development-team database action, not an in-app capability at all.
 
 **Season Winner**:
-The Player with the highest Season Total at season end, within one Competition. Eligible pool excludes any Late Joiner and (if it's ever built) a Superadmin; a Competition Admin **is** eligible. Bots are eligible to win.
+The Player with the highest Season Total at season end, within one Competition. Eligible pool excludes any Late Joiner, every Bot, and (if it's ever built) a Superadmin; a Competition Admin **is** eligible. **No Bot can be Season Winner** — Bots are there for fun and intrigue only, so the Season Winner is always a person (see `docs/adr/0009-match-scoring-formula-and-title-eligibility.md`).
 
 **Late Joiner**:
-A Player who signs up after Gameweek 1 has begun. Not eligible for Season Winner (didn't compete the full season). May submit Predict the Table at any time after joining, or skip it — both optional, unlike the mandatory pre-season capture for on-time Players.
+A Player who signs up after Gameweek 1 has begun. Not eligible for Season Winner (didn't compete the full season), and not eligible to win the separate Table Prediction title either — they appear on both leaderboards, visually de-emphasised. May submit Predict the Table at any time after joining, or skip it — both optional, unlike the mandatory pre-season capture for on-time Players. Sits outside the Bold Call process entirely.
 
 **Table Prediction**:
 A Player's full 20-team finishing-order prediction for the season, captured by sorting teams into Table Bands. Submitted once during onboarding, re-submittable any number of times until Gameweek 1's first kickoff, then locked. Optional for a Late Joiner.
@@ -80,5 +90,12 @@ A Player's full 20-team finishing-order prediction for the season, captured by s
 One of 7 fixed groupings of final Premier League position, used to score a Table Prediction: Champion (1), Champions League (2–5), Europe (6–8), Mid Table (9–11), Lower Table (12–14), Relegation Battle (15–17), Relegated (18–20). A team's predicted Table Band is compared against its actual Table Band to score points; the order of teams within a Band carries no scoring weight.
 
 **Table Prediction Score**:
-A standalone points total (max 200) earned from a Table Prediction, recomputed continuously against current Premier League standings. Distinct from Season Total — does not affect Season Winner.
+A standalone points total (max 200) earned from a Table Prediction, recomputed continuously against current Premier League standings. Three components: Placement (5/2/1/0 by Band distance, max 100), Band Bonus (max 85) and Bold Call (max 15). Distinct from Season Total — does not affect Season Winner. Has its own leaderboard and its own title, which a Late Joiner appears on but cannot win.
 _Avoid_: assuming this contributes to Season Total — it deliberately doesn't, for now.
+
+**Band Bonus**:
+Points for predicting one Table Band's full membership exactly, in any order within it: 15 for Champion, Champions League and Relegated, 10 for the other four. An over- or under-filled Band simply forfeits its bonus rather than being rejected.
+
+**Bold Call**:
+A correct placement made by no more than roughly one in 10 eligible players, worth +3; a Player's best 5 count. Competitions with fewer than 10 eligible players still allow one lone correct call, then the threshold grows by one agreement per 10 players. Rewards being right where almost nobody else was, so the score pays for judgement rather than common knowledge. A Late Joiner sits outside the process in both directions — earns none, and counts toward nobody's rarity.
+_Avoid_: Bold Pick (collides with Pick, which means a match scoreline)

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CircleCheck } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { ScoringSummary } from "@/components/scoring/ScoringSummary";
 import {
   bandPosition,
   dropInto,
@@ -45,7 +46,13 @@ function formatCountdown(msRemaining: number): string {
 // reserves `warning` for exactly this ("Locks-soon countdown"), just not
 // wired up anywhere yet. Only ever shown to on-time players before lock --
 // Late Joiners are never locked (CLAUDE.md).
-function LockCountdown({ kickoffIso, now }: { kickoffIso: string; now: number }) {
+function LockCountdown({
+  kickoffIso,
+  now,
+}: {
+  kickoffIso: string;
+  now: number;
+}) {
   const remainingMs = new Date(kickoffIso).getTime() - now;
   if (remainingMs <= 0) return null;
   const soon = remainingMs < 24 * 60 * 60 * 1000;
@@ -88,7 +95,8 @@ export function PredictTableFlow({
   initialSubmittedAt,
   gameweekOneKickoff,
 }: PredictTableFlowProps) {
-  const [assignments, setAssignments] = useState<Assignments>(initialAssignments);
+  const [assignments, setAssignments] =
+    useState<Assignments>(initialAssignments);
   const [previous, setPrevious] = useState<PriorBandByTeam>({});
   // Which Band is armed while filling -- always Champion on load. Which Band
   // opens on a *return* visit is #118's scope (return-visit landing), not
@@ -96,9 +104,7 @@ export function PredictTableFlow({
   const [openBand, setOpenBand] = useState<BandKey>("champion");
   const [lifted, setLifted] = useState<string | null>(null);
   const [undo, setUndo] = useState<UndoState | null>(null);
-  const [justSwapped, setJustSwapped] = useState<[string, string] | null>(
-    null,
-  );
+  const [justSwapped, setJustSwapped] = useState<[string, string] | null>(null);
 
   const [isSkipped, setIsSkipped] = useState(initialIsSkipped);
   const [submittedAt, setSubmittedAt] = useState(initialSubmittedAt);
@@ -331,7 +337,9 @@ export function PredictTableFlow({
     if (failed) {
       setAssignments(prevAssignments);
       setPrevious(prevPrevious);
-      setSaveError("Couldn't start again -- check your connection and try again.");
+      setSaveError(
+        "Couldn't start again -- check your connection and try again.",
+      );
     }
     setStartingAgain(false);
   }
@@ -381,6 +389,7 @@ export function PredictTableFlow({
             ? "Locked in -- Gameweek 1 has kicked off."
             : "Gameweek 1 has kicked off, so this is locked. Here's what you had:"}
         </p>
+        <ScoringSummary kind="table" />
         <BandSummary assignments={assignments} teamsById={teamsById} />
       </main>
     );
@@ -395,6 +404,7 @@ export function PredictTableFlow({
         <p className="text-ink/70">
           No worries -- you can still call your table whenever you like.
         </p>
+        <ScoringSummary kind="table" />
         <Button
           onClick={() => setIsSkipped(false)}
           fullWidth
@@ -414,9 +424,10 @@ export function PredictTableFlow({
         Predict the Table
       </h1>
       <p className="-mt-2 text-ink/70">
-        Where will each Premier League club finish? Tap a Band to open it,
-        then tap clubs to add them.
+        Where will each Premier League club finish? Tap a Band to open it, then
+        tap clubs to add them.
       </p>
+      <ScoringSummary kind="table" />
 
       <div className="-mt-2 flex items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-xs font-bold text-ink/50">
@@ -520,8 +531,8 @@ export function PredictTableFlow({
           <div className="rounded-card border border-paper-line bg-white p-3">
             <p className="mb-2 text-sm text-ink">
               {mismatchCount} Band{mismatchCount > 1 ? "s aren't" : " isn't"}{" "}
-              the right size -- you&apos;ll miss {mismatchCount} Band
-              Bonus{mismatchCount > 1 ? "es" : ""}. Seal it anyway?
+              the right size -- you&apos;ll miss {mismatchCount} Band Bonus
+              {mismatchCount > 1 ? "es" : ""}. Seal it anyway?
             </p>
             <div className="flex gap-2">
               <Button

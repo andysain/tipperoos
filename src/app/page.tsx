@@ -18,6 +18,7 @@ import { PickBoardSlotCard } from "@/components/pick-board/PickBoardSlotCard";
 import { SeasonStatsBlock } from "@/components/pick-board/SeasonStatsBlock";
 import { StatsStrip } from "@/components/pick-board/StatsStrip";
 import { TablePredictionPrompt } from "@/components/pick-board/TablePredictionPrompt";
+import { ScoringSummary } from "@/components/scoring/ScoringSummary";
 import {
   DEFAULT_TIME_ZONE,
   TIMEZONE_COOKIE_NAME,
@@ -98,6 +99,7 @@ export default async function PickBoardPage() {
             earliestOpenKickoffUtcIso={gameweek.earliestOpenKickoffUtcIso}
             timeZone={timeZone}
           />
+          <ScoringSummary kind="matches" />
           <div className="flex flex-col gap-3 md:grid md:grid-cols-2 md:items-start md:gap-4">
             {gameweek.slots.map((slot, index) => (
               <PickBoardSlotCard

@@ -16,6 +16,7 @@ import {
   CardShellHeader,
   CardShellSeam,
 } from "@/components/ui/CardShell";
+import { ScoringBreakdown } from "@/components/scoring/ScoringBreakdown";
 
 export interface TippedMatchTeam {
   name: string;
@@ -476,25 +477,31 @@ function FinishedFooter({
 }) {
   const exact = ownHomeScore === homeScore && ownAwayScore === awayScore;
   return (
-    <div className="flex items-center gap-2 bg-ink px-3.5 pt-0.5 pb-3.5 text-[0.86rem]">
-      {exact ? (
-        <span className="font-bold text-success">You called it exactly</span>
-      ) : ownHomeScore !== null && ownAwayScore !== null ? (
-        <span className="text-paper/75">
-          You tipped{" "}
-          <span className="font-extrabold text-accent">
-            {ownHomeScore}–{ownAwayScore}
+    <>
+      <div className="flex items-center gap-2 bg-ink px-3.5 pt-0.5 pb-3.5 text-[0.86rem]">
+        {exact ? (
+          <span className="font-bold text-success">You called it exactly</span>
+        ) : ownHomeScore !== null && ownAwayScore !== null ? (
+          <span className="text-paper/75">
+            You tipped{" "}
+            <span className="font-extrabold text-accent">
+              {ownHomeScore}–{ownAwayScore}
+            </span>
           </span>
-        </span>
-      ) : (
-        <span className="text-paper/60">No pick filed</span>
-      )}
+        ) : (
+          <span className="text-paper/60">No pick filed</span>
+        )}
+      </div>
       {points !== null ? (
-        <span className="ml-auto rounded-full bg-success/25 px-2.5 py-1 text-[0.82rem] font-extrabold text-success">
-          +{points} pts
-        </span>
+        <ScoringBreakdown
+          pickHome={ownHomeScore}
+          pickAway={ownAwayScore}
+          resultHome={homeScore}
+          resultAway={awayScore}
+          points={points}
+        />
       ) : null}
-    </div>
+    </>
   );
 }
 

@@ -9,13 +9,9 @@ import { PinInput } from "@/components/ui/PinInput";
 import { TextField } from "@/components/ui/TextField";
 import { detectBrowserTimeZone } from "@/components/nav/timezone-cookie";
 import { EMOJI_OPTIONS, pickRandomEmoji } from "@/lib/auth/emoji-options";
+import { fetchPlayers, type Player } from "./fetch-players";
 
 const STORED_CODE_KEY = "tipperoos.competitionCode";
-
-interface Player {
-  displayName: string;
-  emoji: string | null;
-}
 
 type Step = "checking" | "code" | "list" | "pin" | "join";
 
@@ -28,34 +24,6 @@ function formatLocalTime(iso: string): string {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(iso));
-}
-
-export type FetchPlayersResult =
-  | { status: "ok"; players: Player[] }
-  | { status: "invalid-code" }
-  | { status: "error" };
-
-// Never rejects -- every failure mode (network failure, a non-JSON body, a
-// transient 5xx, an actually-invalid/rotated code) resolves to a specific
-// FetchPlayersResult instead. Centralized here rather than relying on every
-// call site to remember try/catch: an earlier version left this rejecting
-// on network failure, which the mount-time silent-replay call site (below)
-// didn't catch -- the user was stuck on the initial loading screen forever.
-// It also used to return `null` for any non-ok response, which conflated a
-// genuinely invalid/rotated code (403) with a transient server error (5xx),
-// wiping a still-valid stored code from localStorage on a mere blip.
-export async function fetchPlayers(code: string): Promise<FetchPlayersResult> {
-  try {
-    const response = await fetch("/api/auth/players", {
-      headers: { "x-competition-code": code },
-    });
-    if (response.status === 403) return { status: "invalid-code" };
-    if (!response.ok) return { status: "error" };
-    const data = await response.json();
-    return { status: "ok", players: data.players };
-  } catch {
-    return { status: "error" };
-  }
 }
 
 function LoginFlow() {
