@@ -99,10 +99,7 @@ function PlacedTeamCard({
           {team.name}
         </span>
       </span>
-      <X
-        aria-hidden
-        className="size-4 shrink-0 self-center text-ink/30"
-      />
+      <X aria-hidden className="size-4 shrink-0 self-center text-ink/30" />
     </button>
   );
 }
@@ -149,7 +146,7 @@ function RosterChip({
           <span
             className={`block truncate text-[0.76rem] leading-tight font-extrabold ${band ? "text-ink/60" : "text-ink"}`}
           >
-            {team.shortCode ?? team.name.slice(0, 3).toUpperCase()}
+            {team.displayName}
           </span>
           {band ? (
             <X aria-hidden className="size-3 shrink-0 text-ink/40" />
@@ -158,7 +155,9 @@ function RosterChip({
         <span className="block truncate text-[0.66rem] leading-tight text-ink/50">
           {band
             ? BAND_LABEL[band]
-            : (team.previousSeasonPosition ? `#${team.previousSeasonPosition}` : "Promoted")}
+            : team.previousSeasonPosition
+              ? `#${team.previousSeasonPosition}`
+              : "Promoted"}
         </span>
       </span>
     </button>
@@ -189,21 +188,21 @@ function CollapsedBandRow({
     <button
       type="button"
       onClick={onOpen}
-      className={`flex w-full items-center gap-2 rounded-card border px-3 py-2.5 text-left transition hover:border-accent/50 ${FILL_GROUND[tone]}`}
+      className={`flex w-full flex-col gap-1 rounded-card border px-3 py-2.5 text-left transition hover:border-accent/50 ${FILL_GROUND[tone]}`}
     >
-      <meta.Icon className="size-4 shrink-0 text-ink/60" aria-hidden />
-      <span className="w-[8.5rem] shrink-0 truncate text-[0.8rem] font-extrabold text-ink">
-        {band.label}
+      <span className="flex w-full items-center gap-2">
+        <meta.Icon className="size-4 shrink-0 text-ink/60" aria-hidden />
+        <span className="min-w-0 flex-1 truncate text-[0.8rem] font-extrabold text-ink">
+          {band.label}
+        </span>
+        <span
+          className={`shrink-0 text-[0.7rem] tabular-nums ${FILL_COUNT_TEXT[tone]}`}
+        >
+          {countRead(filled, band.target)}
+        </span>
       </span>
-      <span className="min-w-0 flex-1 truncate text-[0.72rem] font-semibold text-ink/50">
-        {teams.length
-          ? teams.map((t) => t.shortCode ?? t.name.slice(0, 3).toUpperCase()).join(" · ")
-          : "—"}
-      </span>
-      <span
-        className={`shrink-0 text-[0.7rem] tabular-nums ${FILL_COUNT_TEXT[tone]}`}
-      >
-        {countRead(filled, band.target)}
+      <span className="w-full pl-6 text-[0.72rem] leading-snug font-semibold whitespace-normal text-ink/50">
+        {teams.length ? teams.map((t) => t.displayName).join(" · ") : "—"}
       </span>
     </button>
   );
@@ -294,11 +293,17 @@ export function BandsBoard({
             {band.key === "relegated" ? <DropDivider /> : null}
             <CardShell
               className={
-                isOpen ? "ring-2 ring-accent ring-offset-2 ring-offset-paper" : ""
+                isOpen
+                  ? "ring-2 ring-accent ring-offset-2 ring-offset-paper"
+                  : ""
               }
             >
               <CardShellHeader
-                style={headerBackground ? { background: headerBackground } : undefined}
+                style={
+                  headerBackground
+                    ? { background: headerBackground }
+                    : undefined
+                }
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
@@ -352,7 +357,7 @@ export function BandsBoard({
                     onClick={() => onDropInto(band.key)}
                     className="mt-2 w-full rounded-btn border-2 border-dashed border-accent bg-accent/10 px-3 py-2.5 text-sm font-extrabold text-ink transition hover:bg-accent/20"
                   >
-                    Move {teamsById.get(lifted!)?.shortCode ?? "here"} here
+                    Move {teamsById.get(lifted!)?.name ?? "that team"} here
                   </button>
                 ) : null}
 

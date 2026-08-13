@@ -15,6 +15,7 @@ import { type FillTone } from "@/lib/table-predictions/board";
 export interface Team {
   id: string;
   name: string;
+  displayName: string;
   shortCode: string | null;
   previousSeasonPosition: number | null;
 }
