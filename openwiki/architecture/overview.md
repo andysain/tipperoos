@@ -26,7 +26,7 @@ flowchart TD
     Next --> SS
     Next --> CS
     SS -->|service_role key| Supabase
-    CS -->|fetch() to /api/*| SS
+    CS -->|"fetch() to /api/*"| SS
     SS -->|server-to-server| FD
 ```
 
