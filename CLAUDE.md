@@ -53,11 +53,11 @@ Do not build a general tournament/sports platform. Build for this specific priva
 - **Lockout**: 5 failed PIN attempts locks the account for 15 minutes (auto-expires, no admin action needed for the common case). A successful login resets the failed-attempt counter.
 - **Forgot-PIN reset (admin-assisted, forced-reset flow)**: admin sets a temporary PIN (typed by the admin, communicated to the player directly — no delivery mechanism needed since it's in-person/by phone) and flags the account as needing a reset. The player logs in with the temp PIN and is forced to choose a real new PIN before reaching the app; the reset flag then clears, along with any lockout state.
 - **Admin is a two-tier role, scoped per competition** (see `docs/adr/0004-multi-competition-foundational-scope.md` for the full reasoning): a **Competition Admin** (`is_admin = true`, scoped to their own competition) can still play for fun and, unlike an earlier single-tier version of this rule, **is eligible for their own competition's season "winner" title** — their one elevated capability (resetting another player's PIN, plus administering that competition's settings once any exist, e.g. a lockout duration) can't influence scoring, so the credibility conflict that would otherwise justify excluding them doesn't apply. **Match-result and kickoff-time correction is explicitly not a Competition Admin capability.** For now it's a development-team database action, not an in-app capability at all — matching the app's actual current state, since no admin route for it exists yet. A future **Superadmin** role (cross-competition match-result correction, deliberately kept off every competition's visible login list) is a documented design, not built — build it only once a second human Competition Admin makes arbitrating a shared match fact a real need, not speculatively now. No elevated read visibility for either tier: pre-lock pick visibility rules apply the same to a Competition Admin as to any other player; there is no "sees everything early" bypass, and building one would be scope creep beyond what's actually decided. The very first Competition Admin account is created via a one-off seed script (same pattern as fixture seeding) alongside its competition, not a UI flow — exactly one per competition. _Deferred to future work_: a proper competition-setup flow where the first signup becomes admin automatically, a user-management screen for adding players and assigning roles, and admin-configurable competition-specific settings.
-- Bot players exist (`is_bot = true`), clearly labelled on the leaderboard (e.g. 🤖). **Bots are eligible for the season "winner" title.** Three bot types carry forward from the old app (ported logic, not reinvented); the ELO bot is dropped (see _Explicitly out of scope_):
+- Bot players exist (`is_bot = true`), clearly labelled on the leaderboard (e.g. 🤖). **No bot is eligible for the season "winner" title** — bots are there for fun and intrigue, and the season winner is always a person. This reverses an earlier "bots are eligible" rule; see `docs/adr/0009-match-scoring-formula-and-title-eligibility.md`, which also records the evidence behind it (in the retired World Cup app the Median Bot led most of the season and won it, and the Random Bot finished a substantial last). **Bots are per-competition** — each competition has its own bot players, scoped by `players.competition_id`; the Median Bot in particular must derive from its own competition's human picks only. Three bot types carry forward from the old app (ported logic, not reinvented); the ELO bot is dropped (see _Explicitly out of scope_):
   - **Random Bot**: predicts a random plausible scoreline for each side, independently, per match.
   - **1-1 Bot**: always predicts 1–1.
-  - **Median Bot**: predicts the rounded median of that match's human players' submitted picks. Generated only _after_ the match locks (not a blind guess) — it's a "wisdom of the crowd" reference pick, not a competitive prediction.
-- **Late joiners**: a player who signs up (via the private competition code) after gameweek 1 has begun. They **are not eligible for the season "winner" title** (didn't compete the full season). They **can submit Predict the Table at any time after joining, or skip it entirely** — both optional for them, unlike the mandatory pre-season capture for players who join before gameweek 1. Gameweeks before they joined score 0, with no special-case logic needed beyond "no picks exist for those matches."
+  - **Median Bot**: predicts the rounded median of that match's human players' submitted picks. Generated only _after_ the match locks (not a blind guess) — it's a "wisdom of the crowd" reference pick, not a competitive prediction. With bots now ineligible for the title, it functions as the leaderboard's **benchmark line**: beating the crowd's own consensus over a season is the one comparison in the app that says something about skill rather than luck.
+- **Late joiners**: a player who signs up (via the private competition code) after gameweek 1 has begun. They **are not eligible for the season "winner" title** (didn't compete the full season). They **can submit Predict the Table at any time after joining, or skip it entirely** — both optional for them, unlike the mandatory pre-season capture for players who join before gameweek 1. Gameweeks before they joined score 0, with no special-case logic needed beyond "no picks exist for those matches" — the leaderboard's points-per-gameweek-played column (see _Scoring_) is what stops that reading as poor form rather than absence.
 
 ## Core weekly mechanic: two matches per gameweek
 
@@ -94,18 +94,26 @@ The app's landing route `/` **is** the pick board; there is no hub or dashboard 
 
 ## Scoring — additive
 
-All points stack (confirmed choice; the old app's actually-shipped code had drifted to a different, tiered/mutually-exclusive model — this rebuild uses the originally-documented additive one):
+All points stack. This is the final formula — see `docs/adr/0009-match-scoring-formula-and-title-eligibility.md` for how it was arrived at, what it deliberately does **not** reward, and the alternatives rejected. That ADR supersedes the earlier version of this section (which carried an exact-scoreline bonus and a maximum of 9).
 
 ```
-Correct result:              +3
-Correct goal difference:     +2
-Correct home (Team A) score: +1
-Correct away (Team B) score: +1
-Exact scoreline bonus:       +2
-Maximum per match:           9
+Correct result:                             +3
+Correct goal difference:                    +2
+Correct home (Team A) score  (result right) +1
+Correct away (Team B) score  (result right) +1
+Wrong Way Round                             +1
+Maximum per match:                           7
 ```
 
-No knockout-advancement bonus — there are no knockouts in a league season.
+- **There is no exact-scoreline bonus.** An exact scoreline scores 7 from its components alone. Exact hits are largely chance, and with only 76 scored matches in a season (2 per gameweek × 38) a jackpot term let luck outweigh a season of better judgement.
+- **The two team-score points require a correct result.** A correct team score on a wrong result scores nothing.
+- **Wrong Way Round** = the exact scoreline with the sides swapped (predicted 2–1, it finished 1–2): **+1**. Mutually exclusive with every other term by construction — a reversed scoreline always gets the result, the goal difference and both team scores wrong — so it can only ever pay exactly 1. It can never fire on a draw, since a reversed draw is the same scoreline.
+- Reachable scores are therefore `{0, 1, 3, 4, 5, 7}`.
+- No knockout-advancement bonus — there are no knockouts in a league season.
+
+A per-match score is a **pure function of one player's pick and the match's result**. Nothing in it reads other players' picks or their relative ranking. This is what makes the idempotency rule below implementable, and what keeps a future double-points mechanic layerable as a multiplier.
+
+**No pick, no points.** A player who never interacts has no pick row and scores nothing; missing picks are never auto-filled with a generated scoreline (see `docs/adr/0007` and ADR 0009's rejected alternatives). To stop this visually burying a Late Joiner or a player who missed a fortnight, the **leaderboard shows points-per-gameweek-played alongside the cumulative total** — a display treatment, not a scoring rule.
 
 Scoring must be **idempotent**: correcting a previously-entered result and recomputing must never double-count. Implement as an upsert into a `scores` table keyed by `(player_id, match_id)`, recomputed from the match's current authoritative result — not as an accumulating counter.
 
@@ -118,7 +126,7 @@ Scoring must be **idempotent**: correcting a previously-entered result and recom
 - **Scoring**, per team: `(7 − band_distance) − 1`, range 0–6, where `band_distance` is the number of Bands between the player's predicted Band and the team's actual Band (Bands ordered 1–7 as above; a team can never score below 0, since the maximum possible band_distance is exactly 6). A team left unplaced scores nothing, and a Band whose predicted membership isn't exactly its actual membership forfeits its bonus. Plus a **Band Bonus** of +10 for exactly matching a Band's full team membership (any order within it), except the Champion Band, whose bonus is +20 (a single-team Band, the flagship pick). Maximum possible score: **200** (20 teams × 6, + 6 Bands × 10, + 20 for Champion).
 - Ground truth for actual final Bands comes from football-data.org's `/v4/competitions/{id}/standings` endpoint (same provider as fixture/result sync) — no separate data source needed.
 - This score is computed **continuously** through the season against current live standings, not revealed only at season end — a fun, low-cost engagement hook given the standings endpoint is already available.
-- This score is **standalone** — it does not fold into Season Total and does not affect Season Winner. Deliberately left this way for now; easy to reverse later since the full order is always captured regardless of how it's scored.
+- This score is **standalone** — it does not fold into Season Total and does not affect Season Winner. Reaffirmed alongside the match-scoring final call (`docs/adr/0009`): a realistic weekly-picking season is now ~150 points against Predict the Table's 200 maximum, so folding it in would let one pre-season submission outweigh 38 gameweeks of picking. Easy to reverse later since the full order is always captured regardless of how it's scored. Band Bonus sizing (+10 per Band, +20 Champion — the part that does most of the separating between players) was raised at the same time and **deliberately parked, unchanged**.
 
 ## Notifications
 
