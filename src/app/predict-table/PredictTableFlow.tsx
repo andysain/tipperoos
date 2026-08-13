@@ -19,6 +19,7 @@ import {
 } from "@/lib/table-predictions/board";
 import {
   TABLE_BANDS,
+  TABLE_PREDICTION_DEADLINE,
   type BandKey,
   validateBandCounts,
 } from "@/lib/table-predictions/rules";
@@ -47,13 +48,13 @@ function formatCountdown(msRemaining: number): string {
 // wired up anywhere yet. Only ever shown to on-time players before lock --
 // Late Joiners are never locked (CLAUDE.md).
 function LockCountdown({
-  kickoffIso,
+  deadlineIso,
   now,
 }: {
-  kickoffIso: string;
+  deadlineIso: string;
   now: number;
 }) {
-  const remainingMs = new Date(kickoffIso).getTime() - now;
+  const remainingMs = new Date(deadlineIso).getTime() - now;
   if (remainingMs <= 0) return null;
   const soon = remainingMs < 24 * 60 * 60 * 1000;
   return (
@@ -83,7 +84,6 @@ interface PredictTableFlowProps {
   locked: boolean;
   initialIsSkipped: boolean;
   initialSubmittedAt: string | null;
-  gameweekOneKickoff: string | null;
 }
 
 export function PredictTableFlow({
@@ -93,7 +93,6 @@ export function PredictTableFlow({
   locked,
   initialIsSkipped,
   initialSubmittedAt,
-  gameweekOneKickoff,
 }: PredictTableFlowProps) {
   const [assignments, setAssignments] =
     useState<Assignments>(initialAssignments);
@@ -386,8 +385,8 @@ export function PredictTableFlow({
         </h1>
         <p className="text-ink/70">
           {placedCount === teams.length
-            ? "Locked in -- Gameweek 1 has kicked off."
-            : "Gameweek 1 has kicked off, so this is locked. Here's what you had:"}
+            ? "Locked in -- Predict the Table is locked after 31 August."
+            : "Predict the Table is locked after 31 August. Here's what you had:"}
         </p>
         <ScoringSummary kind="table" />
         <BandSummary assignments={assignments} teamsById={teamsById} />
@@ -440,10 +439,13 @@ export function PredictTableFlow({
               </span>
             </>
           ) : null}
-          {!locked && !isLateJoiner && gameweekOneKickoff ? (
+          {!locked && !isLateJoiner ? (
             <>
               <span aria-hidden>&middot;</span>
-              <LockCountdown kickoffIso={gameweekOneKickoff} now={now} />
+              <LockCountdown
+                deadlineIso={TABLE_PREDICTION_DEADLINE.toISOString()}
+                now={now}
+              />
             </>
           ) : null}
         </p>
@@ -491,7 +493,7 @@ export function PredictTableFlow({
       {submittedAt ? (
         <p className="-mt-2 flex items-center gap-1.5 text-sm text-success">
           <CircleCheck className="size-4 shrink-0" aria-hidden />
-          Submitted -- you can keep editing until Gameweek 1 kicks off.
+          Submitted -- you can keep editing until 31 August.
         </p>
       ) : null}
 

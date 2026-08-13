@@ -103,7 +103,7 @@ export function SubmittedMoment({
           You&apos;re locked in!
         </p>
         <p className="mt-1 max-w-[26ch] text-sm text-ink/70">
-          Submitted -- you can keep editing until Gameweek 1 kicks off.
+          Submitted -- you can keep editing until 31 August.
         </p>
         {champion ? (
           <div className="mt-3 inline-flex items-center gap-2 rounded-btn bg-accent/10 px-3 py-2 text-sm font-bold text-ink">

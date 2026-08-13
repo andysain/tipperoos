@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasCsrfHeader } from "@/app/_lib/csrf";
 import { getSessionPlayerId } from "@/app/_lib/session-cookie";
-import {
-  getPlayerForTablePrediction,
-  getTablePredictionEditabilityForPlayer,
-} from "@/app/_lib/table-prediction-access";
 import { isBandKey } from "@/lib/table-predictions/rules";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -52,121 +48,40 @@ export async function POST(request: Request) {
   }
 
   const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase.rpc("table_prediction_assign", {
+    p_player_id: playerId,
+    p_team_id: teamId,
+    p_band: band,
+  });
+  const result = Array.isArray(data) ? data[0] : data;
 
-  const player = await getPlayerForTablePrediction(supabase, playerId);
-  if (!player) {
+  if (error || !result) {
+    return NextResponse.json(
+      {
+        error: "That move didn't save -- check your connection and try again.",
+      },
+      { status: 500 },
+    );
+  }
+  if (result.result === "locked") {
+    return NextResponse.json(
+      { error: "Predict the Table is locked after 31 August." },
+      { status: 403 },
+    );
+  }
+  if (result.result === "player_not_found") {
     return NextResponse.json(
       { error: "Couldn't find your player profile -- try logging in again." },
       { status: 500 },
     );
   }
-
-  const editability = await getTablePredictionEditabilityForPlayer(supabase, {
-    joinedAt: player.joinedAt,
-    now: new Date(),
-  });
-  if (!editability.editable) {
+  if (result.result === "invalid_team") {
     return NextResponse.json(
       {
-        error:
-          "Predict the Table has locked now that Gameweek 1 has kicked off.",
+        error: "That doesn't look like a real team -- try refreshing the page.",
       },
-      { status: 403 },
+      { status: 400 },
     );
   }
-
-  // "Submitted" means this exact board state was confirmed -- assigning a
-  // team afterwards un-confirms it until the player re-submits.
-  const { data: prediction, error: predictionError } = await supabase
-    .from("table_predictions")
-    .upsert(
-      { player_id: playerId, is_skipped: false, submitted_at: null },
-      { onConflict: "player_id" },
-    )
-    .select("id")
-    .single();
-  if (predictionError || !prediction) {
-    return NextResponse.json(
-      {
-        error: "That move didn't save -- check your connection and try again.",
-      },
-      { status: 500 },
-    );
-  }
-
-  const genericSaveError = () =>
-    NextResponse.json(
-      {
-        error: "That move didn't save -- check your connection and try again.",
-      },
-      { status: 500 },
-    );
-
-  // Retries the select-max-rank -> insert cycle a few times, so a losing
-  // side of a race (two requests reading the same "current ranks" snapshot
-  // before either writes) recomputes against fresh data instead of
-  // silently giving up. Two distinct races land here:
-  //  1. The same team, twice (a fast double-tap) -> the second attempt's
-  //     insert 23505s on team_id; once we see the row exists, we're done.
-  //  2. Two different teams whose computed predicted_rank happened to
-  //     collide -> the insert 23505s on predicted_rank instead; the losing
-  //     request just needs to recompute a fresh rank and retry its own
-  //     insert, since its own team_id row still doesn't exist yet.
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const { data: existingRanks, error: ranksError } = await supabase
-      .from("table_prediction_ranks")
-      .select("id, team_id, predicted_rank")
-      .eq("table_prediction_id", prediction.id);
-    if (ranksError) return genericSaveError();
-
-    const existing = existingRanks?.find((rank) => rank.team_id === teamId);
-    if (existing) {
-      const { error: updateError } = await supabase
-        .from("table_prediction_ranks")
-        .update({ band })
-        .eq("id", existing.id);
-      if (updateError) return genericSaveError();
-      return NextResponse.json({ ok: true });
-    }
-
-    // The smallest rank 1-20 not currently in use -- not "max + 1". Ranks
-    // are never renumbered when a row is deleted (unassign), so always
-    // incrementing would eventually walk past 20 and start failing the
-    // `predicted_rank between 1 and 20` check constraint after enough
-    // remove-then-recall cycles. There are at most 19 other rows at this
-    // point (this team doesn't have one yet), so a free slot in 1-20
-    // always exists.
-    const usedRanks = new Set(
-      (existingRanks ?? []).map((rank) => rank.predicted_rank),
-    );
-    let nextRank = 1;
-    while (usedRanks.has(nextRank)) nextRank++;
-    const { error: insertError } = await supabase
-      .from("table_prediction_ranks")
-      .insert({
-        table_prediction_id: prediction.id,
-        team_id: teamId,
-        band,
-        predicted_rank: nextRank,
-      });
-    if (!insertError) return NextResponse.json({ ok: true });
-
-    if (insertError.code === "23503") {
-      // Foreign-key violation -> the given teamId doesn't exist.
-      return NextResponse.json(
-        {
-          error:
-            "That doesn't look like a real team -- try refreshing the page.",
-        },
-        { status: 400 },
-      );
-    }
-    if (insertError.code !== "23505") return genericSaveError();
-    // 23505 (unique violation) -> loop and recheck: either our own team_id
-    // now has a row (case 1, handled by the `existing` branch above on the
-    // next pass) or the rank collided with a different team (case 2,
-    // resolved by recomputing nextRank on the next pass).
-  }
-
-  return genericSaveError();
+  return NextResponse.json({ ok: true });
 }

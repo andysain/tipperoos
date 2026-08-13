@@ -5,6 +5,14 @@ import {
   type TablePredictionEditability,
 } from "@/lib/table-predictions/rules";
 
+export async function getDatabaseTime(
+  supabase: SupabaseClient,
+): Promise<Date | null> {
+  const { data, error } = await supabase.rpc("get_db_time");
+  if (error || typeof data !== "string") return null;
+  return new Date(data);
+}
+
 // DB-fetching glue for the Predict the Table lock/late-joiner rules --
 // deliberately outside src/lib/** (see session-cookie.ts for the same
 // rationale: the golden-value discipline in TESTING_STANDARD.md targets

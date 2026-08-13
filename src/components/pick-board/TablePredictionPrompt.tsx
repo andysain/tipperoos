@@ -2,7 +2,8 @@ import Link from "next/link";
 
 /**
  * Prompt banner on `/` until the player has submitted or skipped Predict
- * the Table, or Gameweek 1 has kicked off -- ADR-0007's first-run decision.
+ * the Table, or the fixed Table Prediction deadline has passed -- ADR-0007's
+ * first-run decision.
  * This issue (#90) owns only the prompt; #26 owns the capture flow itself.
  */
 export function TablePredictionPrompt() {

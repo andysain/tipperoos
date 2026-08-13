@@ -1,14 +1,10 @@
 import { NextResponse } from "next/server";
 import { hasCsrfHeader } from "@/app/_lib/csrf";
 import { getSessionPlayerId } from "@/app/_lib/session-cookie";
-import {
-  getPlayerForTablePrediction,
-  getTablePredictionEditabilityForPlayer,
-} from "@/app/_lib/table-prediction-access";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 // Marks the current band assignment as submitted -- re-submittable any
-// number of times until Gameweek 1's first kickoff (CLAUDE.md). Submit never
+// number of times until 31 August (CLAUDE.md). Submit never
 // blocks on an untidy table; a wrongly-sized Band simply forfeits that
 // Band's Bonus (docs/adr/0008-predict-the-table-group-fill-capture.md).
 export async function POST(request: Request) {
@@ -22,58 +18,35 @@ export async function POST(request: Request) {
   }
 
   const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase.rpc("table_prediction_submit", {
+    p_player_id: playerId,
+  });
+  const result = Array.isArray(data) ? data[0] : data;
 
-  const player = await getPlayerForTablePrediction(supabase, playerId);
-  if (!player) {
+  if (error || !result) {
+    return NextResponse.json(
+      { error: "Couldn't submit -- check your connection and try again." },
+      { status: 500 },
+    );
+  }
+  if (result.result === "player_not_found") {
     return NextResponse.json(
       { error: "Couldn't find your player profile -- try logging in again." },
       { status: 500 },
     );
   }
-
-  const editability = await getTablePredictionEditabilityForPlayer(supabase, {
-    joinedAt: player.joinedAt,
-    now: new Date(),
-  });
-  if (!editability.editable) {
+  if (result.result === "locked") {
     return NextResponse.json(
-      {
-        error:
-          "Predict the Table has locked now that Gameweek 1 has kicked off.",
-      },
+      { error: "Predict the Table is locked after 31 August." },
       { status: 403 },
     );
   }
-
-  const { data: prediction, error: predictionError } = await supabase
-    .from("table_predictions")
-    .select("id")
-    .eq("player_id", playerId)
-    .maybeSingle();
-  if (predictionError) {
-    return NextResponse.json(
-      { error: "Couldn't load your table prediction -- try again." },
-      { status: 500 },
-    );
-  }
-  if (!prediction) {
+  if (result.result === "no_prediction") {
     return NextResponse.json(
       { error: "Sort some teams into Bands before submitting." },
       { status: 400 },
     );
   }
 
-  const submittedAt = new Date().toISOString();
-  const { error: updateError } = await supabase
-    .from("table_predictions")
-    .update({ submitted_at: submittedAt, is_skipped: false })
-    .eq("id", prediction.id);
-  if (updateError) {
-    return NextResponse.json(
-      { error: "Couldn't submit -- check your connection and try again." },
-      { status: 500 },
-    );
-  }
-
-  return NextResponse.json({ submittedAt });
+  return NextResponse.json({ submittedAt: result.submitted_at });
 }

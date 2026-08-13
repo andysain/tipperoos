@@ -13,7 +13,7 @@ import {
   type Team,
 } from "./shared";
 
-/** Read-only expanded board -- used once Gameweek 1 has kicked off. No
+/** Read-only expanded board -- used once Predict the Table has locked. No
  * lifting, no drop targets, no tints: "one too many" is history, not a
  * task, at that point (docs/predict-table-capture-spec.md). */
 export function BandSummary({
