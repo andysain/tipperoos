@@ -99,10 +99,14 @@ export interface TablePredictionEditability {
   isLateJoiner: boolean;
 }
 
+// End of 31 August 2026 in Australia/Sydney, represented in UTC. The cutoff
+// is exclusive: requests at or after this instant are locked.
+export const TABLE_PREDICTION_DEADLINE = new Date("2026-08-31T14:00:00.000Z");
+
 /**
- * On-time players can edit/re-submit freely until Gameweek 1's first
- * kickoff, then are locked. Late Joiners are never locked -- they may
- * submit at any time after joining, or skip entirely (CLAUDE.md).
+ * On-time players can edit/re-submit freely until the fixed deadline, then
+ * are locked. Late Joiners are never locked -- they may submit at any time
+ * after joining, or skip entirely (CLAUDE.md).
  */
 export function getTablePredictionEditability(params: {
   joinedAt: Date;
@@ -114,9 +118,7 @@ export function getTablePredictionEditability(params: {
     return { editable: true, locked: false, isLateJoiner: true };
   }
 
-  const locked =
-    params.gameweekOneKickoff !== null &&
-    params.now.getTime() >= params.gameweekOneKickoff.getTime();
+  const locked = params.now.getTime() >= TABLE_PREDICTION_DEADLINE.getTime();
 
   return { editable: !locked, locked, isLateJoiner: false };
 }

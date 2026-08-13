@@ -127,8 +127,8 @@ describe("validateBandCounts", () => {
 
 // Golden values hand-derived from CLAUDE.md -> "Late joiners": "a player who
 // signs up ... after gameweek 1 has begun" is a Late Joiner (never locked,
-// can submit any time or skip); an on-time player is locked once "Gameweek
-// 1's first kickoff" passes.
+// can submit any time or skip); an on-time player is locked at the fixed
+// deadline in Australia/Sydney.
 const GW1_KICKOFF = new Date("2026-08-15T19:00:00.000Z");
 
 describe("isLateJoiner", () => {
@@ -156,10 +156,10 @@ describe("isLateJoiner", () => {
 });
 
 describe("getTablePredictionEditability", () => {
-  it("on-time player, before kickoff: editable, not locked", () => {
+  it("on-time player, before 31 August deadline: editable, not locked", () => {
     const result = getTablePredictionEditability({
       joinedAt: new Date("2026-08-01T00:00:00.000Z"),
-      now: new Date("2026-08-10T00:00:00.000Z"),
+      now: new Date("2026-08-31T13:59:59.999Z"),
       gameweekOneKickoff: GW1_KICKOFF,
     });
     expect(result).toEqual({
@@ -169,10 +169,10 @@ describe("getTablePredictionEditability", () => {
     });
   });
 
-  it("on-time player, at/after kickoff: locked, not editable", () => {
+  it("on-time player, exactly at deadline: locked, not editable", () => {
     const result = getTablePredictionEditability({
       joinedAt: new Date("2026-08-01T00:00:00.000Z"),
-      now: GW1_KICKOFF,
+      now: new Date("2026-08-31T14:00:00.000Z"),
       gameweekOneKickoff: GW1_KICKOFF,
     });
     expect(result).toEqual({
@@ -180,6 +180,17 @@ describe("getTablePredictionEditability", () => {
       locked: true,
       isLateJoiner: false,
     });
+  });
+
+  it("on-time player, after deadline: remains locked", () => {
+    const result = getTablePredictionEditability({
+      joinedAt: new Date("2026-08-01T00:00:00.000Z"),
+      now: new Date("2026-09-01T00:00:00.000Z"),
+      gameweekOneKickoff: GW1_KICKOFF,
+    });
+    expect(result.locked).toBe(true);
+    expect(result.editable).toBe(false);
+    expect(result.isLateJoiner).toBe(false);
   });
 
   it("late joiner, well after kickoff: always editable, never locked", () => {
@@ -195,15 +206,15 @@ describe("getTablePredictionEditability", () => {
     });
   });
 
-  it("no gameweek-1 kickoff known yet: nobody is locked", () => {
+  it("no gameweek-1 kickoff known yet: on-time player still follows fixed deadline", () => {
     const result = getTablePredictionEditability({
       joinedAt: new Date("2026-08-01T00:00:00.000Z"),
-      now: new Date("2026-08-10T00:00:00.000Z"),
+      now: new Date("2026-09-01T00:00:00.000Z"),
       gameweekOneKickoff: null,
     });
     expect(result).toEqual({
-      editable: true,
-      locked: false,
+      editable: false,
+      locked: true,
       isLateJoiner: false,
     });
   });

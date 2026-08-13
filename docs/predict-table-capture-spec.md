@@ -117,7 +117,8 @@ Submit **never blocks**. If any Band is the wrong size it warns once, listing ea
 Band with its current and target team count. The player can submit anyway, forfeiting those
 Band Bonuses, or keep editing. Submission sets `submitted_at` (which is what silences the
 Pick Board's prompt banner), plays the submitted moment, and leaves the table editable until
-Gameweek 1's first kickoff.
+the end of 31 August 2026 in Australia/Sydney (the exclusive UTC cutoff
+`2026-08-31T14:00:00Z`). Late Joiners remain editable after that cutoff.
 
 An untidy table still scores. Per-team band distance computes normally on any assignment;
 only the Band Bonus needs exact membership, and over-filling hedges nothing since a club sits
@@ -129,7 +130,7 @@ Decided in ADR 0008 but absent from the prototype — implement from here, not f
 
 - **Return visits** open the first Band that isn't correctly filled. Champion on a first
   visit; wherever the work actually is on a later one.
-- **After Gameweek 1 kicks off**: the expanded review board, read-only. Lifting disabled,
+- **After the fixed Table Prediction deadline**: the expanded review board, read-only. Lifting disabled,
   drop targets absent, tints dropped — once locked, "one too many" is history, not a task.
 - **Ceremony** on the Champion pick: a non-blocking visual beat (the card landing with
   weight, the Band lighting up). Never an interstitial, never anything to dismiss — players

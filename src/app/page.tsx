@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSessionPlayerId } from "@/app/_lib/session-cookie";
 import {
-  getGameweekOneKickoff,
+  getDatabaseTime,
   getTablePredictionRecord,
 } from "@/app/_lib/table-prediction-access";
 import {
@@ -11,6 +11,7 @@ import {
   loadSeasonStats,
 } from "@/app/_lib/pick-board-access";
 import { isMatchLocked, resolveCompetitionId } from "@/lib/competitions/scope";
+import { TABLE_PREDICTION_DEADLINE } from "@/lib/table-predictions/rules";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { GameweekHeader } from "@/components/pick-board/GameweekHeader";
 import { LastWeekStrip } from "@/components/pick-board/LastWeekStrip";
@@ -52,12 +53,12 @@ export default async function PickBoardPage() {
   const timeZone =
     cookieStore.get(TIMEZONE_COOKIE_NAME)?.value ?? DEFAULT_TIME_ZONE;
 
-  const [gameweek, seasonStats, tablePrediction, gameweekOneKickoff] =
+  const [gameweek, seasonStats, tablePrediction, databaseTime] =
     await Promise.all([
       loadPickBoardGameweek(supabase, competitionId, playerId, now),
       loadSeasonStats(supabase, competitionId, playerId),
       getTablePredictionRecord(supabase, playerId),
-      getGameweekOneKickoff(supabase),
+      getDatabaseTime(supabase),
     ]);
 
   const lastWeek = gameweek
@@ -69,14 +70,15 @@ export default async function PickBoardPage() {
       )
     : null;
 
-  // ADR-0007's first-run decision: prompt until submitted/skipped or
-  // Gameweek 1 kicks off. Late joiners can still submit any time after
-  // that via the Predict the Table tab -- this banner just stops nagging
+  // ADR-0007's first-run decision: prompt until submitted/skipped or the
+  // fixed Table Prediction deadline. Late joiners can still submit any time
+  // after that via the Predict the Table tab -- this banner just stops nagging
   // once the literal deadline in the ADR's own wording has passed.
   const showTablePredictionPrompt =
     tablePrediction?.submittedAt == null &&
     !tablePrediction?.skipped &&
-    (!gameweekOneKickoff || now < gameweekOneKickoff);
+    databaseTime !== null &&
+    databaseTime < TABLE_PREDICTION_DEADLINE;
 
   return (
     // SwitchPlayerButton (fixed top-3 right-3, size-10) floats above content

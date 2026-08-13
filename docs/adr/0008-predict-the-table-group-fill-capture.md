@@ -29,7 +29,7 @@ The screen is **one surface that changes density**, not two passes and not a sta
 - **Drop targets are stated, not implied**: lifting a club in review makes every other group grow an explicit "Move BHA here" button, rather than relying on the group header being quietly clickable.
 - **Start again**: one bulk action survives, confirm-gated. It is the only escape from a table the player wants to bin, and the only operation that cannot be reconstructed from cheap individual moves.
 - **Return visits** arm the first group that isn't correctly filled — Champion on a first visit, the real work on a later one.
-- **After Gameweek 1 kicks off**: the expanded review board, read-only, with lifting disabled and the tints dropped — once locked, "one too many" is history, not a task.
+- **After the fixed Table Prediction deadline**: the expanded review board, read-only, with lifting disabled and the tints dropped — once locked, "one too many" is history, not a task.
 - **Ceremony** goes on the Champion pick: a non-blocking visual beat, never an interstitial, since players change their champion and a celebration that punishes reconsidering is worse than none. The existing submitted moment stays.
 - **Late joiners** are unchanged: the optional-and-skippable variant, with "Skip for now" below the submit button.
 

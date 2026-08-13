@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasCsrfHeader } from "@/app/_lib/csrf";
 import { getSessionPlayerId } from "@/app/_lib/session-cookie";
-import {
-  getPlayerForTablePrediction,
-  getTablePredictionEditabilityForPlayer,
-} from "@/app/_lib/table-prediction-access";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 interface UnassignBody {
@@ -45,50 +41,13 @@ export async function POST(request: Request) {
   }
 
   const supabase = createServerSupabaseClient();
-
-  const player = await getPlayerForTablePrediction(supabase, playerId);
-  if (!player) {
-    return NextResponse.json(
-      { error: "Couldn't find your player profile -- try logging in again." },
-      { status: 500 },
-    );
-  }
-
-  const editability = await getTablePredictionEditabilityForPlayer(supabase, {
-    joinedAt: player.joinedAt,
-    now: new Date(),
+  const { data, error } = await supabase.rpc("table_prediction_unassign", {
+    p_player_id: playerId,
+    p_team_id: teamId,
   });
-  if (!editability.editable) {
-    return NextResponse.json(
-      {
-        error:
-          "Predict the Table has locked now that Gameweek 1 has kicked off.",
-      },
-      { status: 403 },
-    );
-  }
+  const result = Array.isArray(data) ? data[0] : data;
 
-  const { data: prediction, error: predictionError } = await supabase
-    .from("table_predictions")
-    .select("id")
-    .eq("player_id", playerId)
-    .maybeSingle();
-  if (predictionError) {
-    return NextResponse.json(
-      { error: "Couldn't load your table prediction -- try again." },
-      { status: 500 },
-    );
-  }
-  if (!prediction) {
-    return NextResponse.json({ ok: true });
-  }
-
-  const { error: deleteError } = await supabase
-    .from("table_prediction_ranks")
-    .delete()
-    .eq("table_prediction_id", prediction.id)
-    .eq("team_id", teamId);
-  if (deleteError) {
+  if (error || !result) {
     return NextResponse.json(
       {
         error: "That move didn't save -- check your connection and try again.",
@@ -96,13 +55,17 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
-
-  // "Submitted" means this exact board state was confirmed -- rearranging
-  // afterwards un-confirms it until the player re-submits.
-  await supabase
-    .from("table_predictions")
-    .update({ submitted_at: null })
-    .eq("id", prediction.id);
-
+  if (result.result === "locked") {
+    return NextResponse.json(
+      { error: "Predict the Table is locked after 31 August." },
+      { status: 403 },
+    );
+  }
+  if (result.result === "player_not_found") {
+    return NextResponse.json(
+      { error: "Couldn't find your player profile -- try logging in again." },
+      { status: 500 },
+    );
+  }
   return NextResponse.json({ ok: true });
 }

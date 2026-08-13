@@ -83,9 +83,9 @@ Anything touching `src/lib/**` needs your explicit approval before merge (CODEOW
 
 ---
 
-## Second deadline on the same date
+## Predict the Table deadline
 
-- [ ] **#26 — Predict the Table capture UI.** The table locks at gameweek 1's first kickoff and can never be captured afterwards except by late joiners. Labelled `cut-if-behind`, which reads as slippable — it isn't, beyond a few days. **Run as an independent track, not after the picks work.**
+- [x] **#26 — Predict the Table capture UI.** The table is editable through the end of 31 August 2026 in Australia/Sydney, then locks for on-time Players. Late Joiners remain unrestricted. **Run as an independent track, not after the picks work.**
 
 ## Pre-kickoff, not tracked as issues
 

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSessionPlayerId } from "@/app/_lib/session-cookie";
 import {
   getGameweekOneKickoff,
+  getDatabaseTime,
   getPlayerForTablePrediction,
   getTablePredictionRecord,
 } from "@/app/_lib/table-prediction-access";
@@ -36,7 +37,7 @@ export default async function PredictTablePage() {
     );
   }
 
-  const [{ data: teams, error: teamsError }, gameweekOneKickoff] =
+  const [{ data: teams, error: teamsError }, gameweekOneKickoff, databaseTime] =
     await Promise.all([
       supabase
         .from("teams")
@@ -44,6 +45,7 @@ export default async function PredictTablePage() {
         .eq("active", true)
         .order("name", { ascending: true }),
       getGameweekOneKickoff(supabase),
+      getDatabaseTime(supabase),
     ]);
 
   if (teamsError || !teams) {
@@ -56,9 +58,19 @@ export default async function PredictTablePage() {
     );
   }
 
+  if (!databaseTime) {
+    return (
+      <main className="flex min-h-full flex-1 items-center justify-center bg-paper p-4">
+        <p className="text-danger">
+          Couldn&apos;t confirm the deadline. Try refreshing.
+        </p>
+      </main>
+    );
+  }
+
   const editability = getTablePredictionEditability({
     joinedAt: player.joinedAt,
-    now: new Date(),
+    now: databaseTime,
     gameweekOneKickoff,
   });
 
@@ -89,7 +101,6 @@ export default async function PredictTablePage() {
       locked={editability.locked}
       initialIsSkipped={prediction?.skipped ?? false}
       initialSubmittedAt={prediction?.submittedAt ?? null}
-      gameweekOneKickoff={gameweekOneKickoff?.toISOString() ?? null}
     />
   );
 }
