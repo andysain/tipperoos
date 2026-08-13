@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 export interface PinInputProps {
   length?: number;
   label: string;
+  masked?: boolean;
   error?: string;
   onComplete: (pin: string) => void;
 }
@@ -20,6 +21,7 @@ export interface PinInputProps {
 export function PinInput({
   length = 4,
   label,
+  masked = false,
   error,
   onComplete,
 }: PinInputProps) {
@@ -82,7 +84,7 @@ export function PinInput({
             ref={(el) => {
               inputRefs.current[index] = el;
             }}
-            type="text"
+            type={masked ? "password" : "text"}
             inputMode="numeric"
             pattern="[0-9]*"
             maxLength={1}

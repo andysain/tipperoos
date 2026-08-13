@@ -85,7 +85,6 @@ function LoginFlow() {
   const [joinDisplayName, setJoinDisplayName] = useState("");
   const [joinPin, setJoinPin] = useState("");
   const [joinPinResetKey, setJoinPinResetKey] = useState(0);
-  const [joinEmail, setJoinEmail] = useState("");
   const [joinEmoji, setJoinEmoji] = useState<string | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [joinSubmitting, setJoinSubmitting] = useState(false);
@@ -237,7 +236,6 @@ function LoginFlow() {
           competitionCode,
           displayName: joinDisplayName,
           pin: joinPin,
-          email: joinEmail.trim() || undefined,
           emoji: joinEmoji ?? undefined,
         }),
       });
@@ -362,6 +360,7 @@ function LoginFlow() {
             <PinInput
               key={pinResetKey}
               label="PIN"
+              masked
               onComplete={handlePinComplete}
               error={pinError ?? undefined}
             />
@@ -399,14 +398,6 @@ function LoginFlow() {
                 key={joinPinResetKey}
                 label="Choose a 4-digit PIN"
                 onComplete={setJoinPin}
-              />
-              <TextField
-                label="Email (optional)"
-                type="email"
-                value={joinEmail}
-                onChange={(e) => setJoinEmail(e.target.value)}
-                autoComplete="email"
-                hint="Only used for gameweek reminders — totally optional."
               />
 
               <div className="flex flex-col gap-1.5">
