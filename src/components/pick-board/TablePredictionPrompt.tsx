@@ -12,7 +12,7 @@ export function TablePredictionPrompt() {
       className="flex items-center justify-between gap-3 rounded-card bg-accent px-4 py-3 text-accent-ink transition hover:brightness-105"
     >
       <span className="text-sm font-bold">
-        Don&apos;t forget to predict the table!
+        Your next step: predict the table!
       </span>
       <span className="text-sm font-extrabold underline underline-offset-2">
         Go now

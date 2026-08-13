@@ -14,7 +14,7 @@
 // - kid-appropriate only: no alcohol/tobacco, weapons, suggestive
 //   content, gambling, or gore.
 
-// The 10 classic grid options shown on the join form.
+// The 12 classic grid options shown on the join form.
 export const EMOJI_OPTIONS = [
   "⚽",
   "🏆",
@@ -26,6 +26,8 @@ export const EMOJI_OPTIONS = [
   "🐱",
   "🎉",
   "🍕",
+  "🫧",
+  "🪿",
 ];
 
 // The full random-pick pool: EMOJI_OPTIONS plus the curated additions.

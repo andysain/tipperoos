@@ -6,7 +6,7 @@ import { EMOJI_LIBRARY, EMOJI_OPTIONS, pickRandomEmoji } from "./emoji-options";
 // so EMOJI_OPTIONS must always be a subset of EMOJI_LIBRARY -- a grid pick
 // missing from the library would pass client-side then 400 on the server.
 describe("EMOJI_OPTIONS vs EMOJI_LIBRARY", () => {
-  it("keeps the original 10 grid options", () => {
+  it("keeps the 12 classic grid options", () => {
     expect(EMOJI_OPTIONS).toEqual([
       "⚽",
       "🏆",
@@ -18,8 +18,10 @@ describe("EMOJI_OPTIONS vs EMOJI_LIBRARY", () => {
       "🐱",
       "🎉",
       "🍕",
+      "🫧",
+      "🪿",
     ]);
-    expect(EMOJI_OPTIONS.length).toBe(10);
+    expect(EMOJI_OPTIONS.length).toBe(12);
   });
 
   it("every grid option is a member of the library", () => {
@@ -30,12 +32,12 @@ describe("EMOJI_OPTIONS vs EMOJI_LIBRARY", () => {
 });
 
 describe("EMOJI_LIBRARY", () => {
-  it("holds the curated count of 475 emojis (golden value -- changing the curation deliberately updates this)", () => {
-    expect(EMOJI_LIBRARY.length).toBe(475);
+  it("holds the curated count of 477 emojis (golden value -- changing the curation deliberately updates this)", () => {
+    expect(EMOJI_LIBRARY.length).toBe(477);
   });
 
   it("has no duplicates", () => {
-    expect(new Set(EMOJI_LIBRARY).size).toBe(475);
+    expect(new Set(EMOJI_LIBRARY).size).toBe(477);
   });
 
   // The curation's mechanical acceptance bar (issue #127, deliverable 4):

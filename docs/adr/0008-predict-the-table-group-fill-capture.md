@@ -17,12 +17,12 @@ The screen is **one surface that changes density**, not two passes and not a sta
 
 **Two grammars, deliberately.** Filling is group-first (a group is armed; tapping any club sends it there) because that is a scaffold for the load of placing twenty clubs. Reviewing is team-first (tap a club, then tap where it goes) because at that point you notice the _club_ is wrong, not the group. Tapping a club anywhere — roster or board — acts on that club; the phase decides the verb.
 
-**Over- and under-filling are legal throughout, and an untidy table still scores.** Band-distance scoring works on any assignment, since a club sits in exactly one group regardless of how full it is; only the Band Bonus needs exact membership, and over-filling hedges nothing. So an untidy table is a _worse_ table, not a void one — worse by exactly the amount of structure the player didn't use. Submit therefore never blocks; it warns once ("you'll miss 2 Band Bonuses — seal it anyway?"), dismissible in one tap, then seals. This restores 0003's original free-form intent, which was never revoked on purpose — it was squeezed out when the #26 build made the flow one-team-at-a-time.
+**Over- and under-filling are legal throughout, and an untidy table still scores.** Band-distance scoring works on any assignment, since a club sits in exactly one group regardless of how full it is; only the Band Bonus needs exact membership, and over-filling hedges nothing. So an untidy table is a _worse_ table, not a void one — worse by exactly the amount of structure the player didn't use. Submit therefore never blocks; it warns once with each affected group's count, then lets the player either submit anyway or keep editing. This restores 0003's original free-form intent, which was never revoked on purpose — it was squeezed out when the #26 build made the flow one-team-at-a-time.
 
 ### Supporting decisions
 
 - **Roster**: all 20 clubs always visible in fixed positions, ordered by last season's finishing position with that position shown (promoted clubs last, marked "Promoted"). Placed clubs stay in the roster, labelled with the group they're in. Because the source list _is_ last season's table, every placement is implicitly a judgement about improvement or decline — the anchor is present without a mechanic for it.
-- **Navigation**: no rail and no chevrons. Group headers are the navigation — tapping a collapsed group opens it. Global progress ("14 of 20 placed") sits above the seal button, where finishing is decided; per-group counts cover the local picture.
+- **Navigation**: no rail and no chevrons. Group headers are the navigation — tapping a collapsed group opens it. Global progress ("14 of 20 placed") sits above the submit button, where finishing is decided; per-group counts cover the local picture.
 - **Fill state**: tint means "something to do here" and nothing else. Under-filled takes a soft neutral wash, over-filled a danger tint, and a group that is exactly right goes plain white with a ticked count. The board opens fully washed and visibly calms down as it is finished, rather than colouring in both the resolved and unresolved states.
 - **Correction while filling**: tapping a club already in the open group toggles it back to its previous state (previous group, or unplaced) — standard multi-select semantics, so a misclick needs no new mechanic. There is **no unplace action**, since an unplaced club scores zero while a badly placed one still scores band distance; removal is strictly self-harm.
 - **Moving a placed club**: no confirmation dialog. The move happens with a quiet undo. Prevention is handled by the group label on every roster chip, and a modal on a frequent path is how a flow starts to feel like fighting.
@@ -30,8 +30,8 @@ The screen is **one surface that changes density**, not two passes and not a sta
 - **Start again**: one bulk action survives, confirm-gated. It is the only escape from a table the player wants to bin, and the only operation that cannot be reconstructed from cheap individual moves.
 - **Return visits** arm the first group that isn't correctly filled — Champion on a first visit, the real work on a later one.
 - **After Gameweek 1 kicks off**: the expanded review board, read-only, with lifting disabled and the tints dropped — once locked, "one too many" is history, not a task.
-- **Ceremony** goes on the Champion pick: a non-blocking visual beat, never an interstitial, since players change their champion and a celebration that punishes reconsidering is worse than none. The existing seal moment stays.
-- **Late joiners** are unchanged: the optional-and-skippable variant, with "Skip for now" below the seal button.
+- **Ceremony** goes on the Champion pick: a non-blocking visual beat, never an interstitial, since players change their champion and a celebration that punishes reconsidering is worse than none. The existing submitted moment stays.
+- **Late joiners** are unchanged: the optional-and-skippable variant, with "Skip for now" below the submit button.
 
 ## What this deletes
 

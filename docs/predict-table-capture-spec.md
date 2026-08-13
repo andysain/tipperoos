@@ -25,7 +25,7 @@ A Band renders in one of three treatments:
 | **Open**              | Filling, and this is the open Band. Members as cards, then the drop-target block (review only, so absent here), then the full roster            |
 | **Expanded**          | Review. Members as cards, no roster                                                                                                             |
 
-Below the stack: the placed count (`14 of 20 placed`), then the seal button. Nothing is
+Below the stack: the placed count (`14 of 20 placed`), then the submit button. Nothing is
 sticky.
 
 ## State
@@ -113,11 +113,11 @@ reads badly as three-plus-one on a phone — give it 2×2 until there's width fo
 
 ## Submission
 
-Submit **never blocks**. If any Band is the wrong size it warns once — _"2 Bands aren't the
-right size — you'll miss 2 Band Bonuses. Seal it anyway?"_ — dismissible in one tap, with
-"Let me fix it" as the alternative. Then it seals: sets `submitted_at` (which is what
-silences the Pick Board's prompt banner), plays the seal moment, and leaves the table
-editable until Gameweek 1's first kickoff.
+Submit **never blocks**. If any Band is the wrong size it warns once, listing each affected
+Band with its current and target team count. The player can submit anyway, forfeiting those
+Band Bonuses, or keep editing. Submission sets `submitted_at` (which is what silences the
+Pick Board's prompt banner), plays the submitted moment, and leaves the table editable until
+Gameweek 1's first kickoff.
 
 An untidy table still scores. Per-team band distance computes normally on any assignment;
 only the Band Bonus needs exact membership, and over-filling hedges nothing since a club sits
@@ -135,9 +135,9 @@ Decided in ADR 0008 but absent from the prototype — implement from here, not f
   weight, the Band lighting up). Never an interstitial, never anything to dismiss — players
   change their champion, and a celebration that punishes reconsidering is worse than none. If
   it can't be made re-triggerable without irritating, fire it only on the first champion
-  named in a session. The existing seal moment is unchanged.
+  named in a session. The existing submitted moment is unchanged.
 - **Late joiners** are unchanged from today: the explanatory line plus a ghost "Skip for now"
-  below the seal button.
+  below the submit button.
 
 ## Known gaps in the prototype
 

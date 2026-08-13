@@ -50,7 +50,7 @@ export const BAND_LABEL: Record<BandKey, string> = Object.fromEntries(
 
 // A team's identity fill for its rail + ClubCodeBadge -- contrast-floored
 // against white, the only ground it's ever drawn on across this feature
-// (BandsBoard's cards, BandSummary's rows, SealedMoment/TeamIdentity's
+// (BandsBoard's cards, BandSummary's rows, SubmittedMoment/TeamIdentity's
 // occupant rows). Unlike the Tipped Match card, nothing here draws a kit
 // colour on an ink ground -- flooring against ink too would needlessly
 // wash a dark, saturated kit colour toward pink (issue: Aston Villa

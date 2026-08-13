@@ -38,7 +38,7 @@ const confettiPiece = tv({
 // Stays on screen until the player explicitly dismisses it -- no
 // auto-timeout. This is a "you're locked in" confirmation, not a passive
 // toast; a player who glances away shouldn't come back to it already gone.
-export function SealedMoment({
+export function SubmittedMoment({
   assignments,
   teamsById,
   onDismiss,
@@ -67,7 +67,7 @@ export function SealedMoment({
     <div
       role="dialog"
       aria-modal="true"
-      aria-labelledby="sealed-moment-title"
+      aria-labelledby="submitted-moment-title"
       onKeyDown={(event) => {
         if (event.key === "Tab") {
           event.preventDefault();
@@ -97,7 +97,7 @@ export function SealedMoment({
       >
         <Trophy className="mx-auto size-12 text-accent" aria-hidden />
         <p
-          id="sealed-moment-title"
+          id="submitted-moment-title"
           className="mt-2 text-xl font-extrabold text-ink"
         >
           You&apos;re locked in!

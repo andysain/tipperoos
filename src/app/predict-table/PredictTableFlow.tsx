@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CircleCheck } from "lucide-react";
+import { CircleCheck, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ScoringSummary } from "@/components/scoring/ScoringSummary";
 import {
@@ -24,7 +24,7 @@ import {
 } from "@/lib/table-predictions/rules";
 import { BandSummary } from "./BandSummary";
 import { BandsBoard, type UndoState } from "./BandsBoard";
-import { SealedMoment } from "./SealedMoment";
+import { SubmittedMoment } from "./SubmittedMoment";
 import { BAND_LABEL, type Team } from "./shared";
 
 // How long the swap-pulse animation (globals.css) plays before its
@@ -111,7 +111,7 @@ export function PredictTableFlow({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [justSealed, setJustSealed] = useState(false);
+  const [justSubmitted, setJustSubmitted] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [busyTeamIds, setBusyTeamIds] = useState<string[]>([]);
   const [warnedIncomplete, setWarnedIncomplete] = useState(false);
@@ -363,14 +363,14 @@ export function PredictTableFlow({
     const { ok, data } = await postJson("/api/table-predictions/submit");
     if (ok) {
       setSubmittedAt(data.submittedAt);
-      setJustSealed(true);
+      setJustSubmitted(true);
     } else {
       setActionError(data.error ?? "Couldn't submit -- try again.");
     }
     setBusy(false);
   }
 
-  function handleSealClick() {
+  function handleSubmitClick() {
     if (validation.ok) {
       void handleSubmit();
       return;
@@ -415,8 +415,6 @@ export function PredictTableFlow({
       </main>
     );
   }
-
-  const mismatchCount = validation.mismatches.length;
 
   return (
     <main className="relative mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4">
@@ -528,20 +526,56 @@ export function PredictTableFlow({
 
       <div className="flex flex-col gap-2">
         {warnedIncomplete && !validation.ok ? (
-          <div className="rounded-card border border-paper-line bg-white p-3">
-            <p className="mb-2 text-sm text-ink">
-              {mismatchCount} Band{mismatchCount > 1 ? "s aren't" : " isn't"}{" "}
-              the right size -- you&apos;ll miss {mismatchCount} Band Bonus
-              {mismatchCount > 1 ? "es" : ""}. Seal it anyway?
-            </p>
-            <div className="flex gap-2">
+          <div
+            role="alert"
+            className="rounded-card border border-warning/50 bg-white p-4"
+          >
+            <div className="flex items-start gap-3">
+              <TriangleAlert
+                className="mt-0.5 size-5 shrink-0 text-warning"
+                aria-hidden
+              />
+              <div>
+                <h2 className="font-extrabold text-ink">
+                  Your table needs a quick tidy-up
+                </h2>
+                <p className="mt-1 text-sm text-ink/70">
+                  These groups do not have the right number of teams. You can
+                  submit now, but they will miss their Band Bonus.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 flex flex-col gap-2">
+              {validation.mismatches.map((mismatch) => {
+                const difference = mismatch.actual - mismatch.expected;
+                return (
+                  <div
+                    key={mismatch.band}
+                    className="flex items-center justify-between gap-3 rounded-btn-sm bg-warning/10 px-3 py-2 text-sm"
+                  >
+                    <span className="font-extrabold text-ink">
+                      {BAND_LABEL[mismatch.band]}
+                    </span>
+                    <span className="text-right font-bold text-ink/70 tabular-nums">
+                      {mismatch.actual} of {mismatch.expected} teams
+                      <span className="block text-xs font-semibold text-warning">
+                        {difference > 0
+                          ? `${difference} too many`
+                          : `${Math.abs(difference)} more needed`}
+                      </span>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-4 flex flex-col gap-2 md:flex-row">
               <Button
                 onClick={handleSubmit}
                 disabled={busy}
                 fullWidth
                 intent="secondary"
               >
-                Seal it anyway
+                Submit anyway
               </Button>
               <Button
                 onClick={() => setWarnedIncomplete(false)}
@@ -549,18 +583,18 @@ export function PredictTableFlow({
                 fullWidth
                 intent="ghost"
               >
-                Let me fix it
+                Keep editing
               </Button>
             </div>
           </div>
         ) : (
           <Button
-            onClick={handleSealClick}
+            onClick={handleSubmitClick}
             disabled={busy}
             fullWidth
             className="max-w-md"
           >
-            {submittedAt ? "Re-seal my table" : "Seal my table"}
+            {submittedAt ? "Submit table again" : "Submit my table"}
           </Button>
         )}
 
@@ -577,11 +611,11 @@ export function PredictTableFlow({
         ) : null}
       </div>
 
-      {justSealed ? (
-        <SealedMoment
+      {justSubmitted ? (
+        <SubmittedMoment
           assignments={assignments}
           teamsById={teamsById}
-          onDismiss={() => setJustSealed(false)}
+          onDismiss={() => setJustSubmitted(false)}
         />
       ) : null}
     </main>
