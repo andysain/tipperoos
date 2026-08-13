@@ -1,8 +1,11 @@
 # Predict the Table: band-sort capture UI, band-distance scoring, standalone from Season Total
 
-> **Partly superseded by `0008-predict-the-table-group-fill-capture.md`.** The band
-> structure, band-distance scoring, standalone-from-Season-Total decision, no-crest
-> constraint, and the rejection of drag-and-drop all still stand. Everything below about the
+> **Partly superseded by `0008-predict-the-table-group-fill-capture.md` and
+> `0010-predict-the-table-scoring.md`.** The band structure, the principle of scoring on
+> band distance, the standalone-from-Season-Total decision, the no-crest constraint, and the
+> rejection of drag-and-drop all still stand. **The scoring numbers below do not** — 0010
+> replaces them with placement 5/2/1/0, Band Bonuses on all seven Bands (15/10), and a
+> cohort-relative Bold Call bonus, still to a maximum of 200. Everything below about the
 > Picker, the calling queue, swapping, remove-and-requeue, and the Clear actions — including
 > the build-update entries that fix them — is history: the capture flow now iterates per
 > group, not per team. Read 0008 first.
