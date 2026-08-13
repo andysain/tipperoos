@@ -40,7 +40,7 @@ export default async function PredictTablePage() {
     await Promise.all([
       supabase
         .from("teams")
-        .select("id, name, short_code, previous_season_position")
+        .select("id, name, display_name, short_code, previous_season_position")
         .eq("active", true)
         .order("name", { ascending: true }),
       getGameweekOneKickoff(supabase),
@@ -80,6 +80,7 @@ export default async function PredictTablePage() {
       teams={teams.map((team) => ({
         id: team.id,
         name: team.name,
+        displayName: team.display_name,
         shortCode: team.short_code,
         previousSeasonPosition: team.previous_season_position,
       }))}

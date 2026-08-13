@@ -19,11 +19,11 @@ review route.
 
 A Band renders in one of three treatments:
 
-| Treatment             | When                                                                                                                                   |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| **Collapsed summary** | Filling, and this Band is not the open one. One row: Band name, position range, a truncated list of member short codes, the fill count |
-| **Open**              | Filling, and this is the open Band. Members as cards, then the drop-target block (review only, so absent here), then the full roster   |
-| **Expanded**          | Review. Members as cards, no roster                                                                                                    |
+| Treatment             | When                                                                                                                                            |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Collapsed summary** | Filling, and this Band is not the open one. One row: Band name, position range, a truncated list of member display/common names, the fill count |
+| **Open**              | Filling, and this is the open Band. Members as cards, then the drop-target block (review only, so absent here), then the full roster            |
+| **Expanded**          | Review. Members as cards, no roster                                                                                                             |
 
 Below the stack: the placed count (`14 of 20 placed`), then the seal button. Nothing is
 sticky.
@@ -71,7 +71,7 @@ Reached automatically when the 20th club is placed. All Bands expand; the roster
 
 - **Tap a club** → lifts it (tapping the lifted club again cancels).
 - **While lifted**, every Band except the club's current one shows an explicit drop-target
-  button — _"Move BHA here"_. This is deliberate: the affordance is stated, not implied by a
+  button — _"Move Bournemouth here"_. This is deliberate: the affordance is stated, not implied by a
   quietly-clickable header.
 - **Tap a drop target** → move, clear `lifted`, show undo.
 - There is no toggle-revert here and no unplace: an unplaced club scores zero while a badly

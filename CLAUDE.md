@@ -174,7 +174,7 @@ Scoring must be **idempotent**: correcting a previously-entered result and recom
 
 ## Data model (conceptual — not DDL; finalize schema during build)
 
-- `seasons`, `teams` — global, shared across every competition; see `competitions` below.
+- `seasons`, `teams` — global, shared across every competition; `teams.full_name` preserves the provider label for reference only, `teams.name` is the default page-facing suffix-cleaned short name, `teams.display_name` is the common UI label for Predict the Table filling, and `teams.short_code` remains the provider code; see `competitions` below.
 - `competitions` — one row per private competition (currently exactly one); see `docs/adr/0004-multi-competition-foundational-scope.md` for the full reasoning. `players` and `gameweeks` carry a `competition_id`; `matches`/`teams`/`seasons` deliberately never do, since fixtures are shared, global facts.
 - `gameweeks` — includes the Match-2 picker state machine (picker id, status, deadline) as DB columns, not app memory or cron-job state, so a missed cron cycle or cold start always resumes safely. Also references which fixture is Match 1 and which is Match 2 (either may be null — a Skipped Slot — if its fixture was postponed before lock).
 - `matches` — includes a stable external provider id (paired with a provider name, so a future provider swap doesn't collide ids), kickoff time, status (must represent both the post-lock Voided Match and the pre-lock Skipped Slot cases distinctly — see _Predictions_), current authoritative score.
@@ -182,6 +182,7 @@ Scoring must be **idempotent**: correcting a previously-entered result and recom
 - `scores` — idempotent points ledger, upserted per `(player_id, match_id)` on every (re)computation.
 - `table_predictions` + a full 20-team ordering per player, captured once per season.
 - `players` — unique (case-insensitive, scoped per competition) `display_name` as the identity key, optional non-unique email, PIN hash, `pin_reset_required` flag (forced-reset flow), emoji (mandatory at signup, curated allowlist — see Identity and auth), `is_admin`/`is_bot` flags.
+- During initial Predict the Table Band filling, use `teams.display_name` rather than `short_code`; review move actions use `teams.name`.
 - A per-gameweek **standings snapshot**, recorded starting gameweek 1 — required to compute "who finished last" for the gameweek-2 Match-2 picker; don't skip this just because the picker UI itself might ship later than the data collection.
 - `sync_log` — lightweight record of fixture/result sync attempts and outcomes, for admin visibility into the one external dependency (the football data API) that can fail silently otherwise.
 

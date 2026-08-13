@@ -10,6 +10,7 @@ import {
   requireEnv,
   createFootballDataClient,
 } from "./lib/football-data-client.mjs";
+import { displayName, shortName } from "./lib/team-names.mjs";
 
 const FOOTBALL_DATA_API_KEY = requireEnv("FOOTBALL_DATA_API_KEY");
 const SUPABASE_URL = requireEnv("SUPABASE_URL");
@@ -35,7 +36,9 @@ async function main() {
 
   const teamsResp = await fetchFromFootballData("/competitions/PL/teams");
   const teamRows = teamsResp.teams.map((t) => ({
-    name: t.name,
+    full_name: t.name,
+    name: shortName(t.name),
+    display_name: displayName(shortName(t.name)),
     short_code: t.tla,
     crest_url: t.crest,
     provider_name: PROVIDER_NAME,
