@@ -113,17 +113,35 @@ Offline/retry states for the filing stamp · the ambient countdown treatment · 
 
 # TO DO
 
+Sizes are rough t-shirt estimates (XS ≈ &lt;1hr, S ≈ half day, M ≈ 1–2 days, L ≈ 3+ days), not commitments.
+
 - [ ] PRE Launch
-  - [ ] When logging in remove the "**Welcome back, Test2345!** You're logged in. Let's Go" screen. Have it just go straight to the home page
-  - [ ] Need instructions on scoring and page helpers etc
-- [ ] POST Launch
-  - [ ] make it so text input is only single digit on 5+. currently just get a vague error about it. or just add an error messgae that value must be between 5-9
 
-# TO CHANGE/DECIDE
+  _Bar for PRE: either blocks a player from cleanly completing signup → pick filing → Predict the Table capture before gameweek 1 lock, or is cheap enough that deferring it buys nothing._
+  - [ ] General
+    - [ ] **#125 — In-app help: scoring + mechanics explainer** — **M**
+  - [ ] Login / Onboarding
+    - [x] When logging in remove the "**Welcome back, Test2345!** You're logged in. Let's Go" screen. Have it just go straight to the home page
+    - [ ] **#126 — Login/signup polish: mask PIN on login, hide email input** — **XS** (bundles the PIN-mask and email-hide items)
+    - [ ] **#127 — Make emoji selection mandatory + add random-pick button** — **S** (`cut-if-behind`: the full emoji-library tier)
+  - [ ] Pick Board
+    - [ ] **#128 — Pick Board: show calendar date alongside kickoff time** — **S**
+  - [ ] Predict the Table
+    - [x] new predict the table input approach
+    - [ ] **#129 — Fix "locked in" confirmation to a fixed modal** — **S**
+    - [ ] **#130 — Band-by-Band guidance (next-prompt + progress tracker)** — **M**
+    - [ ] **#131 — Placed-team X marker + tap-to-swap interaction** — **M** (bundles the X-marker and swap items)
+    - [ ] **#132 — Extend lock deadline to 31 August** — **S**
 
-- [ ] PRE LAUNCH
-  - [ ] Login with list of all players. Pivot this approach
-  - [ ] new predict the table input approach
 - [ ] POST Launch
-  - [ ] predict the table can be set until aug 31
-  - [ ] how to compare table predictions with other players/actual state
+  - [ ] Performance
+    - [ ] Investigate shared server-side root cause behind slow login, slow screen loads/saves, and the laggy "grey card → full contrast" team-add commit on Predict the Table — treat as one investigation, not three separate fixes. Fix root cause only; no optimistic-UI masking. — **M** (investigation), follow-on fix size TBD by finding
+  - [ ] Login / Onboarding
+    - [ ] Replace the full player list on login with type-ahead search: as the player types, show a small filtered dropdown of close/partial matches only — never the full roster — balances usability for younger players against not exposing an enumerable name list as the group scales past ~5 — **M**
+  - [ ] Pick Board
+    - [ ] Fix score input requiring two taps before the number pad/cursor appears — **XS**
+    - [ ] Reorder Match 1 / Match 2 by kickoff time (chronological), Top Pick as tiebreak only — supersedes the current fixed Match-1-first ordering in `docs/adr/0007` — **S**
+    - [ ] Decide on redesigning the score input (buttons vs. free text) — must resolve the "single digit on 5+" case too: multi-digit entry above the valid range currently fails with a vague error instead of being prevented or clearly explained — open design question, not committed — **M**
+    - [ ] Show the viewing player's own Champion pick (from Predict the Table) on the pick board, as a personal reference chip — **S**
+  - [ ] Predict the Table
+    - [ ] _Future direction, not committed:_ after lock, mirror the weekly pick visibility rule — other players' full Table predictions become visible, plus a comparison against actual current standings
