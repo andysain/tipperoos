@@ -6,6 +6,7 @@ export interface PinInputProps {
   length?: number;
   label: string;
   masked?: boolean;
+  autoFocus?: boolean;
   error?: string;
   onComplete: (pin: string) => void;
 }
@@ -22,6 +23,7 @@ export function PinInput({
   length = 4,
   label,
   masked = false,
+  autoFocus = true,
   error,
   onComplete,
 }: PinInputProps) {
@@ -29,8 +31,8 @@ export function PinInput({
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
-    inputRefs.current[0]?.focus();
-  }, []);
+    if (autoFocus) inputRefs.current[0]?.focus();
+  }, [autoFocus]);
 
   function setDigitAt(index: number, value: string) {
     const next = [...digits];

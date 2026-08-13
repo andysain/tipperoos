@@ -12,6 +12,7 @@ import { EMOJI_OPTIONS, pickRandomEmoji } from "@/lib/auth/emoji-options";
 import { fetchPlayers, type Player } from "./fetch-players";
 
 const STORED_CODE_KEY = "tipperoos.competitionCode";
+const TABLE_PREDICTION_NUDGE_KEY = "tipperoos.needsTablePrediction";
 
 type Step = "checking" | "code" | "list" | "pin" | "join";
 
@@ -51,6 +52,9 @@ function LoginFlow() {
   const [pinSubmitting, setPinSubmitting] = useState(false);
 
   const [joinDisplayName, setJoinDisplayName] = useState("");
+  const [joinDisplayNameError, setJoinDisplayNameError] = useState<
+    string | null
+  >(null);
   const [joinPin, setJoinPin] = useState("");
   const [joinPinResetKey, setJoinPinResetKey] = useState(0);
   const [joinEmoji, setJoinEmoji] = useState<string | null>(null);
@@ -178,6 +182,7 @@ function LoginFlow() {
   async function handleJoinSubmit(event: React.FormEvent) {
     event.preventDefault();
     setJoinError(null);
+    setJoinDisplayNameError(null);
 
     if (!joinDisplayName.trim()) {
       setJoinError("Pick a display name first.");
@@ -210,12 +215,20 @@ function LoginFlow() {
       const data = await response.json();
 
       if (!response.ok) {
-        setJoinError(data.error ?? "Something went wrong — try again.");
+        if (response.status === 409) {
+          setJoinDisplayNameError(
+            "That name is already taken. Try a different display name.",
+          );
+          setJoinError(null);
+        } else {
+          setJoinError(data.error ?? "Something went wrong — try again.");
+        }
         setJoinPin("");
         setJoinPinResetKey((k) => k + 1);
         return;
       }
 
+      window.localStorage.setItem(TABLE_PREDICTION_NUDGE_KEY, "true");
       router.push("/");
     } catch {
       setJoinError(
@@ -301,12 +314,9 @@ function LoginFlow() {
             <button
               type="button"
               onClick={() => setStep("join")}
-              className="mt-6 w-full text-center text-sm text-ink/60"
+              className="mt-6 flex w-full items-center justify-center rounded-btn border-2 border-accent bg-accent/10 px-4 py-3 text-center text-[1.0625rem] font-extrabold text-ink transition hover:bg-accent/20"
             >
-              New here?{" "}
-              <span className="font-bold text-ink underline">
-                Join the competition
-              </span>
+              New here? Join the competition
             </button>
           </>
         ) : null}
@@ -357,14 +367,20 @@ function LoginFlow() {
               <TextField
                 label="Display name"
                 value={joinDisplayName}
-                onChange={(e) => setJoinDisplayName(e.target.value)}
+                onChange={(e) => {
+                  setJoinDisplayName(e.target.value);
+                  setJoinDisplayNameError(null);
+                  setJoinError(null);
+                }}
                 autoComplete="nickname"
                 autoFocus
-                hint="2–20 characters. This is what everyone sees on the leaderboard."
+                error={joinDisplayNameError ?? undefined}
+                hint="Unique to you. Use 2–20 letters, numbers, spaces, apostrophes or hyphens. This is what everyone sees."
               />
               <PinInput
                 key={joinPinResetKey}
                 label="Choose a 4-digit PIN"
+                autoFocus={false}
                 onComplete={setJoinPin}
               />
 
@@ -372,7 +388,7 @@ function LoginFlow() {
                 <span className="text-[0.8rem] font-bold tracking-[0.08em] text-ink uppercase">
                   Pick an emoji
                 </span>
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-6 gap-2">
                   {EMOJI_OPTIONS.map((option) => (
                     <button
                       key={option}
@@ -389,19 +405,23 @@ function LoginFlow() {
                     </button>
                   ))}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-3">
                   <Button
                     type="button"
-                    intent="ghost"
+                    intent="secondary"
                     size="sm"
+                    className="self-start"
                     onClick={() => setJoinEmoji(pickRandomEmoji(joinEmoji))}
                   >
                     <Dices className="h-4 w-4" />
-                    Surprise me
+                    Pick Random Emoji
                   </Button>
-                  {joinEmoji && !EMOJI_OPTIONS.includes(joinEmoji) ? (
-                    <span className="text-sm text-ink/70">
-                      Your pick: <span className="text-xl">{joinEmoji}</span>
+                  {joinEmoji ? (
+                    <span className="flex items-center gap-2 rounded-btn-sm border border-accent bg-accent/10 px-3 py-1.5 text-sm font-bold text-ink">
+                      <span className="text-xs tracking-[0.08em] text-ink/60 uppercase">
+                        Selected
+                      </span>
+                      <span className="text-4xl leading-none">{joinEmoji}</span>
                     </span>
                   ) : null}
                 </div>

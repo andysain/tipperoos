@@ -61,6 +61,7 @@ function UndoRow({ undo, onUndo }: { undo: UndoState; onUndo: () => void }) {
 function PlacedTeamCard({
   team,
   emphasis,
+  overfilled,
   onTap,
   disabled,
   liftedHere,
@@ -68,6 +69,7 @@ function PlacedTeamCard({
 }: {
   team: Team;
   emphasis?: boolean;
+  overfilled?: boolean;
   onTap: () => void;
   disabled?: boolean;
   liftedHere?: boolean;
@@ -81,9 +83,9 @@ function PlacedTeamCard({
       type="button"
       onClick={onTap}
       disabled={disabled}
-      className={`group flex items-stretch gap-3 overflow-hidden rounded-btn border py-3 pr-3 pl-2.5 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
+      className={`group flex min-h-12 items-stretch gap-3 overflow-hidden rounded-btn border py-3 pr-3 pl-2.5 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
         emphasis ? "border-accent bg-accent/10 ring-1 ring-accent/40" : ""
-      } ${liftedHere ? "border-accent bg-accent/10 ring-2 ring-accent/50" : !emphasis ? "border-paper-line bg-white hover:border-accent/50" : ""} ${justSwapped ? "motion-safe:animate-swap-pulse" : ""}`}
+      } ${liftedHere ? "border-accent bg-accent/10 ring-2 ring-accent/50" : overfilled ? "border-danger/50 bg-danger/10 hover:border-danger" : !emphasis ? "border-paper-line bg-white hover:border-accent/50" : ""} ${justSwapped ? "motion-safe:animate-swap-pulse" : ""}`}
     >
       <span
         aria-hidden
@@ -326,29 +328,35 @@ export function BandsBoard({
                 ) : null}
 
                 <div className={`grid ${PLACED_TEAM_GRID_COLS} gap-2`}>
-                  {inBand.length === 0 ? (
-                    <p className="col-span-full text-sm text-ink/40">
-                      {band.key === "champion"
-                        ? "Tap a team to name your champion."
-                        : "Nobody here yet."}
-                    </p>
-                  ) : (
-                    inBand.map((team) => (
-                      <PlacedTeamCard
-                        key={team.id}
-                        team={team}
-                        emphasis={isChampionSingle}
-                        disabled={busyTeamIds.includes(team.id)}
-                        liftedHere={lifted === team.id}
-                        justSwapped={
-                          justSwapped != null &&
-                          (justSwapped[0] === team.id ||
-                            justSwapped[1] === team.id)
-                        }
-                        onTap={() => onTapTeam(team.id)}
-                      />
-                    ))
-                  )}
+                  {inBand.map((team) => (
+                    <PlacedTeamCard
+                      key={team.id}
+                      team={team}
+                      emphasis={isChampionSingle}
+                      overfilled={inBand.length > band.target}
+                      disabled={busyTeamIds.includes(team.id)}
+                      liftedHere={lifted === team.id}
+                      justSwapped={
+                        justSwapped != null &&
+                        (justSwapped[0] === team.id ||
+                          justSwapped[1] === team.id)
+                      }
+                      onTap={() => onTapTeam(team.id)}
+                    />
+                  ))}
+                  {inBand.length < band.target
+                    ? Array.from({ length: band.target - inBand.length }).map(
+                        (_, index) => (
+                          <div
+                            key={`empty-${band.key}-${index}`}
+                            className="flex min-h-12 items-center justify-center rounded-btn border-2 border-dashed border-paper-line bg-paper/60 px-3 text-sm font-bold text-ink/35"
+                            aria-label={`${band.label} empty slot`}
+                          >
+                            Empty slot
+                          </div>
+                        ),
+                      )
+                    : null}
                 </div>
 
                 {showDropTarget ? (

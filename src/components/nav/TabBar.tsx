@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSyncExternalStore } from "react";
 import { TAB_BAR_HEIGHT_CLASS } from "./shell-metrics";
 import { TABS } from "./tabs";
 
@@ -11,6 +12,15 @@ import { TABS } from "./tabs";
 // it while open.
 export function TabBar() {
   const pathname = usePathname();
+  const needsTablePrediction = useSyncExternalStore(
+    (onChange) => {
+      window.addEventListener("storage", onChange);
+      return () => window.removeEventListener("storage", onChange);
+    },
+    () =>
+      window.localStorage.getItem("tipperoos.needsTablePrediction") === "true",
+    () => false,
+  );
 
   return (
     <nav
@@ -30,6 +40,12 @@ export function TabBar() {
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
                 onClick={(event) => {
+                  if (tab.href === "/predict-table") {
+                    window.localStorage.removeItem(
+                      "tipperoos.needsTablePrediction",
+                    );
+                    window.dispatchEvent(new Event("storage"));
+                  }
                   // Tapping the already-active tab scrolls back to the top
                   // rather than doing nothing or re-navigating -- pinned
                   // down now (docs/adr/0004-app-navigation-shell.md) so
@@ -50,7 +66,14 @@ export function TabBar() {
                 className={`flex h-full flex-col items-center justify-center gap-0.5 text-xs font-bold ${toneClass}`}
               >
                 <Icon className={`size-6 ${toneClass}`} />
-                {tab.label}
+                <span className="relative">
+                  {tab.label}
+                  {tab.href === "/predict-table" && needsTablePrediction ? (
+                    <span className="absolute -top-2 -right-8 rounded-badge bg-accent px-1.5 py-0.5 text-[0.6rem] font-extrabold text-accent-ink">
+                      Next up
+                    </span>
+                  ) : null}
+                </span>
               </Link>
             </li>
           );
