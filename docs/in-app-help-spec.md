@@ -134,13 +134,45 @@ New authenticated route `/how-it-works`, wrapped by `AppShell` like every other 
 
 ## Verification
 
-- **Committed tests** for the breakdown's state selection — which rows appear for a given pick and result — as a pure function under `src/lib/**` or a colocated component test. This is the only part with real branching logic, and it is where a wrong answer would be invisible.
+- **Committed tests** for the breakdown's state selection — which rows appear for a given pick and result. This is the only part with real branching logic, and where a wrong answer would be invisible.
+  **Put this logic and its tests beside the component, not in `src/lib/**`.** `.github/workflows/ci.yml` runs a critical-module guard over `src/lib/**` enforcing the golden-value, test-first discipline of `TESTING_STANDARD.md` §1a — that exists for consequence-critical modules like the scoring engines, and this is presentation logic deciding which rows to render. Putting it there would subject copy decisions to scoring-engine ceremony and blur what the guard is for.
 - **Manual, on the deployed Preview URL**, for everything else: the four Surface-1 states (seed `scores` rows directly against staging, since no match-scoring engine exists to produce them yet), both expanders, the six sections, and the unauthenticated redirect.
 - Full validation sequence per `TESTING_STANDARD.md` §3: `npm run typecheck && npm run lint && npm run test && npm run build`.
 - `TESTING_STANDARD.md` §4 applies: if anything here changes product behaviour or vocabulary, `CLAUDE.md`/`CONTEXT.md` are updated in the same change, not as a follow-up.
 
+## Context you won't get from the codebase
+
+Things that are true but not discoverable by reading the repo, and that change how this work should be approached.
+
+### The season starts 2026-08-21 — and no player can see Surface 1 until well after that
+
+This spec was written on 2026-08-13, eight days out. `BUILD_PLAN.md` decision 42 defines a deliberately narrow minimum launch: log in, land on the Pick Board, file a scoreline that a server-side lock enforces. **Scoring is explicitly sequenced behind launch**, so:
+
+- **Surface 1 cannot be seen by any player at launch, or for some time after.** It needs a settled slot with points, which needs both the match-scoring engine (#21, unwritten) and a completed Gameweek. It is the most interesting part of this work and the least urgent.
+- **Surfaces 2 and 3 are the ones with pre-launch value.** A new player joining for Gameweek 1 has no idea how any of this works and nothing in the app to tell them. If this issue gets split or partially delivered, ship those first.
+- **The Pick Board is the launch-critical surface.** Surface 1 modifies `TippedMatchCard.tsx`, which is the one screen the whole launch depends on. Treat changes there as higher-risk than their size suggests: additive, behind the existing `points !== null` branch, and verified against a board with no scores at all (the day-one state — `BUILD_PLAN.md` decision 42 and ADR 0007 describe how the board renders before anything is scored).
+
+### You are inventing the disclosure pattern, not following one
+
+`grep -rn "aria-expanded" src` returns **nothing**. There is no existing accessible disclosure anywhere in this app; Predict the Table's Band accordion is driven from `BandsBoard.tsx` without one. Whatever this issue builds becomes the codebase's reference implementation for every future expander, so build it properly — real `<button>`, `aria-expanded`/`aria-controls`, keyboard operable — rather than matching the nearest existing thing.
+
+### Use the existing kickoff formatter for any time or date in copy
+
+`src/lib/dates/kickoff-format.ts` (tested) is the only correct way to render a kickoff time or date. `CLAUDE.md` has a hard constraint here: all comparisons in UTC, rendering in the viewer's browser-detected timezone via the `tz` cookie, falling back to `Australia/Sydney`. Blank-week copy that mentions when the next match is must go through that helper — a hand-rolled `toLocaleString` is a real bug, not a style nit. See issue #93 for the reasoning.
+
+### The AppShell change touches every authenticated page
+
+Adding the **?** affordance means editing `src/components/nav/AppShell.tsx`, which wraps all authenticated routes. It is a one-line-looking change with app-wide blast radius, and `SwitchPlayerButton` currently sits alone in that corner — check both together on a narrow phone viewport before calling it done.
+
+### How this repo's automation will behave while you work
+
+- **Husky pre-commit** runs `lint-staged`, `npm run typecheck`, `npm run test`. **Pre-push** runs `npm run build` and then `scripts/review/local-pr-review.mjs` — three Sonnet review passes (correctness, security invariants, spec conformance) over the diff vs. `main`.
+- **If that review finds something it can safely fix, it commits the fix locally and aborts the push.** This is expected behaviour, not a failure: git had already resolved what to push before the hook ran. Just push again to include the fix. Don't fight it with `--no-verify`.
+- Every change goes through a branch and PR (`BUILD_PLAN.md` decision 30). Paths outside `src/lib/**` and `.github/workflows/**` auto-merge once CI passes — which is all of this work, given the test-placement decision above.
+
 ## Notes for the implementer
 
-- Surface 1 is the only part with meaningful logic; Surfaces 2 and 3 are copy and layout. Budget accordingly.
-- The scoring formula was finalised on 2026-08-13 — read `docs/adr/0009-match-scoring-formula-and-title-eligibility.md` and `docs/adr/0010-predict-the-table-scoring.md` before writing any copy. Both record what the scoring deliberately does *not* reward, which is often what a player is actually asking about.
+- Surface 1 is the only part with meaningful logic; Surfaces 2 and 3 are copy and layout. Budget accordingly — and note that the hardest thing here is the writing, not the code.
+- The scoring formula was finalised on 2026-08-13 — read `docs/adr/0009-match-scoring-formula-and-title-eligibility.md` and `docs/adr/0010-predict-the-table-scoring.md` before writing any copy. Both record what the scoring deliberately does *not* reward, which is usually what a player is actually asking about. The blank-week and no-pick-filed states exist because of specific decisions in 0009, not as afterthoughts.
 - If any source document disagrees with another on a number, `CLAUDE.md` wins and the disagreement is a bug to fix in the same change, not to route around.
+- If something in this spec turns out to be wrong or stale when you get to it, fix the spec in the same change rather than working around it — `ISSUE_STANDARD.md` §4 treats a stale spec as a bug, not a footnote.
