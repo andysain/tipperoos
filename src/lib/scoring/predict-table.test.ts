@@ -18,7 +18,8 @@ import {
 // Champions League 4 / Europe 3 / Mid Table 3 / Lower Table 3 / Relegation
 // Battle 3 / Relegated 3); placement 5/2/1/0 by Band distance; Band Bonus
 // 15 for Champion, Champions League and Relegated, 10 for the rest; Bold
-// Call +3 for a correct placement fewer than a third of the frozen cohort
+// Call +3 for a correct placement made by no more than roughly one in ten of
+// the frozen cohort.
 // made, best 5. Max 100 + 85 + 15 = 200. A prediction is a team -> Band
 // index map whose Bands may be any size
 // (docs/adr/0008-predict-the-table-group-fill-capture.md); only the actual
@@ -287,9 +288,9 @@ describe("scorePredictTableCohort -- Bold Calls", () => {
     }));
   }
 
-  it("awards +3 for a correct placement fewer than a third of the cohort made", () => {
+  it("awards +3 for a lone correct placement in a six-player cohort", () => {
     // Six players. Five put T10 in Lower Table; only P0 has it in Mid
-    // Table, where it actually finishes. 1 of 6 is under a third, so P0
+    // Table, where it actually finishes. 1 of 6 is the only agreement, so P0
     // banks a Bold Call worth 3 on top of a perfect 185.
     const results = scorePredictTableCohort(
       cohort([
@@ -322,15 +323,15 @@ describe("scorePredictTableCohort -- Bold Calls", () => {
     }
   });
 
-  it("treats 'fewer than a third' as strict: 3 of 12 is rare, 4 of 12 is not", () => {
-    // P0-P3 put T7 in Europe (correct, 4 of 12 -- not rare).
-    // P0-P2 put T8 in Europe (correct, 3 of 12 -- rare).
+  it("allows one agreement but not two in a twelve-player cohort", () => {
+    // P0-P1 put T7 in Europe (correct, 2 of 12 -- not rare).
+    // Only P0 puts T8 in Europe (correct, 1 of 12 -- rare).
     // Everyone else pushes those teams into Mid Table.
     const entries = cohort(
       Array.from({ length: 12 }, (_, index) => {
         const prediction = new Map(PERFECT_PREDICTION);
-        if (index >= 4) prediction.set("T7", 3);
-        if (index >= 3) prediction.set("T8", 3);
+        if (index >= 2) prediction.set("T7", 3);
+        if (index >= 1) prediction.set("T8", 3);
         return prediction;
       }),
     );
@@ -340,9 +341,23 @@ describe("scorePredictTableCohort -- Bold Calls", () => {
     expect(results.get("P0")!.boldCalls).toEqual(["T8"]);
     expect(results.get("P0")!.totalScore).toBe(188);
 
-    // P3 had T7 right (not rare) and T8 wrong -- no Bold Call at all.
+    // P3 had both placements wrong -- no Bold Call at all.
     expect(results.get("P3")!.boldCalls).toEqual([]);
-    expect(results.get("P3")!.totalScore).toBe(162);
+    expect(results.get("P3")!.totalScore).toBe(159);
+  });
+
+  it("allows two agreements in a twenty-player cohort", () => {
+    const results = scorePredictTableCohort(
+      cohort([
+        PERFECT_PREDICTION,
+        PERFECT_PREDICTION,
+        ...Array.from({ length: 18 }, () => REVERSED_PREDICTION),
+      ]),
+      ACTUAL_TABLE,
+    );
+
+    expect(results.get("P0")!.boldCalls).toHaveLength(MAX_BOLD_CALLS);
+    expect(results.get("P0")!.boldCallScore).toBe(15);
   });
 
   it("caps Bold Calls at 5, which is what makes 200 reachable", () => {

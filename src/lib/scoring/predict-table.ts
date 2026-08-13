@@ -207,9 +207,12 @@ export interface CohortEntry<K> {
   readonly boldCallEligible: boolean;
 }
 
-/** A placement is a Bold Call when strictly fewer than a third agreed. */
+/**
+ * A placement is a Bold Call when no more than roughly one in ten eligible
+ * players made it. Small competitions still allow one lone correct call.
+ */
 function isRare(agreeCount: number, cohortSize: number): boolean {
-  return agreeCount * 3 < cohortSize;
+  return agreeCount <= Math.max(1, Math.floor(cohortSize / 10));
 }
 
 /**
@@ -217,8 +220,8 @@ function isRare(agreeCount: number, cohortSize: number): boolean {
  *
  * Rarity is measured only against Bold-Call-eligible entries — the cohort
  * frozen at Gameweek 1's lock — and the player's own prediction counts
- * toward its own rarity, so "fewer than a third" means the player plus at
- * most a handful of others.
+ * toward its own rarity. The threshold is one agreement for cohorts below
+ * twenty players, then one additional agreement per ten eligible players.
  */
 export function scorePredictTableCohort<K>(
   entries: readonly CohortEntry<K>[],

@@ -97,5 +97,5 @@ _Avoid_: assuming this contributes to Season Total — it deliberately doesn't, 
 Points for predicting one Table Band's full membership exactly, in any order within it: 15 for Champion, Champions League and Relegated, 10 for the other four. An over- or under-filled Band simply forfeits its bonus rather than being rejected.
 
 **Bold Call**:
-A correct placement that fewer than a third of the frozen Gameweek-1 cohort also made, worth +3; a Player's best 5 count. Rewards being right where others weren't, so the score pays for judgement rather than for common knowledge. A Late Joiner sits outside the process in both directions — earns none, and counts toward nobody's rarity.
+A correct placement made by no more than roughly one in 10 eligible players, worth +3; a Player's best 5 count. Competitions with fewer than 10 eligible players still allow one lone correct call, then the threshold grows by one agreement per 10 players. Rewards being right where almost nobody else was, so the score pays for judgement rather than common knowledge. A Late Joiner sits outside the process in both directions — earns none, and counts toward nobody's rarity.
 _Avoid_: Bold Pick (collides with Pick, which means a match scoreline)

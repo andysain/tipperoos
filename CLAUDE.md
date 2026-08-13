@@ -85,6 +85,8 @@ Each Premier League gameweek (~10 fixtures), exactly **two matches** are opened 
 
 The app's landing route `/` **is** the pick board; there is no hub or dashboard in front of it. See `docs/adr/0007-home-surface-and-pick-entry.md` for the full shape, its states, the entry mechanic, and the prototyped alternatives that were rejected.
 
+- Every authenticated page has a persistent top-corner `?` link to `/how-it-works`. The page explains weekly picks, scoring, missing picks, Predict the Table, and winner eligibility in kid-friendly language; it is not a tab-bar destination.
+
 - **The current gameweek is derived per request** (lowest-numbered gameweek in this season and competition with any tipped match not yet locked; else the highest-numbered gameweek that has tipped matches) — never an `is_current` column, so a missed job can't leave it wrong.
 - **Two slots in fixed order**, Match 1 above Match 2, in every state, all season. Both open slots show their entry controls immediately — nothing needs opening first.
 - **A settled slot** (filed, locked, live or finished) collapses to a dark plate carrying the scoreline and the player's own points. **Comparing against other players lives in the Match Centre, not here** — home shows a player their own pick and their own outcome only, which is also how the pre-lock visibility rule above is upheld by construction.
@@ -133,8 +135,8 @@ Scoring must be **idempotent**: correcting a previously-entered result and recom
     3+ Bands out, or unplaced    0                              max 100
 
   Bold Call bonus
-    +3 per correct placement that fewer than a third of the
-    frozen Gameweek-1 cohort also made; the best 5 count        max  15
+    +3 per correct placement made by no more than roughly one in
+    10 eligible players; the best 5 count                         max  15
 
   Band Bonus (exact full membership, any order within)
     Champion / Champions League / Relegated          15 each
@@ -145,7 +147,7 @@ Scoring must be **idempotent**: correcting a previously-entered result and recom
 
   `band_distance` is the number of Bands between the player's predicted Band and the team's actual Band (Bands ordered 1–7 as above). A team left unplaced scores nothing — the same as one placed 3+ Bands out. A Band whose predicted membership isn't exactly its actual membership forfeits its bonus. The three larger bonuses sit on the Bands a season is actually about; those are also the easier Bands to hit (Champion needs one team right, Mid Table needs three exact), so 15-against-10 is a bigger premium per unit of effort than it looks.
 
-- **Bold Calls** reward being right where others weren't — the mechanism that stops the score paying the same for common knowledge as for real judgement. The rarity cohort is **frozen at Gameweek 1's lock**, so a later signup can never dilute a score already earned, and a player's own prediction counts toward its own rarity. A **Late Joiner sits outside the Bold Call process in both directions**: they earn none, and their prediction never counts toward anyone's denominator. They appear on the Predict the Table board, visually de-emphasised, and are **not eligible to win it** — which is what makes their resulting 185 ceiling a non-issue rather than a handicap.
+- **Bold Calls** reward being right where almost nobody else was — a placement made by no more than roughly one in 10 eligible players. A competition with fewer than 10 eligible players still allows one lone correct call; the threshold then grows by one agreement per 10 players. The rarity cohort is **frozen at Gameweek 1's lock**, so a later signup can never dilute a score already earned, and a player's own prediction counts toward its own rarity. A **Late Joiner sits outside the Bold Call process in both directions**: they earn none, and their prediction never counts toward anyone's denominator. They appear on the Predict the Table board, visually de-emphasised, and are **not eligible to win it** — which is what makes their resulting 185 ceiling a non-issue rather than a handicap.
 - Bold Calls make the score a function of the whole cohort, not of one prediction alone. It stays deterministic and idempotent — fully recomputable from stored data — but note this is a **deliberate divergence** from the match-scoring rule in `docs/adr/0009` that a score is a pure function of one player's own pick. `src/lib/scoring/predict-table.ts` reflects this with two entry points: `scorePredictTable` (placement and Band Bonus, pure) and `scorePredictTableCohort` (the only one that produces a complete score).
 - Ground truth for actual final Bands comes from football-data.org's `/v4/competitions/{id}/standings` endpoint (same provider as fixture/result sync) — no separate data source needed.
 - This score is computed **continuously** through the season against current live standings, not revealed only at season end — a fun, low-cost engagement hook given the standings endpoint is already available.

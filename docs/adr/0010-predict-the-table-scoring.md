@@ -18,8 +18,8 @@ PLACEMENT (per team, 20 teams)
   3+ Bands out, or unplaced       0                  max 100
 
 BOLD CALL BONUS
-  +3 per correct placement that fewer than a third
-  of the frozen Gameweek-1 cohort also made; best 5   max  15
+  +3 per correct placement made by no more than roughly one in 10
+  eligible players; best 5                            max  15
 
 BAND BONUS (exact full membership, any order within)
   Champion / Champions League / Relegated     15 each
@@ -30,7 +30,7 @@ MAXIMUM                                                   200
 
 **The placement curve is steeper and shorter.** `5 / 2 / 1 / 0` instead of a linear 6-down-to-0 across seven distances. This was raised as an explainability fix — four tiers with no mental arithmetic instead of seven — and it is one, but its larger effect is on discrimination. The old curve was nearly flat across the distances that actually occur, so everyone scored alike; the new one drops sharply across exactly that range. Rough modelling put the gap between a good and a weaker predictor at ~14% before and ~25% after. The explainability win was the stated reason; the compression fix is the reason it's the right call.
 
-**Bold Call is surprisal scoring, capped and flattened.** A correct placement that fewer than a third of the cohort also made pays +3. This is the direct mechanism for the finding above: it pays for information rather than for placements, and it takes its difficulty signal from the crowd, so nothing has to be modelled and it re-calibrates itself every season. Flat rather than proportional, and capped at five, because a ten-to-twenty player crowd is a thin sample and the rarity signal will be lumpy — a cap stops that noise being amplified into a runaway score. The cap is also what keeps the maximum at a quotable 200.
+**Bold Call is surprisal scoring, capped and flattened.** A correct placement made by no more than roughly one in 10 eligible players pays +3. Competitions with fewer than 10 eligible players still allow one lone correct call; the threshold then grows by one agreement per 10 players. This is the direct mechanism for the finding above: it pays for information rather than for placements, and it takes its difficulty signal from the crowd, so nothing has to be modelled and it re-calibrates itself every season. Flat rather than proportional, and capped at five, because a ten-to-twenty player crowd is a thin sample and the rarity signal will be lumpy — a cap stops that noise being amplified into a runaway score. The cap is also what keeps the maximum at a quotable 200.
 
 **All seven Bands carry a bonus, with 15 on Champion, Champions League and Relegated.** The three key Bands are what a season is actually about. They are also the *easier* ones to hit — Champion needs one team right where Mid Table needs three exact — so 15-against-10 is a larger premium per unit of effort than the ratio suggests. Paying a bigger multiple on top of that would have been paying the premium twice, which is why the wider 25/20/20-against-5 split was rejected.
 
@@ -45,7 +45,7 @@ MAXIMUM                                                   200
 - **This breaks the pure-function property, knowingly.** `docs/adr/0009` established that a match score is a pure function of one player's pick, and rejected rank-relative scoring ("Closest to the Pin") to preserve it. Bold Calls need the whole cohort's predictions. The score stays deterministic and idempotent — fully recomputable from stored data at any time — but it is no longer a function of one prediction alone. This is the **second** deliberate divergence between the two scoring systems (the first being difficulty-shaped weighting, rejected for matches and effectively accepted here). Two divergences are defensible on the grounds that Predict the Table is standalone and cannot decide the season; a third would suggest there is no principle, only preferences.
 - **The module has two entry points.** `scorePredictTable` scores one prediction's placement and Band Bonuses and remains pure. `scorePredictTableCohort` is the only entry point that can produce a complete score, because Bold Calls are inherently a property of the cohort. Callers wanting a real total must use the latter.
 - **The maximum is still 200**, so `CLAUDE.md`'s existing "Maximum possible score: 200" survives the rewrite unchanged. Coincidence rather than design, but a welcome one.
-- **A player's own prediction counts toward its own rarity.** With twelve eligible players, "fewer than a third" means the player plus at most two others. Documented rather than adjusted — the alternative (excluding yourself) makes the threshold shift with cohort size in a way that's harder to explain.
+- **A player's own prediction counts toward its own rarity.** With twelve eligible players, one agreement qualifies and two do not. Documented rather than adjusted — the alternative (excluding yourself) makes the threshold shift with cohort size in a way that's harder to explain.
 - **The 3+ Bands out cliff means a badly-placed team scores exactly what an unplaced team scores.** ADR 0008 deliberately allows an untidy, under-filled table to still score; this slightly weakens the incentive to place a team you have no read on. Accepted: a player still has everything to gain by guessing within two Bands, which is most guesses.
 
 ## Considered and rejected
@@ -66,5 +66,5 @@ MAXIMUM                                                   200
 ## Deferred, not settled here
 
 - **Whether the Champion Band Bonus is worth its 15.** It needs one team right, so in a typical season most of a twelve-player group will earn it and it will separate nobody, functioning as a flat addition to everyone's score. The counter-argument is that the rare season where a surprise club wins the league is exactly when it should blow the board apart, and variance is free in a standalone feature. Left at 15 without resolving which reading is correct; revisit after a season of real data.
-- **The Bold Call threshold of "fewer than a third."** A judgement call, not a derived number, and the most likely thing to need tuning once there's a real cohort. It is a single constant in `src/lib/scoring/predict-table.ts`.
+- **The Bold Call threshold of roughly one in 10.** A judgement call, not a derived number, and the most likely thing to need tuning once there's a real cohort. It is a single threshold in `src/lib/scoring/predict-table.ts`; small competitions floor it at one qualifying agreement.
 - **How "greyed out" renders for a Late Joiner** on the Predict the Table board — a display decision for whoever builds that surface.

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchPlayers } from "./page";
+import { fetchPlayers } from "./fetch-players";
 
 // Real scenarios fetchPlayers must resolve (never reject) for -- see the
 // comment on fetchPlayers itself for why this matters: the mount-time
