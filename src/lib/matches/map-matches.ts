@@ -1,8 +1,15 @@
 /**
  * Maps a football-data.org /v4/competitions/PL/matches response to `matches`
- * upsert rows. See issue #11's decision log for the status mapping and why
+ * update rows. See issue #11's decision log for the status mapping and why
  * this only ever reads kickoff time, status, and full-time score -- never
  * team+date -- to key a match.
+ *
+ * This produces per-row UPDATEs (keyed on the internal `id`), not upserts:
+ * per CLAUDE.md, all fixtures are seeded once up front and this route only
+ * ever applies deltas to an existing row. An upsert here previously failed
+ * in production -- Postgres validates the NOT NULL columns (season_id,
+ * team_a_id, team_b_id) on the proposed row even for an UPDATE-only conflict
+ * resolution, and this mapper never has those values to send.
  */
 
 const COMPLETED_STATUSES = new Set(["FINISHED"]);
@@ -28,9 +35,8 @@ export interface FootballDataMatchesResponse {
   readonly matches: readonly FootballDataMatch[];
 }
 
-export interface MatchRow {
-  readonly provider_name: string;
-  readonly provider_match_id: string;
+export interface MatchUpdate {
+  readonly id: string;
   readonly kickoff_time: string;
   readonly status: MatchStatus;
   readonly team_a_score: number | null;
@@ -39,7 +45,7 @@ export interface MatchRow {
 }
 
 export interface MapMatchesResult {
-  readonly rows: readonly MatchRow[];
+  readonly updates: readonly MatchUpdate[];
   readonly unmatchedProviderMatchIds: readonly string[];
 }
 
@@ -49,19 +55,19 @@ export function mapProviderStatus(status: string): MatchStatus {
   return "scheduled";
 }
 
-export function mapMatchesToRows(
+export function mapMatchesToUpdates(
   response: FootballDataMatchesResponse,
-  knownProviderMatchIds: ReadonlySet<string>,
-  providerName: string,
+  matchIdByProviderMatchId: ReadonlyMap<string, string>,
   now: Date,
 ): MapMatchesResult {
   const nowIso = now.toISOString();
-  const rows: MatchRow[] = [];
+  const updates: MatchUpdate[] = [];
   const unmatchedProviderMatchIds: string[] = [];
 
   for (const match of response.matches) {
     const providerMatchId = String(match.id);
-    if (!knownProviderMatchIds.has(providerMatchId)) {
+    const id = matchIdByProviderMatchId.get(providerMatchId);
+    if (!id) {
       unmatchedProviderMatchIds.push(providerMatchId);
       continue;
     }
@@ -69,9 +75,8 @@ export function mapMatchesToRows(
     const status = mapProviderStatus(match.status);
     const isCompleted = status === "completed";
 
-    rows.push({
-      provider_name: providerName,
-      provider_match_id: providerMatchId,
+    updates.push({
+      id,
       kickoff_time: match.utcDate,
       status,
       team_a_score: isCompleted ? match.score.fullTime.home : null,
@@ -80,5 +85,5 @@ export function mapMatchesToRows(
     });
   }
 
-  return { rows, unmatchedProviderMatchIds };
+  return { updates, unmatchedProviderMatchIds };
 }
