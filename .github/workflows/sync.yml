@@ -1,0 +1,47 @@
+name: Fixture and Standings Sync
+
+# Issue #11: primary fixture/result and league-standings sync mechanism.
+# One schedule, two calls (matches first, then standings) per #88's
+# 2026-08-09 decision log -- avoids a second, redundant cron.
+#
+# Cadence: every 30 minutes, 10:00-23:59 UTC, every day of the week. Not
+# gated to "match days" (Premier League fixtures aren't confined to a fixed
+# weekday, and this repo is public so Actions minutes are free/unlimited),
+# but gated to hours -- an always-on 24/7 cadence was pure noise, since
+# almost every run outside UK afternoon/evening finds nothing to sync. See
+# issue #11's decision log (2026-08-14) for the full reasoning.
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: "Override the base URL to sync against (defaults to the SYNC_TARGET_URL secret, i.e. production). Use a staging/Preview URL for a manual dry run."
+        required: false
+        type: string
+  schedule:
+    - cron: "*/30 10-23 * * *"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve target URL
+        id: target
+        run: |
+          URL="${{ inputs.target_url }}"
+          if [ -z "$URL" ]; then
+            URL="${{ secrets.SYNC_TARGET_URL }}"
+          fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Sync fixtures and results
+        id: matches
+        run: |
+          curl --fail-with-body -sS -X POST "${{ steps.target.outputs.url }}/api/sync/matches" \
+            -H "x-sync-secret: ${{ secrets.SYNC_TRIGGER_SECRET }}"
+
+      - name: Sync league standings
+        id: standings
+        if: always()
+        run: |
+          curl --fail-with-body -sS -X POST "${{ steps.target.outputs.url }}/api/sync/standings" \
+            -H "x-sync-secret: ${{ secrets.SYNC_TRIGGER_SECRET }}"

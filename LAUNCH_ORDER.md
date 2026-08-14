@@ -10,7 +10,7 @@ Launch is defined as: _a player logs in, lands on the Pick Board, sees gameweek 
 #18 ──> #19 ──> #89 ──┘
 #86 ──────────────────┘
 #88 (migration, standalone)
-#11 (sync cadence — see gap below)
+#11 (sync cadence, standalone — wave 1)
 ```
 
 ---
@@ -49,6 +49,10 @@ Anything touching `src/lib/**` needs your explicit approval before merge (CODEOW
 
   _Head of the selection chain. Pure logic; positions are an input, so it does not wait on #88._
 
+- [ ] **#11 — GitHub Actions sync workflow**
+
+  _Moved into wave 1 from the "Open gap" below (decision made 2026-08-14 via `/ship`): #88's standings sync assumes this cadence exists, and a rescheduled GW1 fixture has no mechanism to correct its pick-lock time without it. See #11's own decision log for the build shape._
+
 ## Wave 2 — two in parallel
 
 - [x] **#19 — Match 2: uniform-random rule** (after #18)
@@ -70,16 +74,6 @@ Anything touching `src/lib/**` needs your explicit approval before merge (CODEOW
 
   _Also needs #89 in practice: no gameweek exists to render or to exercise on Preview until the seed script has run._
   _Includes the login redirect — login currently dead-ends into `/predict-table`._
-
----
-
-## Open gap to resolve before wave 1
-
-- [ ] **#11 — GitHub Actions sync workflow.** Already `launch-critical` but sitting in _Fixtures &amp; Results Sync_, not the launch milestone. Two reasons it belongs in wave 1:
-  - #88's standings fetch is written as "wired into the existing sync cadence" — and that cadence does not exist yet.
-  - Kickoff times drive lock times, so a rescheduled gameweek-1 fixture with no sync locks at the wrong moment.
-
-  **Decision needed:** move #11 into the launch milestone and build it in wave 1, or ship #88 as a route the seed script invokes manually for day one (works, but leaves kickoff drift unhandled).
 
 ---
 
