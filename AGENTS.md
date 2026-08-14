@@ -23,6 +23,7 @@ This file is a router, not a rulebook — the linked docs own their rules; don't
 | A hard-to-reverse architectural call — why does something work this way                        | `docs/adr/`                                                   |
 | GitHub issue backlog / what's done vs. open                                                    | `gh issue list -R andysain/tipperoos --state all --limit 100` |
 | Frontend/design/UI work                                                                        | `docs/FRONTEND_BRIEFING.md`                                   |
+| Server-side data loading / round-trip counts / perf regressions                                | `docs/standards/PERFORMANCE_TESTING_STANDARD.md`              |
 
 ## Non-negotiables (see CLAUDE.md for full detail)
 
