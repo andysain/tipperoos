@@ -13,6 +13,14 @@ interface SaveBody {
 const MIN_SCORE = 0;
 const MAX_SCORE = 9; // digit-row entry only ever produces 0-9 per side.
 
+// matchId feeds directly into a PostgREST .or() filter string below, which
+// is not parameter-bound the way .eq() is -- a value containing a comma or
+// parenthesis could inject an unintended filter clause. matches.id is a
+// uuid column, so requiring this shape closes that off same as a type
+// check would in a parameterized query.
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function isValidScore(value: unknown): value is number {
   return (
     typeof value === "number" &&
@@ -62,6 +70,12 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
+  if (!UUID_PATTERN.test(matchId)) {
+    return NextResponse.json(
+      { error: "That match isn't a currently tipped match." },
+      { status: 400 },
+    );
+  }
   if (!isValidScore(body.homeScore) || !isValidScore(body.awayScore)) {
     return invalidScoreResponse();
   }
@@ -83,38 +97,41 @@ export async function POST(request: Request) {
   // might send. `picks`/`matches` carry no competition_id of their own --
   // `gameweeks` is the table that actually carries it, per
   // src/lib/competitions/scope.ts's established join-back pattern.
-  const { data: gameweeks, error: gameweeksError } = await supabase
-    .from("gameweeks")
-    .select("match_1_id, match_2_id")
-    .eq("competition_id", competitionId);
-  if (gameweeksError) {
+  //
+  // Filtered directly by matchId (at most one gameweek row can reference
+  // it) rather than fetching every gameweek row for the competition and
+  // checking membership in JS -- and run alongside the kickoff-time fetch
+  // below, since neither depends on the other's result.
+  const [membershipResult, matchResult] = await Promise.all([
+    supabase
+      .from("gameweeks")
+      .select("id")
+      .eq("competition_id", competitionId)
+      .or(`match_1_id.eq.${matchId},match_2_id.eq.${matchId}`)
+      .order("id")
+      .maybeSingle(),
+    supabase.from("matches").select("kickoff_time").eq("id", matchId).single(),
+  ]);
+  if (membershipResult.error) {
     return NextResponse.json(
       { error: "Couldn't verify that match -- try again." },
       { status: 500 },
     );
   }
-  const isTippedMatch = (gameweeks ?? []).some(
-    (gw) => gw.match_1_id === matchId || gw.match_2_id === matchId,
-  );
-  if (!isTippedMatch) {
+  if (!membershipResult.data) {
     return NextResponse.json(
       { error: "That match isn't a currently tipped match." },
       { status: 400 },
     );
   }
 
-  const { data: match, error: matchError } = await supabase
-    .from("matches")
-    .select("kickoff_time")
-    .eq("id", matchId)
-    .single();
-  if (matchError || !match) {
+  if (matchResult.error || !matchResult.data) {
     return NextResponse.json(
       { error: "Couldn't verify that match -- try again." },
       { status: 500 },
     );
   }
-  if (isMatchLocked(new Date(match.kickoff_time), new Date())) {
+  if (isMatchLocked(new Date(matchResult.data.kickoff_time), new Date())) {
     return NextResponse.json(
       { error: "Picks lock 5 minutes before kickoff." },
       { status: 403 },
