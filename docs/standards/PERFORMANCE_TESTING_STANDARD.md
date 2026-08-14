@@ -24,15 +24,34 @@ and no CDN layer to tune.
 
 That means:
 
-- **Chasing Core Web Vitals is chasing the wrong number here.** LCP on `/` is
-  a near-direct function of how long the Server Component spends awaiting
-  Supabase. Fix the awaits and LCP follows; tune the client and nothing moves.
-- The two measurements that matter are **serial round-trip depth** (how many
-  Supabase calls happen strictly one-after-another before a response can be
-  produced) and **blocking CPU per request** (`scryptSync`).
+- **Chasing Core Web Vitals is chasing the wrong number here** — for LCP.
+  LCP on `/` is a near-direct function of how long the Server Component
+  spends awaiting Supabase. Fix the awaits and LCP follows; tune the client
+  and nothing moves. **This did not hold for INP** — see the correction
+  below. Treat this section's framing as right for LCP and load time, and
+  wrong if extended uncritically to interaction responsiveness.
+- The two measurements that matter for _load_ performance are **serial
+  round-trip depth** (how many Supabase calls happen strictly
+  one-after-another before a response can be produced) and **blocking CPU
+  per request** (`scryptSync`).
 
 Both are countable by reading code. That is the cheapest performance tool
-this project has, and §4 makes it the primary one.
+this project has, and §4 makes it the primary one for round-trip depth.
+
+**Correction (2026-08-14, after the §4 fixes below shipped):** a real-device
+Chrome trace of the Pick Board found INP dominated by a ~230ms browser-level
+delay on _every_ tap (`GestureTapUnconfirmed` -> `GestureTap` in the trace) —
+the double-tap-zoom gesture disambiguation Chrome runs on touch input when no
+`touch-action` is declared. This is client-side, has nothing to do with
+Supabase round trips, and was very likely the real cause of the "grey card"
+and general tap-feels-slow complaints in `LAUNCH_ORDER.md`, more than round-
+trip depth was. Fixed with `touch-action: manipulation` on `body`
+(`src/app/globals.css`). The lesson this section got wrong: "no CDN layer to
+tune" and "small client bundle" are true and irrelevant to touch-input
+latency, which is a browser gesture-recognition behavior, not a rendering or
+network cost — the kind of thing only a real-device trace catches, never a
+code read. §6's real-device checklist is the control for this class of bug;
+§2b's round-trip budget script cannot see it.
 
 ## 2) What the tooling actually is
 
@@ -269,9 +288,16 @@ that makes you think "did that register?" is a finding.
       whether that's still true, it is a separate defect from latency.)
 - [ ] Predict the Table: tapping a team commits visibly within ~100 ms.
       The "grey card → full contrast" lag is the known symptom; with `assign`
-      now a single RPC, re-check whether it persists — if it does, the cause
-      is client-side render or awaiting the response before painting, not the
-      round trip.
+      now a single RPC and `touch-action: manipulation` set, re-check whether
+      it persists — if it does, the cause is client-side render or awaiting
+      the response before painting, not the round trip or the tap-delay fixed
+      above.
+- [ ] Any tap anywhere feels instant, not delayed-then-instant. This is what
+      the `touch-action` fix targets — if it regresses (e.g. a new component
+      overrides `touch-action` locally), it will feel exactly like the
+      original "grey card" complaint despite every server round trip being
+      fine, and a code read alone won't show it — only a real-device trace
+      will (see §1's correction).
 - [ ] Band accordion open/close is smooth, no layout jump.
 - [ ] Submit confirmation modal appears immediately regardless of scroll
       position.
