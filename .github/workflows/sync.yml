@@ -31,17 +31,25 @@ jobs:
           if [ -z "$URL" ]; then
             URL="${{ secrets.SYNC_TARGET_URL }}"
           fi
+          # Strip any trailing slash -- a bare "https://host/" here produced
+          # "https://host//api/sync/matches" (double slash), which Vercel
+          # redirects to normalize. curl without -L doesn't follow that
+          # redirect and --fail-with-body doesn't treat a 3xx as failure, so
+          # the step reported success while never reaching the route handler
+          # (caught for real in the first two workflow_dispatch runs, both
+          # against the wrong URL for an unrelated reason -- see issue #11).
+          URL="${URL%/}"
           echo "url=$URL" >> "$GITHUB_OUTPUT"
 
       - name: Sync fixtures and results
         id: matches
         run: |
-          curl --fail-with-body -sS -X POST "${{ steps.target.outputs.url }}/api/sync/matches" \
+          curl --fail-with-body -sS -L -X POST "${{ steps.target.outputs.url }}/api/sync/matches" \
             -H "x-sync-secret: ${{ secrets.SYNC_TRIGGER_SECRET }}"
 
       - name: Sync league standings
         id: standings
         if: always()
         run: |
-          curl --fail-with-body -sS -X POST "${{ steps.target.outputs.url }}/api/sync/standings" \
+          curl --fail-with-body -sS -L -X POST "${{ steps.target.outputs.url }}/api/sync/standings" \
             -H "x-sync-secret: ${{ secrets.SYNC_TRIGGER_SECRET }}"

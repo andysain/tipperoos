@@ -1,13 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { mapMatchesToRows, mapProviderStatus } from "./map-matches";
+import { mapMatchesToUpdates, mapProviderStatus } from "./map-matches";
 
 // Golden values hand-derived from a synthetic football-data.org
 // /v4/competitions/PL/matches payload shape, and from CLAUDE.md's Stack
 // section ("match on a stable external fixture ID, never team-name+date")
-// and issue #11's decision log (status mapping table).
-const PROVIDER_NAME = "football-data.org";
+// and issue #11's decision log (status mapping table). Rows are keyed on the
+// internal matches.id (via matchIdByProviderMatchId), not the provider id --
+// this is an UPDATE-only mapper, see map-matches.ts's header comment for why.
 const NOW = new Date("2026-08-14T12:00:00.000Z");
-const KNOWN_IDS = new Set(["100", "101", "102"]);
+const MATCH_ID_BY_PROVIDER_ID = new Map([
+  ["100", "match-uuid-100"],
+  ["101", "match-uuid-101"],
+  ["102", "match-uuid-102"],
+]);
 
 function payload(
   matches: Array<{
@@ -55,19 +60,17 @@ describe("mapProviderStatus", () => {
   });
 });
 
-describe("mapMatchesToRows", () => {
+describe("mapMatchesToUpdates", () => {
   it("maps a scheduled match with a kickoff-time change, no score written", () => {
-    const result = mapMatchesToRows(
+    const result = mapMatchesToUpdates(
       payload([{ id: 100, utcDate: "2026-08-22T15:30:00Z", status: "TIMED" }]),
-      KNOWN_IDS,
-      PROVIDER_NAME,
+      MATCH_ID_BY_PROVIDER_ID,
       NOW,
     );
 
-    expect(result.rows.length).toBe(1);
-    expect(result.rows[0]).toEqual({
-      provider_name: PROVIDER_NAME,
-      provider_match_id: "100",
+    expect(result.updates.length).toBe(1);
+    expect(result.updates[0]).toEqual({
+      id: "match-uuid-100",
       kickoff_time: "2026-08-22T15:30:00Z",
       status: "scheduled",
       team_a_score: null,
@@ -77,7 +80,7 @@ describe("mapMatchesToRows", () => {
   });
 
   it("writes a different final scoreline correctly (3-0)", () => {
-    const result = mapMatchesToRows(
+    const result = mapMatchesToUpdates(
       payload([
         {
           id: 100,
@@ -87,17 +90,16 @@ describe("mapMatchesToRows", () => {
           awayScore: 0,
         },
       ]),
-      KNOWN_IDS,
-      PROVIDER_NAME,
+      MATCH_ID_BY_PROVIDER_ID,
       NOW,
     );
 
-    expect(result.rows[0].team_a_score).toBe(3);
-    expect(result.rows[0].team_b_score).toBe(0);
+    expect(result.updates[0].team_a_score).toBe(3);
+    expect(result.updates[0].team_b_score).toBe(0);
   });
 
   it("writes fullTime score and result_updated_at only when FINISHED", () => {
-    const result = mapMatchesToRows(
+    const result = mapMatchesToUpdates(
       payload([
         {
           id: 101,
@@ -107,19 +109,18 @@ describe("mapMatchesToRows", () => {
           awayScore: 1,
         },
       ]),
-      KNOWN_IDS,
-      PROVIDER_NAME,
+      MATCH_ID_BY_PROVIDER_ID,
       NOW,
     );
 
-    expect(result.rows[0].status).toBe("completed");
-    expect(result.rows[0].team_a_score).toBe(2);
-    expect(result.rows[0].team_b_score).toBe(1);
-    expect(result.rows[0].result_updated_at).toBe(NOW.toISOString());
+    expect(result.updates[0].status).toBe("completed");
+    expect(result.updates[0].team_a_score).toBe(2);
+    expect(result.updates[0].team_b_score).toBe(1);
+    expect(result.updates[0].result_updated_at).toBe(NOW.toISOString());
   });
 
   it("maps a postponed match to postponed status with no score", () => {
-    const result = mapMatchesToRows(
+    const result = mapMatchesToUpdates(
       payload([
         {
           id: 102,
@@ -127,29 +128,27 @@ describe("mapMatchesToRows", () => {
           status: "POSTPONED",
         },
       ]),
-      KNOWN_IDS,
-      PROVIDER_NAME,
+      MATCH_ID_BY_PROVIDER_ID,
       NOW,
     );
 
-    expect(result.rows[0].status).toBe("postponed");
-    expect(result.rows[0].team_a_score).toBe(null);
-    expect(result.rows[0].team_b_score).toBe(null);
+    expect(result.updates[0].status).toBe("postponed");
+    expect(result.updates[0].team_a_score).toBe(null);
+    expect(result.updates[0].team_b_score).toBe(null);
   });
 
   it("skips a match whose provider id matches no seeded fixture, without dropping the rest", () => {
-    const result = mapMatchesToRows(
+    const result = mapMatchesToUpdates(
       payload([
         { id: 100, utcDate: "2026-08-22T15:30:00Z", status: "SCHEDULED" },
         { id: 999, utcDate: "2026-08-22T17:30:00Z", status: "SCHEDULED" },
         { id: 101, utcDate: "2026-08-22T20:00:00Z", status: "SCHEDULED" },
       ]),
-      KNOWN_IDS,
-      PROVIDER_NAME,
+      MATCH_ID_BY_PROVIDER_ID,
       NOW,
     );
 
-    expect(result.rows.length).toBe(2);
+    expect(result.updates.length).toBe(2);
     expect(result.unmatchedProviderMatchIds.length).toBe(1);
     expect(result.unmatchedProviderMatchIds).toEqual(["999"]);
   });
@@ -165,9 +164,9 @@ describe("mapMatchesToRows", () => {
       },
     ]);
 
-    const first = mapMatchesToRows(input, KNOWN_IDS, PROVIDER_NAME, NOW);
-    const second = mapMatchesToRows(input, KNOWN_IDS, PROVIDER_NAME, NOW);
+    const first = mapMatchesToUpdates(input, MATCH_ID_BY_PROVIDER_ID, NOW);
+    const second = mapMatchesToUpdates(input, MATCH_ID_BY_PROVIDER_ID, NOW);
 
-    expect(second.rows).toEqual(first.rows);
+    expect(second.updates).toEqual(first.updates);
   });
 });

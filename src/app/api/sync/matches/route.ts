@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { mapMatchesToRows } from "@/lib/matches/map-matches";
+import { mapMatchesToUpdates } from "@/lib/matches/map-matches";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 // Issue #11: fixture/result sync route, callable manually now and by this
@@ -59,27 +59,34 @@ export async function POST(request: Request) {
       fetchMatches(apiKey, dateFrom, dateTo),
       supabase
         .from("matches")
-        .select("provider_match_id")
+        .select("id, provider_match_id")
         .eq("provider_name", PROVIDER_NAME),
     ]);
 
     if (knownMatchesResult.error) throw knownMatchesResult.error;
 
-    const knownProviderMatchIds = new Set(
-      knownMatchesResult.data.map((row) => row.provider_match_id),
+    const matchIdByProviderMatchId = new Map(
+      knownMatchesResult.data.map((row) => [row.provider_match_id, row.id]),
     );
 
-    const { rows, unmatchedProviderMatchIds } = mapMatchesToRows(
+    const { updates, unmatchedProviderMatchIds } = mapMatchesToUpdates(
       matchesResponse,
-      knownProviderMatchIds,
-      PROVIDER_NAME,
+      matchIdByProviderMatchId,
       now,
     );
 
-    const { error: upsertError } = await supabase
-      .from("matches")
-      .upsert(rows, { onConflict: "provider_name,provider_match_id" });
-    if (upsertError) throw upsertError;
+    // Fixtures are always pre-seeded (CLAUDE.md): every id here already
+    // exists, so this is always an UPDATE, never an insert -- an upsert
+    // fails here because Postgres validates NOT NULL columns (season_id,
+    // team_a_id, team_b_id) on the proposed row even for an update-only
+    // conflict resolution, and this route never has those values to send.
+    const updateResults = await Promise.all(
+      updates.map(({ id, ...changes }) =>
+        supabase.from("matches").update(changes).eq("id", id),
+      ),
+    );
+    const updateError = updateResults.find((result) => result.error)?.error;
+    if (updateError) throw updateError;
 
     const errorMessage =
       unmatchedProviderMatchIds.length > 0
@@ -94,7 +101,7 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({
-      updated: rows.length,
+      updated: updates.length,
       skipped: unmatchedProviderMatchIds,
     });
   } catch (err) {
