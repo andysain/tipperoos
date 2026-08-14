@@ -99,6 +99,10 @@ Run this before filing an issue, or a milestone's worth of issues:
       more than ~3 criteria, that's a signal this is two issues wearing one
       number. Split it before filing rather than after someone's picked it
       up.
+- [ ] **Serial round trips counted.** If the issue adds or changes
+      server-side data loading, state the serial Supabase depth of the
+      affected path and why any sequential awaits can't be parallel — see
+      `docs/standards/PERFORMANCE_TESTING_STANDARD.md` §7.
 - [ ] **Assumption check** (foundational/schema issues only — skip for
       routine feature work). One question: does this design assume
       something that's true today but not guaranteed to stay true? Doesn't
