@@ -1,6 +1,5 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { resolveCurrentGameweekForCompetition } from "@/app/_lib/gameweek-access";
 import { isMatchLocked, scoresForCompetition } from "@/lib/competitions/scope";
 import { rankScores } from "@/lib/leaderboard/rank";
 
@@ -78,23 +77,6 @@ interface MatchRow {
   status: string;
   team_a_score: number | null;
   team_b_score: number | null;
-}
-
-async function getCurrentSeasonId(
-  supabase: SupabaseClient,
-): Promise<string | null> {
-  // .order() is required even for a single expected row -- AGENTS.md:
-  // "Never select a row without an explicit .order()... Postgres row order
-  // is arbitrary." start_date desc is the meaningful tiebreak if `is_current`
-  // were ever momentarily true on more than one row during a season rollover.
-  const { data: season, error } = await supabase
-    .from("seasons")
-    .select("id")
-    .eq("is_current", true)
-    .order("start_date", { ascending: false })
-    .maybeSingle();
-  if (error) throw error;
-  return season?.id ?? null;
 }
 
 /**
@@ -189,23 +171,19 @@ async function loadTeamsById(
  * and points for them, and enough team/standings data to render both slot
  * cards. Null if no season is seeded or no gameweek has ever had a Tipped
  * Match (gameweek 1 not yet selected -- see issue #89).
+ *
+ * `seasonId` and `gameweekNumber` are caller-resolved (the Pick Board route
+ * resolves both once and shares them across every loader) rather than
+ * re-resolved here -- see docs/standards/PERFORMANCE_TESTING_STANDARD.md §4.1.
  */
 export async function loadPickBoardGameweek(
   supabase: SupabaseClient,
   competitionId: string,
   playerId: string,
   now: Date,
+  seasonId: string,
+  gameweekNumber: number,
 ): Promise<PickBoardGameweek | null> {
-  const seasonId = await getCurrentSeasonId(supabase);
-  if (!seasonId) return null;
-
-  const gameweekNumber = await resolveCurrentGameweekForCompetition(
-    supabase,
-    competitionId,
-    now,
-  );
-  if (gameweekNumber === null) return null;
-
   const gwRow = await loadGameweekSlotRow(
     supabase,
     competitionId,
@@ -360,10 +338,8 @@ export async function loadSeasonStats(
   supabase: SupabaseClient,
   competitionId: string,
   playerId: string,
+  seasonId: string,
 ): Promise<SeasonStats | null> {
-  const seasonId = await getCurrentSeasonId(supabase);
-  if (!seasonId) return null;
-
   const scores = await scoresForCompetition(supabase, competitionId, seasonId);
   const hasAnyScoredMatch = scores.some((row) => row.matchesScored > 0);
   if (!hasAnyScoredMatch) return null;
@@ -398,18 +374,20 @@ export interface LastWeekSummary {
  * previous gameweek, or it hasn't been scored yet -- the strip only makes
  * sense once there's a payoff to show, matching the day-one variant's
  * "revert automatically once scores exist" rule.
+ *
+ * `seasonId` and `previousNumber` are caller-resolved, same rationale as
+ * loadPickBoardGameweek -- this also lets the Pick Board route run this
+ * loader in the same parallel wave as the current gameweek's, rather than
+ * serially after it (it no longer depends on that loader's result).
  */
 export async function loadLastWeekSummary(
   supabase: SupabaseClient,
   competitionId: string,
   playerId: string,
-  currentGameweekNumber: number,
+  seasonId: string,
+  previousNumber: number,
 ): Promise<LastWeekSummary | null> {
-  const previousNumber = currentGameweekNumber - 1;
   if (previousNumber < 1) return null;
-
-  const seasonId = await getCurrentSeasonId(supabase);
-  if (!seasonId) return null;
 
   const gwRow = await loadGameweekSlotRow(
     supabase,

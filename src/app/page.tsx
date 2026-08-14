@@ -2,6 +2,10 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSessionPlayerId } from "@/app/_lib/session-cookie";
 import {
+  getCurrentSeasonId,
+  resolveCurrentGameweekForCompetition,
+} from "@/app/_lib/gameweek-access";
+import {
   getDatabaseTime,
   getTablePredictionRecord,
 } from "@/app/_lib/table-prediction-access";
@@ -53,22 +57,52 @@ export default async function PickBoardPage() {
   const timeZone =
     cookieStore.get(TIMEZONE_COOKIE_NAME)?.value ?? DEFAULT_TIME_ZONE;
 
-  const [gameweek, seasonStats, tablePrediction, databaseTime] =
+  // Resolved once and shared across every loader below instead of each
+  // re-deriving it independently -- see
+  // docs/standards/PERFORMANCE_TESTING_STANDARD.md §4.1. gameweekNumber
+  // depends on seasonId, so this pair stays sequential; everything else that
+  // depended on either now runs in the single Promise.all beneath it,
+  // including the last-week summary, which previously ran serially after
+  // the whole block above resolved.
+  const seasonId = await getCurrentSeasonId(supabase);
+  const gameweekNumber = seasonId
+    ? await resolveCurrentGameweekForCompetition(
+        supabase,
+        competitionId,
+        now,
+        seasonId,
+      )
+    : null;
+  const previousGameweekNumber =
+    gameweekNumber !== null ? gameweekNumber - 1 : null;
+
+  const [gameweek, seasonStats, lastWeek, tablePrediction, databaseTime] =
     await Promise.all([
-      loadPickBoardGameweek(supabase, competitionId, playerId, now),
-      loadSeasonStats(supabase, competitionId, playerId),
+      seasonId && gameweekNumber !== null
+        ? loadPickBoardGameweek(
+            supabase,
+            competitionId,
+            playerId,
+            now,
+            seasonId,
+            gameweekNumber,
+          )
+        : Promise.resolve(null),
+      seasonId
+        ? loadSeasonStats(supabase, competitionId, playerId, seasonId)
+        : Promise.resolve(null),
+      seasonId && previousGameweekNumber !== null
+        ? loadLastWeekSummary(
+            supabase,
+            competitionId,
+            playerId,
+            seasonId,
+            previousGameweekNumber,
+          )
+        : Promise.resolve(null),
       getTablePredictionRecord(supabase, playerId),
       getDatabaseTime(supabase),
     ]);
-
-  const lastWeek = gameweek
-    ? await loadLastWeekSummary(
-        supabase,
-        competitionId,
-        playerId,
-        gameweek.number,
-      )
-    : null;
 
   // ADR-0007's first-run decision: prompt until submitted/skipped or the
   // fixed Table Prediction deadline. Late joiners can still submit any time
