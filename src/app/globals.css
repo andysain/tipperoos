@@ -58,11 +58,13 @@
 @keyframes swap-pulse {
   0% {
     transform: scale(1);
-    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-accent) 55%, transparent);
+    box-shadow: 0 0 0 0
+      color-mix(in oklab, var(--color-accent) 55%, transparent);
   }
   30% {
     transform: scale(1.03);
-    box-shadow: 0 0 0 6px color-mix(in oklab, var(--color-accent) 35%, transparent);
+    box-shadow: 0 0 0 6px
+      color-mix(in oklab, var(--color-accent) 35%, transparent);
   }
   100% {
     transform: scale(1);
@@ -90,4 +92,13 @@ body {
     system-ui,
     -apple-system,
     sans-serif;
+  /* Without this, a touch tap on any interactive element waits ~230-300ms
+     for the browser's double-tap-zoom disambiguation gesture (visible in a
+     Chrome trace as GestureTapUnconfirmed -> GestureTap) before dispatching
+     click -- this is what INP's "input delay" phase was actually measuring
+     on a real device, not app or server work (see
+     docs/standards/PERFORMANCE_TESTING_STANDARD.md). "manipulation" keeps
+     pinch-zoom (unlike disabling user-scalable in the viewport meta, which
+     would hurt accessibility) and only removes the double-tap gesture. */
+  touch-action: manipulation;
 }
