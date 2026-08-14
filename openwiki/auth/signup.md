@@ -28,7 +28,7 @@ competitionCode ──► resolveCompetitionByCode() ──► 403 if invalid
 displayName    ──► validateDisplayName()      ──► 400 if invalid
 pin            ──► validatePinFormat()        ──► 400 if invalid
 emoji          ──► validateEmoji()             ──► 400 if invalid
-email          ──► trimmed, stored raw         ──► optional
+email          ──► trimmed; stored, or null when empty ──► optional
                          │
                          ▼
               Check display_name uniqueness in competition

@@ -36,9 +36,9 @@ Rendered when:
 
 - No table prediction has been submitted (`submittedAt == null`)
 - The player hasn't skipped
-- Gameweek 1 hasn't kicked off yet
+- DB time is before the fixed `TABLE_PREDICTION_DEADLINE` (`2026-08-31T14:00:00.000Z`) — uses `getDatabaseTime()` RPC, not a Gameweek 1 kickoff proxy
 
-This implements ADR-0007's first-run decision: prompt until submitted/skipped or Gameweek 1 kicks off. The `TablePredictionPrompt` component links directly to `/predict-table`.
+This implements ADR-0007's first-run decision: prompt until submitted/skipped or the fixed 31 August 2026 deadline. The `TablePredictionPrompt` component links directly to `/predict-table`.
 
 ### Tipped Match Slots
 

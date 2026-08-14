@@ -13,13 +13,15 @@ Bot players (`is_bot = true` on the `players` table) exist in every competition 
 
 Three bot types are defined by the `bot_type` check constraint on the `players` table:
 
-| Type           | Column value | Behavior                                                                                                                                 |
+| Type           | Column value | Behavior (specified in CLAUDE.md)                                                                                                        |
 | -------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | **Random Bot** | `random`     | Predicts a random plausible scoreline for each side, independently, per match                                                            |
 | **1-1 Bot**    | `one_one`    | Always predicts 1–1 for every match                                                                                                      |
 | **Median Bot** | `median`     | Predicts the rounded median of that match's _human players'_ submitted picks, derived only **after** the match locks (not a blind guess) |
 
 These types carried forward from the retired World Cup app; the ELO bot was deliberately dropped.
+
+> **Note**: Bot pick generation is currently specified but unimplemented. The schema (`bot_type` constraint, `is_bot` column) and login exclusion are present, but there is no bot-pick generation code or scoring integration. The boldCallEligible flag in the scoring test is the only bot-aware code in the scoring module.
 
 ## How bots differ from human players
 

@@ -31,7 +31,10 @@ Browser                    Server (Next.js)               Supabase
 
 The `createServerSupabaseClient()` in `src/lib/supabase/server.ts` holds the **service_role key** — which bypasses RLS. Two guards prevent client-side exposure:
 
-- **`import "server-only"`** — a Node.js module that throws when imported from a client bundle. Every file in `src/lib/` and `src/app/_lib/` that touches Supabase begins with this import. The guarded modules include: `src/lib/supabase/server.ts`, `src/lib/auth/scrypt-secret.ts`, `src/lib/auth/competitions.ts`, `src/lib/competitions/scope.ts`, plus all `src/app/_lib/*.ts` files (`session-cookie.ts`, `gameweek-access.ts`, `pick-board-access.ts`, `table-prediction-access.ts`). Test files (`.test.ts`) do not need this guard since they are never bundled for the client.
+- **`import "server-only"`** — a Node.js module that throws when imported from a client bundle. Every module that touches Supabase or a server secret begins with this import. The complete guarded set today is nine files: `src/lib/supabase/server.ts`, `src/lib/auth/scrypt-secret.ts`, `src/lib/auth/competitions.ts`, `src/lib/auth/session.ts`, `src/lib/competitions/scope.ts`, and `src/app/_lib/{session-cookie,gameweek-access,pick-board-access,table-prediction-access}.ts`. Note `src/app/_lib/csrf.ts` is deliberately **not** guarded — it only reads a request header and holds no secret. Pure `src/lib/` modules (scoring, board, rules, kit-colors, rank, kickoff-format) are unguarded by design so client components can import them. Test files never need the guard since they are never bundled for the client.
+
+  When adding a module, the rule is: guard it if it imports the Supabase client, reads a secret env var, or is imported only from server code that does.
+
 - **Vite config stubs it for tests** — `vitest/server-only-stub.ts` replaces it with a no-op so `src/lib/` modules are testable outside a Next.js server bundle.
 
 ### Script-side mirror for `server-only` bypass
@@ -60,7 +63,7 @@ The competition code is required before the player list is revealed:
 
 ### 4. CSRF protection
 
-Every state-changing route checks for the custom header `x-tipperoos-client`:
+Most state-changing routes check for the custom header `x-tipperoos-client`:
 
 ```typescript
 // src/app/_lib/csrf.ts
@@ -70,6 +73,10 @@ export function hasCsrfHeader(request: Request): boolean {
 }
 ```
 
+Routes that use the `x-tipperoos-client` header: picks save, login, logout, signup, and all table-prediction routes (assign, unassign, submit, skip).
+
+The standings sync route uses a separate mechanism: the `x-sync-secret` header matching `SYNC_TRIGGER_SECRET` env var (server-to-server auth, not a CSRF bypass).
+
 A plain cross-site form POST cannot set custom headers, so this is sufficient protection.
 
 ### 5. Competition-scoped data access
@@ -78,12 +85,14 @@ Picks and scores have no `competition_id` column of their own — they are keyed
 
 ### 6. Lock enforcement is server-side
 
-Picks lock 5 minutes before scheduled kickoff. The `isMatchLocked()` function in `src/lib/competitions/scope.ts` compares `Date.now()` against `kickoff_time - 5min`. This runs on every:
+Picks lock 5 minutes before scheduled kickoff. The `isMatchLocked()` function in `src/lib/competitions/scope.ts` compares `now.getTime()` against `kickoffTime.getTime() - 5min`. This runs on every:
 
-- Picks save (`POST /api/picks`)
-- Picks reveal (`picksForMatch`)
+- Picks save (`POST /api/picks`) — passes `new Date()` (application-server time)
+- Picks reveal (`picksForMatch`) — also passes `new Date()`
 
 The client cannot bypass lock by disabling UI controls or manipulating its clock.
+
+**Known divergence**: The picks route uses application-server time (`new Date()`) rather than DB time (`get_db_time()` RPC). The table-prediction deadline was correctly migrated to DB time; picks lock enforcement is still on the server clock.
 
 ## PIN security
 

@@ -1,13 +1,13 @@
 ---
 type: concept
 title: Competition Bootstrap
-description: Atomic creation of a new competition and its exactly-one Competition Admin via an interactive script and a Postgres RPC function.
+description: Atomic creation of a new competition and its first Competition Admin via an interactive script and a Postgres RPC function.
 tags: [competition, bootstrap, admin, script, rpc]
 ---
 
 # Competition Bootstrap
 
-A new competition — and its exactly-one Competition Admin — is created atomically via `scripts/bootstrap-competition.mjs`.
+A new competition — with its first Competition Admin — is created atomically via `scripts/bootstrap-competition.mjs`. The script creates exactly one admin; the schema itself does not enforce a one-admin-per-competition limit.
 
 ## Why an RPC function
 
@@ -37,7 +37,7 @@ The function uses:
 
 ## Interactive prompts
 
-The script prompts for (all hidden/secure):
+The script prompts for (the competition code and admin PIN use hidden prompts; the competition name, admin display name, and emoji are plain visible prompts):
 
 | Prompt             | Validation                             | Storage                                      |
 | ------------------ | -------------------------------------- | -------------------------------------------- |
@@ -67,7 +67,7 @@ The bootstrap flow is validated by `scripts/verify-bootstrap-competition.mjs`, w
 1. Bootstraps a fresh competition + admin via the RPC
 2. Verifies both rows exist
 3. Tests the collision guard (rejects duplicate code)
-4. Tests that a PIN-less login fails
+4. Verifies the created admin PIN hash accepts the set PIN and rejects a wrong one (checked directly via `verifySecret()` — no login attempt is made)
 5. Tests set-competition-code.mjs's multi-competition selector
 6. Cleans up all inserted rows in a `finally` block
 

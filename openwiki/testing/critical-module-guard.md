@@ -39,9 +39,9 @@ GITHUB_BASE_REF=main node scripts/ci/critical-module-guard.mjs
 
 A brand-new `src/lib/**` file (one that didn't exist before this PR) cannot literally satisfy the test-first check: there is no prior commit on the base branch that touched the test file, so `git log --reverse --format=%H BASE_REF..HEAD -- "<testFile>"` returns the same commit as the implementation. The guard handles this implicitly — it accepts same-commit ties (a test and implementation committed together), because that's the closest approximation to test-first for an entirely new module. The guard's real value surfaces on **subsequent** changes to existing modules, where an agent that modifies implementation without enlarging or adjusting the test is caught immediately.
 
-## Secondary gate: CODEOWNERS
+## Secondary gate: human review
 
-Beyond the CI guard, the `.github/CODEOWNERS` file requires **explicit human approval** for any change to `src/lib/**`. This means a PR with code changes to these modules cannot be merged by automation alone — a human must review and approve it. This is the second line of defense against the self-consistent-but-wrong pattern the CI guard targets.
+The CI guard is the only automated check for `src/lib/**` changes. There is no `.github/CODEOWNERS` file in this repository — human review is encouraged but not mechanically enforced by CODEOWNERS. The CI guard serves as the automated gate against self-consistent-but-wrong changes.
 
 ## Scope
 

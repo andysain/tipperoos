@@ -7,7 +7,7 @@ tags: [match-selection, top-matchup, random-pick, standings, adr-0006]
 
 # Match Selection Rules
 
-Each gameweek, exactly two Premier League fixtures are auto-selected for tipping — nothing is player-chosen. The selection logic (ADR-0006) is implemented as pure functions in `src/lib/match-selection/rules.ts`.
+Each gameweek, two Premier League fixtures are auto-selected for tipping — nothing is player-chosen. The system has two slots (Match 1 above Match 2), but a slot can end up empty: Match 1 may be absent when a gameweek's fixture list is empty, and Match 2 is skipped when its eligible pool is (e.g. every remaining fixture has already kicked off). The selection logic (ADR-0006) is implemented as pure functions in `src/lib/match-selection/rules.ts`.
 
 ## Match 1 — Top Matchup
 
@@ -80,7 +80,7 @@ flowchart LR
 
 ## Test coverage
 
-`src/lib/match-selection/rules.test.ts` (13,300 bytes) covers:
+`src/lib/match-selection/rules.test.ts` covers:
 
 - Correct selection of top matchup by position
 - Tiebreaking logic (position, kickoff, provider ID)

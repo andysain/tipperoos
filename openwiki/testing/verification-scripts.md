@@ -16,7 +16,7 @@ Tests the full bootstrap flow:
 1. Bootstraps a fresh competition + admin via the `create_competition_with_admin()` RPC
 2. Verifies both rows exist in the database
 3. Tests the collision guard (refuses to create a competition with a duplicate code)
-4. Tests that a PIN-less login fails
+4. Verifies the created admin PIN hash accepts `"1234"` and rejects `"9999"` via `verifySecret()` — no login attempt is made
 5. Tests `set-competition-code.mjs`'s multi-competition selector
 6. Cleans up all inserted rows in a `finally` block
 

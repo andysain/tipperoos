@@ -74,7 +74,7 @@ See [Security Model](security-model.md) for the full treatment. Key constraints:
 
 ## Core data model
 
-The schema is managed via Supabase CLI migrations at `supabase/migrations/` (10 migrations as of writing). Key tables are documented in [Database Schema](../database/schema.md).
+The schema is managed via Supabase CLI migrations at `supabase/migrations/` (11 migrations as of the current run). Key tables are documented in [Database Schema](../database/schema.md).
 
 ## Related
 

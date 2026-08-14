@@ -26,23 +26,23 @@ expect(scorePredictTable(prediction, actual)).toEqual({
 
 Modules with golden-value tests:
 
-- `scoring/predict-table.ts` → `predict-table.test.ts` (15817 bytes)
-- `scoring` match-breakdown → `ScoringBreakdown.test.ts`
-- `table-predictions/board.ts` → `board.test.ts` (7454 bytes)
-- `table-predictions/rules.ts` → `rules.test.ts` (6575 bytes)
-- `match-selection/rules.ts` → `rules.test.ts` (13300 bytes)
-- `competitions/scope.ts` → `scope.test.ts` (4334 bytes)
-- `auth/scrypt-secret.ts` → `scrypt-secret.test.ts` (2997 bytes)
-- `auth/lockout.ts` → `lockout.test.ts` (3670 bytes)
-- `auth/emoji-options.ts` → `emoji-options.test.ts` (3239 bytes)
-- `auth/competitions.ts` → `competitions.test.ts` (2750 bytes)
-- `auth/session.ts` → `session.test.ts` (2730 bytes)
-- `auth/signup-validation.ts` → `signup-validation.test.ts` (4163 bytes)
-- `leaderboard/rank.ts` → `rank.test.ts` (3178 bytes)
-- `gameweeks/resolve.ts` → `resolve.test.ts` (4666 bytes)
-- `dates/kickoff-format.ts` → `kickoff-format.test.ts` (4333 bytes)
-- `standings/map-standings.ts` → `map-standings.test.ts` (3314 bytes)
-- `teams/kit-colors.ts` → `kit-colors.test.ts` (5044 bytes)
+- `src/lib/scoring/predict-table.ts` → `predict-table.test.ts`
+- `src/components/scoring/match-breakdown.ts` → `ScoringBreakdown.test.ts`
+- `src/lib/table-predictions/board.ts` → `board.test.ts`
+- `src/lib/table-predictions/rules.ts` → `rules.test.ts`
+- `src/lib/match-selection/rules.ts` → `rules.test.ts`
+- `src/lib/competitions/scope.ts` → `scope.test.ts`
+- `src/lib/auth/scrypt-secret.ts` → `scrypt-secret.test.ts`
+- `src/lib/auth/lockout.ts` → `lockout.test.ts`
+- `src/lib/auth/emoji-options.ts` → `emoji-options.test.ts`
+- `src/lib/auth/competitions.ts` → `competitions.test.ts`
+- `src/lib/auth/session.ts` → `session.test.ts`
+- `src/lib/auth/signup-validation.ts` → `signup-validation.test.ts`
+- `src/lib/leaderboard/rank.ts` → `rank.test.ts`
+- `src/lib/gameweeks/resolve.ts` → `resolve.test.ts`
+- `src/lib/dates/kickoff-format.ts` → `kickoff-format.test.ts`
+- `src/lib/standings/map-standings.ts` → `map-standings.test.ts`
+- `src/lib/teams/kit-colors.ts` → `kit-colors.test.ts`
 
 ## Tier 1b: Scripted simulations (integration verification)
 

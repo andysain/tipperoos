@@ -9,11 +9,11 @@ tags: [scoring, table-prediction, placement, band-bonus, bold-call, adr-0010]
 
 The Predict Table scoring formula (max 200 points) is defined in `src/lib/scoring/predict-table.ts`. It has three components:
 
-| Component  | Max points | Description                                                                          |
-| ---------- | ---------- | ------------------------------------------------------------------------------------ |
-| Placement  | 100        | 5/2/1/0 by Band distance (0 / 1 / 2 / 3+ bands away)                                 |
-| Band Bonus | 85         | Exact full membership per Band (15 for Champion, UCL, Relegated; 10 for others)      |
-| Bold Call  | 15         | +3 per correct placement that fewer than ~1/3 of eligible players made; best 5 count |
+| Component  | Max points | Description                                                                           |
+| ---------- | ---------- | ------------------------------------------------------------------------------------- |
+| Placement  | 100        | 5/2/1/0 by Band distance (0 / 1 / 2 / 3+ bands away)                                  |
+| Band Bonus | 85         | Exact full membership per Band (15 for Champion, UCL, Relegated; 10 for others)       |
+| Bold Call  | 15         | +3 per correct placement that fewer than ~1/10 of eligible players made; best 5 count |
 
 ## Placement scoring
 
@@ -57,22 +57,19 @@ Awarded for predicting one Band's full membership **exactly** — same set of te
 
 ## Bold Call
 
-A correct placement earns +3 if it was made by **fewer than roughly one in three** of the frozen Gameweek-1 cohort of eligible players.
+A correct placement earns +3 if it was made by **no more than roughly one in ten** of the frozen Gameweek-1 cohort of eligible players.
+
+The rarity predicate is the module-private `isRare(agreeCount, cohortSize)` — there is no exported `isBoldCall`; grep for `isRare` when you need it:
 
 ```typescript
-function isBoldCall(
-  teamId: string,
-  cohortAgreementCount: number,
-  eligiblePlayerCount: number,
-): boolean {
-  return (
-    cohortAgreementCount <= Math.max(1, Math.floor(eligiblePlayerCount / 10))
-  );
+function isRare(agreeCount: number, cohortSize: number): boolean {
+  return agreeCount <= Math.max(1, Math.floor(cohortSize / 10));
 }
 ```
 
 - Competitions with <10 eligible players still allow one lone correct call
-- Only the **best 5** Bold Calls count per player
+- **Stale source comment**: the module header comment in `src/lib/scoring/predict-table.ts` still says Bold Calls need "fewer than a third" of the cohort. The code and `isRare`'s own doc comment are correct at one in ten; the header is the outdated one. Fixing it needs a paired test change to clear the critical-module guard
+- Only the **best 5** Bold Calls count per player (`MAX_BOLD_CALLS = 5`, `BOLD_CALL_BONUS = 3`)
 - Bold Calls are inherently a cohort property — computed by `scorePredictTableCohort()`
 - Late Joiners sit outside the Bold Call process (earn none, count toward nobody's rarity)
 

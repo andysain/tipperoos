@@ -38,10 +38,12 @@ if (hour24 < OVERNIGHT_HOUR_CUTOFF) {
 
 | Remaining time | Display                      |
 | -------------- | ---------------------------- |
-| ≥ 2 days       | `"2d 4h"` (days + hours)     |
-| 1-48 hours     | `"3h 12m"` (hours + minutes) |
+| ≥ 24 hours     | `"2d 4h"` (days + hours)     |
+| 1–24 hours     | `"3h 12m"` (hours + minutes) |
 | < 1 hour       | `"12m"` (minutes only)       |
 | Past target    | `"0m"`                       |
+
+The branch is on the decomposed parts, not on a raw millisecond threshold: `days > 0` wins first, then `hours > 0`, else minutes only.
 
 ### Decomposition
 

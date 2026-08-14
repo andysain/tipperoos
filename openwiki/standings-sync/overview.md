@@ -39,7 +39,7 @@ sequenceDiagram
     Vercel Route->>Supabase: SELECT seasons (id) WHERE is_current
     Vercel Route->>Vercel Route: mapStandingsToRows()
     Vercel Route->>Supabase: UPSERT team_standings
-    Vercel Route->>Supabase: INSERT INTO sync_log (status="success")
+    Vercel Route->>Supabase: INSERT INTO sync_log (status="success", matches_updated=N)
     Vercel Route-->>Caller: { updated: N, skipped: [...] }
 ```
 

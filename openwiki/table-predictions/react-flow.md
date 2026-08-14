@@ -13,7 +13,7 @@ The client-side Table Prediction experience is composed of several React compone
 
 ```
 PredictTableFlow (state owner)
-├── LockCountdown (live countdown until GW1 kickoff)
+├── LockCountdown (live countdown until 31 August deadline)
 ├── ScoringSummary (collapsible scoring rules)
 ├── BandSummary (per-band counts/status)
 ├── BandsBoard
@@ -53,7 +53,7 @@ The rollback logic ensures the UI never shows a "saved" state that the server di
 
 ## Lock countdown
 
-The `LockCountdown` component shows a live "Locks in Xd Xh" readout for on-time players. Uses a 60-second polling interval via `setInterval` in a `useEffect`. The text turns `warning` color when under 24 hours. Late Joiners never see a lock countdown.
+The `LockCountdown` component shows a live "Locks in Xd Xh" readout for on-time players. It reads `TABLE_PREDICTION_DEADLINE` (the constant `2026-08-31T14:00:00.000Z`), not a dynamic Gameweek 1 kickoff time. Uses a 60-second polling interval via `setInterval` in a `useEffect`. The text turns `warning` color when under 24 hours. Late Joiners never see a lock countdown.
 
 ## SubmittedMoment
 
@@ -63,10 +63,9 @@ The celebration overlay (`SubmittedMoment.tsx`) shows:
 - The predicted Champion team name
 - Confetti animation (CSS `confetti-fall` keyframes)
 - A dismiss button returning to the board view
+- Subtitle: "Submitted — you can keep editing until 31 August." (references the fixed deadline, not a GW1 kickoff)
 
 The `justSubmitted` flag briefly shows confetti across the whole flow.
-
-Note: A stale duplicate file `SubmittedMoment 2.tsx` exists alongside the real one — should be removed.
 
 ## API interaction
 

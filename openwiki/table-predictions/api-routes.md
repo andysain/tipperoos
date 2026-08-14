@@ -1,36 +1,35 @@
 ---
 type: concept
 title: Table Prediction API Routes
-description: Four route handlers (assign, unassign, submit, skip) for table prediction CRUD operations, all enforcing session auth, CSRF, lock/late-joiner rules.
-tags: [table-prediction, api, routes, crud, lock, late-joiner]
+description: Three route handlers (assign, unassign, submit) now backed by transactional Postgres RPCs that enforce the lock deadline against DB time. Direct CRUD and retry logic replaced.
+tags: [table-prediction, api, routes, rpc, lock, late-joiner, deadline]
 ---
 
 # Table Prediction API Routes
 
-Four API routes handle table prediction operations. All require the `x-tipperoos-client` CSRF header and a valid session cookie.
+Three API routes handle table prediction operations. All require the `x-tipperoos-client` CSRF header and a valid session cookie.
 
 ## Route overview
 
 | Route                             | Method | Operation                     | Lock check? | Late-joiner gate?                 |
 | --------------------------------- | ------ | ----------------------------- | ----------- | --------------------------------- |
-| `/api/table-predictions/assign`   | POST   | Assign/re-assign team to band | Yes         | No (Late Joiners always editable) |
-| `/api/table-predictions/unassign` | POST   | Remove team from band         | Yes         | No                                |
-| `/api/table-predictions/submit`   | POST   | Confirm current assignment    | Yes         | No                                |
+| `/api/table-predictions/assign`   | POST   | Assign/re-assign team to band | **RPC**     | No (Late Joiners always editable) |
+| `/api/table-predictions/unassign` | POST   | Remove team from band         | **RPC**     | No                                |
+| `/api/table-predictions/submit`   | POST   | Confirm current assignment    | **RPC**     | No                                |
 | `/api/table-predictions/skip`     | POST   | Skip (Late Joiners only)      | No          | **Yes** — only Late Joiners       |
 
 ## Common security pattern
 
-All four routes follow this flow:
+All routes follow this flow:
 
 ```
 1. hasCsrfHeader(request) → 403 if missing
 2. getSessionPlayerId() → 401 if no session
-3. getPlayerForTablePrediction(supabase, playerId) → 500 if player not found
-4. Lock/late-joiner check → 403 if not editable
-5. Supabase CRUD operation
+3. Call Postgres RPC (lock check + mutation in one transaction)
+4. Interpret RPC result code
 ```
 
-The editability check reuses `getTablePredictionEditabilityForPlayer()` from `src/app/_lib/table-prediction-access.ts`.
+The lock check and mutation happen **atomically inside the Postgres RPC** — the route no longer reads `getPlayerForTablePrediction()` or `getTablePredictionEditabilityForPlayer()` from the data-access layer before each write. See [the deadline migration](../../supabase/migrations/20260813020000_table_prediction_deadline.sql) for the RPC definitions.
 
 ## Route details
 
@@ -43,35 +42,54 @@ Persists one team→Band move immediately (safe resume — moves aren't lost on 
 { "teamId": "uuid", "band": "champion" }
 
 // Behavior
-- Upserts table_predictions row (player_id, is_skipped=false, submitted_at=null)
-- Upserts table_prediction_ranks row (team_id, band)
-- Auto-assigns predicted_rank (smallest unused 1-20)
-- Retry logic (3 attempts) for concurrent-assignment races
+- Calls table_prediction_assign(p_player_id uuid, p_team_id uuid, p_band text) RPC
+- RPC checks lock status first, then upserts/reassigns in one transaction
+- Automatically creates table_predictions row if none exists (player_id ON CONFLICT)
+- Assigns predicted_rank as smallest unused 1-20
 ```
 
-**Concurrency handling**: Two types of races are handled — both surface as Postgres error code `23505` (unique violation):
+**Concurrency handling**: The RPC uses `SELECT ... FOR UPDATE` on the relevant rows, so concurrent requests serialize at the database level. No application-level retry loop is needed — the old route's three-attempt retry for `23505` (unique violation) has been replaced by the transactional RPC.
 
-1. Same team submitted twice (double tap) → detects existing row via `table_prediction_ranks(team_id)` query, updates band in-place
-2. Two teams colliding on `predicted_rank` → the unique constraint `table_prediction_ranks(table_prediction_id, predicted_rank)` fires; the function recomputes the next available rank (smallest 1-20 not in use) and retries
+**Error codes** returned as `result`:
 
-**Foreign-key handling**: If `insertError.code === "23503"` (foreign-key violation — the `team_id` doesn't reference a valid `teams` row), the function returns immediately with a generic save error. It does **not** retry on 23503 because that indicates an invalid request, not a transient race.
-
-The `predicted_rank` computation uses **smallest-unused-1-20** rather than `max(rank) + 1` because ranks are never renumbered when a row is deleted (unassign). Using `max + 1` would eventually walk past 20 and fail the `predicted_rank between 1 and 20` check constraint after enough remove-then-recall cycles. With at most 19 other rows at any point, a free slot in 1-20 always exists.
+- `"saved"` — success
+- `"locked"` — deadline has passed, 403 response
+- `"player_not_found"` — invalid session player, 500 response
+- `"invalid_team"` — team_id doesn't reference a real team, 400 response
 
 ### POST /api/table-predictions/unassign
 
-Removes a team from its band (back to roster). Deletes the `table_prediction_ranks` row outright.
+Removes a team from its band (back to roster).
 
 ```json
 // Request
 { "teamId": "uuid" }
+
+// Behavior
+- Calls table_prediction_unassign(p_player_id uuid, p_team_id uuid) RPC
+- RPC checks lock, then deletes the table_prediction_ranks row
+- Clears submitted_at on the prediction row (un-confirms)
+- Returns "saved" even if no prediction row existed (idempotent)
 ```
 
 ### POST /api/table-predictions/submit
 
-Marks the current assignment as confirmed. Sets `submitted_at` to `now()` and clears `is_skipped`.
+Marks the current assignment as confirmed.
 
 Re-submittable any number of times until lock. Submitting never blocks on untidy band sizes — a wrongly-sized Band simply forfeits its bonus.
+
+```json
+// Behavior
+- Calls table_prediction_submit(p_player_id uuid) RPC
+- RPC checks lock, then updates submitted_at to DB current_timestamp
+- Returns { submittedAt: ISO string } on success
+```
+
+**Error codes**:
+
+- `"locked"` — deadline has passed, 403 response
+- `"player_not_found"` — invalid session player, 500 response
+- `"no_prediction"` — no assigned teams yet, 400 response
 
 ### POST /api/table-predictions/skip
 
@@ -79,17 +97,19 @@ Only available to Late Joiners (checked server-side via `isLateJoiner()`). Sets 
 
 ## Data access layer
 
-All four routes rely on `src/app/_lib/table-prediction-access.ts` for shared DB queries:
+The module at `src/app/_lib/table-prediction-access.ts` provides:
 
-- `getGameweekOneKickoff()` — earliest match kickoff as proxy for GW1 start
-- `getTablePredictionEditabilityForPlayer()` — lock/late-joiner check
-- `getPlayerForTablePrediction()` — player lookup by session ID
+- `getDatabaseTime()` — calls `supabase.rpc("get_db_time")` for DB-current time
+- `getGameweekOneKickoff()` — earliest match kickoff, used for Late Joiner classification
+- `getTablePredictionEditabilityForPlayer()` — wraps pure `getTablePredictionEditability()` (used by the skip route and the PredictTable page, but **no longer** by assign/unassign/submit routes)
+- `getPlayerForTablePrediction()` — player lookup (still used by the PredictTable page)
+- `getTablePredictionRecord()` — shared by Pick Board prompt and PredictTable page
 
 ## Schema
 
 The table prediction data lives in two tables:
 
-- `table_predictions` — one row per player (`player_id`, `submitted_at`, `is_skipped`)
+- `table_predictions` — one row per player (`player_id`, `submitted_at`, `is_skipped`, `updated_at`)
 - `table_prediction_ranks` — one row per team per prediction (`table_prediction_id`, `team_id`, `band`, `predicted_rank`)
 
 ## Related
@@ -97,4 +117,4 @@ The table prediction data lives in two tables:
 - [Capture Rules](capture-rules.md)
 - [Board Logic](board-logic.md)
 - [React Flow](react-flow.md)
-- [Table Prediction Data Access](data-access.md)
+- [Database Migrations - deadline migration](../database/migrations.md)

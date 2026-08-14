@@ -7,7 +7,7 @@ tags: [ux, help, how-it-works, scoring, rules, bots]
 
 # How It Works Page
 
-The How It Works page at `src/app/how-it-works/page.tsx` explains the game's rules in kid-friendly language. It is a public (guest-accessible) route at `/how-it-works`, rendered `force-dynamic`.
+The How It Works page at `src/app/how-it-works/page.tsx` explains the game's rules in kid-friendly language. It is an **authenticated** route at `/how-it-works`, rendered `force-dynamic` — the page calls `getSessionPlayerId()` and `redirect("/login")`s when there is no session. It is not guest-accessible.
 
 ## Access
 

@@ -48,8 +48,8 @@ The overnight case is important for Australian users: a UK Saturday afternoon ki
 
 | Time remaining | Display                                |
 | -------------- | -------------------------------------- |
-| > 48 hours     | `"2d 4h"`                              |
-| 1–48 hours     | `"3h 12m"`                             |
+| ≥ 24 hours     | `"2d 4h"`                              |
+| 1–24 hours     | `"3h 12m"`                             |
 | < 1 hour       | `"12m"` (explicit minutes, no seconds) |
 | Past           | `"0m"`                                 |
 

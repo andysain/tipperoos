@@ -1,8 +1,8 @@
 ---
 type: concept
 title: Table Prediction Data Access
-description: DB-fetching glue layer between the pure decision logic and the API routes, providing gameweek-one kickoff, editability, player lookup, and table-prediction record queries.
-tags: [table-prediction, data-access, supabase, queries]
+description: DB-fetching glue layer between the pure decision logic and the API routes/PredictTable page, providing database time, gameweek-one kickoff, editability, player lookup, and table-prediction record queries.
+tags: [table-prediction, data-access, supabase, queries, database-time]
 ---
 
 # Table Prediction Data Access
@@ -11,9 +11,26 @@ The module at `src/app/_lib/table-prediction-access.ts` provides the Supabase-ro
 
 ## Exports
 
+### `getDatabaseTime(supabase)`
+
+Returns the current database timestamp by calling `supabase.rpc("get_db_time")` — a Postgres function that executes `SELECT current_timestamp;`.
+
+The `get_db_time` RPC was added in migration `20260813020000` (issue #132). It is granted only to `service_role`, so it runs with the server's service-role client.
+
+Used by:
+
+- The Pick Board page (`/`) to gate the table prediction prompt (`databaseTime < TABLE_PREDICTION_DEADLINE`)
+- The Predict Table page to pass DB time instead of server time to `getTablePredictionEditability()`
+
+```typescript
+async function getDatabaseTime(supabase): Promise<Date | null>;
+```
+
+Returns `null` if the RPC call fails.
+
 ### `getGameweekOneKickoff(supabase)`
 
-Returns the earliest kickoff time for the current season — used to determine whether a player is a Late Joiner and whether the prediction window has closed.
+Returns the earliest kickoff time for the current season — used to determine whether a player is a Late Joiner.
 
 ```typescript
 // Derivation: earliest match kickoff in the current season
@@ -36,9 +53,11 @@ async function getTablePredictionEditabilityForPlayer(
 }
 ```
 
+Used by the **skip route** and the **PredictTable page**. The assign/unassign/submit routes no longer call this — their lock check happens inside their transactional Postgres RPC.
+
 ### `getPlayerForTablePrediction(supabase, playerId)`
 
-Returns `{ id, joinedAt }` for the session's player. Used by all four table-prediction routes to establish the player's identity before applying lock/late-joiner rules.
+Returns `{ id, joinedAt }` for the session's player. Used by the **PredictTable page** (not by the assign/unassign/submit API routes).
 
 ### `getTablePredictionRecord(supabase, playerId)`
 
@@ -58,3 +77,4 @@ All DB-fetching glue follows the same pattern: a thin function that calls Supaba
 - [Capture Rules](capture-rules.md)
 - [API Routes](api-routes.md)
 - [React Flow](react-flow.md)
+- [Database Migrations - deadline migration](../database/migrations.md)

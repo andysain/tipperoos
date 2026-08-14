@@ -71,12 +71,14 @@ Per BUILD_PLAN.md and ADR-0009, the scoring engine is:
 
 Every sync attempt records a row in `sync_log`:
 
-| Column          | Purpose                                                                 |
-| --------------- | ----------------------------------------------------------------------- |
-| `provider_name` | Always `"football-data.org"`                                            |
-| `sync_type`     | `"standings"` (future: `"results"`, `"fixtures"`)                       |
-| `status`        | `"success"` or `"failure"`                                              |
-| `error_message` | Details on partial success (e.g., unmatched team IDs) or failure reason |
+| Column            | Purpose                                                                 |
+| ----------------- | ----------------------------------------------------------------------- |
+| `provider_name`   | Always `"football-data.org"`                                            |
+| `sync_type`       | `"standings"` (future: `"results"`, `"fixtures"`)                       |
+| `run_at`          | When the sync cycle started                                             |
+| `status`          | `"success"` or `"failure"`                                              |
+| `matches_updated` | Number of matches updated in the sync                                   |
+| `error_message`   | Details on partial success (e.g., unmatched team IDs) or failure reason |
 
 This table serves as the audit trail and will feed the planned pg_cron health-check watchdog.
 
