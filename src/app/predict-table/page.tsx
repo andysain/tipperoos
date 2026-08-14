@@ -25,7 +25,29 @@ export default async function PredictTablePage() {
 
   const supabase = createServerSupabaseClient();
 
-  const player = await getPlayerForTablePrediction(supabase, playerId);
+  // None of these five reads depends on another's result -- player,
+  // prediction and databaseTime are keyed only on playerId/DB clock,
+  // gameweekOneKickoff and the teams list are global -- so all five run in
+  // one wave instead of player/teams+gameweekOneKickoff+databaseTime/
+  // prediction as three serial stages.
+  // See docs/standards/PERFORMANCE_TESTING_STANDARD.md §4.4.
+  const [
+    player,
+    { data: teams, error: teamsError },
+    gameweekOneKickoff,
+    databaseTime,
+    prediction,
+  ] = await Promise.all([
+    getPlayerForTablePrediction(supabase, playerId),
+    supabase
+      .from("teams")
+      .select("id, name, display_name, short_code, previous_season_position")
+      .eq("active", true)
+      .order("name", { ascending: true }),
+    getGameweekOneKickoff(supabase),
+    getDatabaseTime(supabase),
+    getTablePredictionRecord(supabase, playerId),
+  ]);
 
   if (!player) {
     return (
@@ -36,17 +58,6 @@ export default async function PredictTablePage() {
       </main>
     );
   }
-
-  const [{ data: teams, error: teamsError }, gameweekOneKickoff, databaseTime] =
-    await Promise.all([
-      supabase
-        .from("teams")
-        .select("id, name, display_name, short_code, previous_season_position")
-        .eq("active", true)
-        .order("name", { ascending: true }),
-      getGameweekOneKickoff(supabase),
-      getDatabaseTime(supabase),
-    ]);
 
   if (teamsError || !teams) {
     return (
@@ -73,8 +84,6 @@ export default async function PredictTablePage() {
     now: databaseTime,
     gameweekOneKickoff,
   });
-
-  const prediction = await getTablePredictionRecord(supabase, playerId);
 
   let assignments: Record<string, BandKey> = {};
   if (prediction) {
