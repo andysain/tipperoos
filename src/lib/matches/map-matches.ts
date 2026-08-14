@@ -42,6 +42,7 @@ export interface MatchUpdate {
   readonly team_a_score: number | null;
   readonly team_b_score: number | null;
   readonly result_updated_at: string | null;
+  readonly updated_at: string;
 }
 
 export interface MapMatchesResult {
@@ -82,6 +83,7 @@ export function mapMatchesToUpdates(
       team_a_score: isCompleted ? match.score.fullTime.home : null,
       team_b_score: isCompleted ? match.score.fullTime.away : null,
       result_updated_at: isCompleted ? nowIso : null,
+      updated_at: nowIso,
     });
   }
 

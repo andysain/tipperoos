@@ -76,6 +76,7 @@ describe("mapMatchesToUpdates", () => {
       team_a_score: null,
       team_b_score: null,
       result_updated_at: null,
+      updated_at: NOW.toISOString(),
     });
   });
 
@@ -135,6 +136,9 @@ describe("mapMatchesToUpdates", () => {
     expect(result.updates[0].status).toBe("postponed");
     expect(result.updates[0].team_a_score).toBe(null);
     expect(result.updates[0].team_b_score).toBe(null);
+    // updated_at is set on every write regardless of status -- unlike
+    // result_updated_at, which is only set on completion.
+    expect(result.updates[0].updated_at).toBe(NOW.toISOString());
   });
 
   it("skips a match whose provider id matches no seeded fixture, without dropping the rest", () => {
