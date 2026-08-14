@@ -30,30 +30,50 @@ function buildSlot(
 }
 
 /**
+ * The current season's id (the one row with `is_current = true`). Shared by
+ * every Pick Board loader so a request resolves it once instead of once per
+ * loader -- see docs/standards/PERFORMANCE_TESTING_STANDARD.md §4.1.
+ */
+export async function getCurrentSeasonId(
+  supabase: SupabaseClient,
+): Promise<string | null> {
+  // .order() is required even for a single expected row -- AGENTS.md:
+  // "Never select a row without an explicit .order()... Postgres row order
+  // is arbitrary." start_date desc is the meaningful tiebreak if `is_current`
+  // were ever momentarily true on more than one row during a season rollover.
+  const { data: season, error } = await supabase
+    .from("seasons")
+    .select("id")
+    .eq("is_current", true)
+    .order("start_date", { ascending: false })
+    .maybeSingle();
+  if (error) throw error;
+  return season?.id ?? null;
+}
+
+/**
  * Loads this competition's gameweeks for the current season and resolves
  * which one is current, per docs/adr/0007-home-surface-and-pick-entry.md.
  * Null if the season hasn't been seeded, or no gameweek has ever had a
  * Tipped Match (e.g. before gameweek 1's seed script has run).
+ *
+ * `seasonId` is a required caller-supplied id, not resolved internally --
+ * callers that already know it (the Pick Board route resolves it once up
+ * front) skip a redundant `seasons` round trip by passing it straight
+ * through.
  */
 export async function resolveCurrentGameweekForCompetition(
   supabase: SupabaseClient,
   competitionId: string,
   now: Date,
+  seasonId: string,
 ): Promise<number | null> {
-  const { data: season, error: seasonError } = await supabase
-    .from("seasons")
-    .select("id")
-    .eq("is_current", true)
-    .maybeSingle();
-  if (seasonError) throw seasonError;
-  if (!season) return null;
-
   const { data: gameweeks, error: gameweeksError } = await supabase
     .from("gameweeks")
     .select(
       "number, match_1_id, match_2_id, match_1_voided_at, match_2_voided_at",
     )
-    .eq("season_id", season.id)
+    .eq("season_id", seasonId)
     .eq("competition_id", competitionId)
     .order("number", { ascending: true });
   if (gameweeksError) throw gameweeksError;
