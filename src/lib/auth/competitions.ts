@@ -37,21 +37,49 @@ export async function matchCompetitionByCode(
   return null;
 }
 
+// A verified code -> competitionId mapping, kept for a warm serverless
+// instance's lifetime, bounded by a TTL. Without this, every one of
+// /auth/players, /auth/login and /auth/signup independently re-fetches every
+// competitions row and re-derives a scrypt hash per row -- on a single login
+// flow (list players, then submit) that's the same code verified twice, plus
+// the PIN's own derivation, all serial. The TTL exists so a rotated
+// code (scripts/set-competition-code.mjs) stops being honoured on a warm
+// instance within a bounded window rather than only at its next cold start.
+const CODE_CACHE_TTL_MS = 5 * 60 * 1000;
+const codeCache = new Map<
+  string,
+  { competitionId: string; expiresAt: number }
+>();
+
 /**
- * Thin Supabase-fetching wrapper -- no elaborate test needed, mirrors
- * session-cookie.ts's rationale: the logic it wraps (matchCompetitionByCode)
- * already has its own golden-value tests.
+ * Thin Supabase-fetching wrapper around matchCompetitionByCode (which already
+ * has its own golden-value tests), plus the short-lived cache above.
  */
 export async function resolveCompetitionByCode(
   supabase: SupabaseClient,
   submittedCode: string,
 ): Promise<string | null> {
+  const normalized = normalizeCompetitionCode(submittedCode);
+  if (!normalized) return null;
+
+  const cached = codeCache.get(normalized);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.competitionId;
+  }
+
   const { data, error } = await supabase
     .from("competitions")
     .select("id, code_hash");
   if (error) throw error;
-  return matchCompetitionByCode(
+  const competitionId = await matchCompetitionByCode(
     (data ?? []).map((row) => ({ id: row.id, codeHash: row.code_hash })),
-    submittedCode,
+    normalized,
   );
+  if (competitionId) {
+    codeCache.set(normalized, {
+      competitionId,
+      expiresAt: Date.now() + CODE_CACHE_TTL_MS,
+    });
+  }
+  return competitionId;
 }
