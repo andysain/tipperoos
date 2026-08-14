@@ -205,3 +205,16 @@ Scoring must be **idempotent**: correcting a previously-entered result and recom
 - `CONTEXT.md` — glossary of domain terms (Fixture, Tipped Match, Competition, Competition Admin, Season Standing, etc.).
 - `docs/adr/` — architecture decision records for hard-to-reverse, non-obvious calls.
 - `docs/standards/TESTING_STANDARD.md` — testing philosophy, validation order, and definition of done for this codebase.
+
+<!-- OPENWIKI:START -->
+
+## OpenWiki
+
+This repository has a generated `openwiki/` evidence index. It is optional just-in-time context, not required startup reading.
+
+- Treat source code and tests as authoritative. A brief's unknowns and review items are verification gaps, not automatic requirements.
+- Prefer the narrowest quiet validation that proves the changed behavior. Preserve complete failure output.
+
+The scheduled OpenWiki GitHub Actions workflow refreshes the repository wiki. Do not hand-edit generated OpenWiki pages unless explicitly asked; prefer updating source code/docs and letting OpenWiki regenerate.
+
+<!-- OPENWIKI:END -->

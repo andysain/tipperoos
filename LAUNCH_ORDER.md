@@ -92,7 +92,7 @@ Anything touching `src/lib/**` needs your explicit approval before merge (CODEOW
 - [x] Run the #89 seed script against **production**, not only staging.
 - [x] Confirm production and staging schemas match (no drift from #88's migration).
 - [ ] Walk the deployed Production URL end to end as a real player: enter competition code → sign up → file both picks → re-edit one → confirm the other players' picks are not visible anywhere.
-- [ ] Confirm at least one other household can log in on their own device.
+- [x] Confirm at least one other household can log in on their own device.
 
 ---
 
@@ -118,30 +118,36 @@ Sizes are rough t-shirt estimates (XS ≈ &lt;1hr, S ≈ half day, M ≈ 1–2 d
 - [ ] PRE Launch
 
   _Bar for PRE: either blocks a player from cleanly completing signup → pick filing → Predict the Table capture before gameweek 1 lock, or is cheap enough that deferring it buys nothing._
-  - [ ] General
-    - [ ] **#125 — In-app help: scoring + mechanics explainer** — **M**
-  - [ ] Login / Onboarding
+  - [x] General
+    - [x] **#125 — In-app help: scoring + mechanics explainer** — **M**
+    - [x] **User Better team names than the full full names**
+  - [x] Login / Onboarding
     - [x] When logging in remove the "**Welcome back, Test2345!** You're logged in. Let's Go" screen. Have it just go straight to the home page
-    - [ ] **#126 — Login/signup polish: mask PIN on login, hide email input** — **XS** (bundles the PIN-mask and email-hide items)
-    - [ ] **#127 — Make emoji selection mandatory + add random-pick button** — **S** (`cut-if-behind`: the full emoji-library tier)
-  - [ ] Pick Board
-    - [ ] **#128 — Pick Board: show calendar date alongside kickoff time** — **S**
-  - [ ] Predict the Table
+    - [x] **#126 — Login/signup polish: mask PIN on login, hide email input** — **XS** (bundles the PIN-mask and email-hide items)
+    - [x] **#127 — Make emoji selection mandatory + add random-pick button** — **S** (`cut-if-behind`: the full emoji-library tier)
+  - [x] Pick Board
+    - [x] **#128 — Pick Board: show calendar date alongside kickoff time** — **S**
+    - [ ] Show the viewing player's own Champion pick (from Predict the Table) on the pick board, as a personal reference chip
+  - [x] Predict the Table
     - [x] new predict the table input approach
-    - [ ] **#129 — Fix "locked in" confirmation to a fixed modal** — **S**
-    - [ ] **#130 — Band-by-Band guidance (next-prompt + progress tracker)** — **M**
-    - [ ] **#131 — Placed-team X marker + tap-to-swap interaction** — **M** (bundles the X-marker and swap items)
-    - [ ] **#132 — Extend lock deadline to 31 August** — **S**
+    - [x] **#129 — Fix "locked in" confirmation to a fixed modal** — **S**
+    - [x] **#130 — Band-by-Band guidance (next-prompt + progress tracker)** — **M**
+    - [x] **#131 — Placed-team X marker + tap-to-swap interaction** — **M** (bundles the X-marker and swap items)
+    - [x] **#132 — Extend lock deadline to 31 August** — **S**
 
 - [ ] POST Launch
   - [ ] Performance
-    - [ ] Investigate shared server-side root cause behind slow login, slow screen loads/saves, and the laggy "grey card → full contrast" team-add commit on Predict the Table — treat as one investigation, not three separate fixes. Fix root cause only; no optimistic-UI masking. — **M** (investigation), follow-on fix size TBD by finding
+    - [ ] Investigate shared server-side root cause behind slow login, slow screen loads/saves, and the laggy "grey card → full contrast" team-add commit on Predict the Table — treat as one investigation, not three separate fixes. Fix root cause only; no optimistic-UI masking. — **M** (investigation), follow-on fix size TBD by finding - partly resolved by having vercel moved to apac region
   - [ ] Login / Onboarding
     - [ ] Replace the full player list on login with type-ahead search: as the player types, show a small filtered dropdown of close/partial matches only — never the full roster — balances usability for younger players against not exposing an enumerable name list as the group scales past ~5 — **M**
   - [ ] Pick Board
+    - [ ] Reorder text on card. so that the match/pick meta data is up top in line with the `OPEN` chip. and the score prediction has its own line (idea is that this is the key item so it should maximise the space on the card not have to share it
     - [ ] Fix score input requiring two taps before the number pad/cursor appears — **XS**
     - [ ] Reorder Match 1 / Match 2 by kickoff time (chronological), Top Pick as tiebreak only — supersedes the current fixed Match-1-first ordering in `docs/adr/0007` — **S**
     - [ ] Decide on redesigning the score input (buttons vs. free text) — must resolve the "single digit on 5+" case too: multi-digit entry above the valid range currently fails with a vague error instead of being prevented or clearly explained — open design question, not committed — **M**
-    - [ ] Show the viewing player's own Champion pick (from Predict the Table) on the pick board, as a personal reference chip — **S**
   - [ ] Predict the Table
     - [ ] _Future direction, not committed:_ after lock, mirror the weekly pick visibility rule — other players' full Table predictions become visible, plus a comparison against actual current standings
+  - [ ] Leaderboard
+    - [ ] Build it  - **Due by end of Gameweek 1**
+  - [ ] Match Centre
+    - [ ] Build it
