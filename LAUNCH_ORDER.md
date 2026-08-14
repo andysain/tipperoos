@@ -137,7 +137,7 @@ Sizes are rough t-shirt estimates (XS ≈ &lt;1hr, S ≈ half day, M ≈ 1–2 d
 
 - [ ] POST Launch
   - [ ] Performance
-    - [ ] Investigate shared server-side root cause behind slow login, slow screen loads/saves, and the laggy "grey card → full contrast" team-add commit on Predict the Table — treat as one investigation, not three separate fixes. Fix root cause only; no optimistic-UI masking. — **M** (investigation), follow-on fix size TBD by finding - partly resolved by having vercel moved to apac region
+    - [ ] Investigate shared server-side root cause behind slow login, slow screen loads/saves, and the laggy "grey card → full contrast" team-add commit on Predict the Table — treat as one investigation, not three separate fixes. Fix root cause only; no optimistic-UI masking. — **M** (investigation), follow-on fix size TBD by finding - partly resolved by having vercel moved to apac region. Investigation and remediation plan now live in `docs/standards/PERFORMANCE_TESTING_STANDARD.md` §4. Progress: `table-predictions/assign`/`unassign`/`submit` already collapsed to single RPCs (pre-existing migration); scrypt now non-blocking + competition-code lookup cached (this fix). Still open: Pick Board (`src/app/page.tsx`) round-trip reduction, `/api/picks` parallelization, `/predict-table` serial tail, real-device re-check of the grey-card lag.
   - [ ] Login / Onboarding
     - [ ] Replace the full player list on login with type-ahead search: as the player types, show a small filtered dropdown of close/partial matches only — never the full roster — balances usability for younger players against not exposing an enumerable name list as the group scales past ~5 — **M**
   - [ ] Pick Board
