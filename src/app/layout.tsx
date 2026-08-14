@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { AppShell } from "@/components/nav/AppShell";
 import { TimezoneSync } from "@/components/nav/TimezoneSync";
 import "./globals.css";
@@ -39,6 +40,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <TimezoneSync />
         <AppShell>{children}</AppShell>
+        <SpeedInsights />
       </body>
     </html>
   );

@@ -23,7 +23,12 @@ export async function POST(request: Request) {
 
   const supabase = createServerSupabaseClient();
 
-  const player = await getPlayerForTablePrediction(supabase, playerId);
+  // Independent of each other -- neither reads the other's result -- so run
+  // together instead of serially (PERFORMANCE_TESTING_STANDARD.md item #5).
+  const [player, gameweekOneKickoff] = await Promise.all([
+    getPlayerForTablePrediction(supabase, playerId),
+    getGameweekOneKickoff(supabase),
+  ]);
   if (!player) {
     return NextResponse.json(
       { error: "Couldn't find your player profile -- try logging in again." },
@@ -31,7 +36,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const gameweekOneKickoff = await getGameweekOneKickoff(supabase);
   const lateJoiner = isLateJoiner(player.joinedAt, gameweekOneKickoff);
   if (!lateJoiner) {
     return NextResponse.json(

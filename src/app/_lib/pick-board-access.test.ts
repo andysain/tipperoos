@@ -1,15 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Isolates loadPickBoardGameweek's own logic from gameweek-resolution
-// details (already golden-value tested in src/lib/gameweeks/resolve.test.ts)
-// -- same isolation approach as src/app/api/picks/route.test.ts mocking
-// resolveCompetitionId.
-const resolveCurrentGameweekForCompetitionMock = vi.fn();
-vi.mock("@/app/_lib/gameweek-access", () => ({
-  resolveCurrentGameweekForCompetition: (...args: unknown[]) =>
-    resolveCurrentGameweekForCompetitionMock(...args),
-}));
-
 interface TableData {
   single?: unknown;
   list?: unknown[];
@@ -54,17 +44,16 @@ const SESSION_PLAYER = "player-me";
 const OTHER_PLAYER = "player-other";
 const COMPETITION_ID = "comp-1";
 const SEASON_ID = "season-1";
+const GAMEWEEK_NUMBER = 1;
 const NOW = new Date("2026-08-21T12:00:00.000Z");
 
 describe("loadPickBoardGameweek", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    resolveCurrentGameweekForCompetitionMock.mockResolvedValue(1);
   });
 
   it("only queries picks and scores scoped to the session player, never another player", async () => {
     const { from, calls } = createSupabaseMock({
-      seasons: { single: { id: SEASON_ID } },
       gameweeks: {
         single: {
           match_1_id: "match-1",
@@ -108,6 +97,8 @@ describe("loadPickBoardGameweek", () => {
       COMPETITION_ID,
       SESSION_PLAYER,
       NOW,
+      SEASON_ID,
+      GAMEWEEK_NUMBER,
     );
 
     const pickCalls = calls.picks;
@@ -137,7 +128,6 @@ describe("loadPickBoardGameweek", () => {
 
   it("only returns this player's own pick on the slot, even if other players' rows exist upstream", async () => {
     const { from } = createSupabaseMock({
-      seasons: { single: { id: SEASON_ID } },
       gameweeks: {
         single: {
           match_1_id: "match-1",
@@ -180,6 +170,8 @@ describe("loadPickBoardGameweek", () => {
       COMPETITION_ID,
       SESSION_PLAYER,
       NOW,
+      SEASON_ID,
+      GAMEWEEK_NUMBER,
     );
 
     expect(result?.slots[0]).toMatchObject({
@@ -188,34 +180,21 @@ describe("loadPickBoardGameweek", () => {
     });
   });
 
-  it("returns null when no season is seeded", async () => {
-    const { from } = createSupabaseMock({ seasons: { single: null } });
+  it("returns null when no gameweek row exists for this season/number", async () => {
+    const { from } = createSupabaseMock({ gameweeks: { single: null } });
     const result = await loadPickBoardGameweek(
       { from } as never,
       COMPETITION_ID,
       SESSION_PLAYER,
       NOW,
-    );
-    expect(result).toBeNull();
-  });
-
-  it("returns null when gameweek 1 hasn't been selected yet", async () => {
-    resolveCurrentGameweekForCompetitionMock.mockResolvedValue(null);
-    const { from } = createSupabaseMock({
-      seasons: { single: { id: SEASON_ID } },
-    });
-    const result = await loadPickBoardGameweek(
-      { from } as never,
-      COMPETITION_ID,
-      SESSION_PLAYER,
-      NOW,
+      SEASON_ID,
+      GAMEWEEK_NUMBER,
     );
     expect(result).toBeNull();
   });
 
   it("renders a skipped slot when a match id is null", async () => {
     const { from } = createSupabaseMock({
-      seasons: { single: { id: SEASON_ID } },
       gameweeks: {
         single: {
           match_1_id: null,
@@ -248,6 +227,8 @@ describe("loadPickBoardGameweek", () => {
       COMPETITION_ID,
       SESSION_PLAYER,
       NOW,
+      SEASON_ID,
+      GAMEWEEK_NUMBER,
     );
     expect(result?.slots[0]).toEqual({ kind: "skipped" });
     expect(result?.slots[1].kind).toBe("match");
@@ -258,7 +239,6 @@ describe("loadPickBoardGameweek", () => {
     // matches.status and gameweeks.match_N_voided_at flip together --
     // this covers a sync step writing status first.
     const { from } = createSupabaseMock({
-      seasons: { single: { id: SEASON_ID } },
       gameweeks: {
         single: {
           match_1_id: "match-1",
@@ -291,6 +271,8 @@ describe("loadPickBoardGameweek", () => {
       COMPETITION_ID,
       SESSION_PLAYER,
       NOW,
+      SEASON_ID,
+      GAMEWEEK_NUMBER,
     );
     expect(result?.slots[0]).toMatchObject({ kind: "match", voided: true });
   });

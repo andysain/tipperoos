@@ -205,6 +205,7 @@ Scoring must be **idempotent**: correcting a previously-entered result and recom
 - `CONTEXT.md` — glossary of domain terms (Fixture, Tipped Match, Competition, Competition Admin, Season Standing, etc.).
 - `docs/adr/` — architecture decision records for hard-to-reverse, non-obvious calls.
 - `docs/standards/TESTING_STANDARD.md` — testing philosophy, validation order, and definition of done for this codebase.
+- `docs/standards/PERFORMANCE_TESTING_STANDARD.md` — performance testing philosophy, round-trip budgets, and the highest-value fix list for this codebase.
 
 <!-- OPENWIKI:START -->
 
