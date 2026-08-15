@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 import { orderBoardSlots } from "./order-slots";
 
 // Golden values hand-derived from the display rule ("shown in kickoff order",
-// CLAUDE.md): matches first by kickoff, the marquee (Top Matchup) breaking
-// a kickoff tie, and any Skipped Slot last. Uses a minimal structural shape --
-// this module never touches the database.
+// CLAUDE.md): matches first by kickoff, the marquee (Top Matchup) breaking a
+// kickoff tie, and any Skipped Slot last. Orders are pinned by numeric
+// position (literal-value discipline, TESTING_STANDARD.md). This module never
+// touches the database.
 
 interface TestSlot {
   kind: "match" | "skipped";
@@ -16,7 +17,7 @@ interface TestSlot {
 function match(
   id: string,
   kickoffUtcIso: string,
-  provenance: TestSlot["provenance"],
+  provenance: NonNullable<TestSlot["provenance"]>,
 ): TestSlot {
   return { kind: "match", id, kickoffUtcIso, provenance };
 }
@@ -28,45 +29,49 @@ const kickoffOf = (s: TestSlot) =>
 const topMatchupOf = (s: TestSlot) =>
   s.kind === "match" && s.provenance === "top_matchup";
 
-function order(items: TestSlot[]): string[] {
-  return orderBoardSlots(items, kickoffOf, topMatchupOf).map((s) => s.id);
+// The 0-based position of an id in the sorted output (-1 if absent).
+function position(items: TestSlot[], id: string): number {
+  return orderBoardSlots(items, kickoffOf, topMatchupOf).findIndex(
+    (s) => s.id === id,
+  );
 }
 
 describe("orderBoardSlots", () => {
   it("puts the earlier kickoff on top, regardless of sourced slot order", () => {
-    // sourced order is marquee-first in the DB, but the random pick kicks off
-    // earlier here -- display must reflect kickoff, not source.
     const marquee = match("marquee", "2026-08-16T17:00:00Z", "top_matchup");
     const random = match("random", "2026-08-16T12:30:00Z", "random_pick");
-    expect(order([marquee, random])).toEqual(["random", "marquee"]);
-    expect(order([random, marquee])).toEqual(["random", "marquee"]);
+    expect(position([marquee, random], "random")).toBe(0);
+    expect(position([marquee, random], "marquee")).toBe(1);
+    expect(position([random, marquee], "random")).toBe(0);
+    expect(position([random, marquee], "marquee")).toBe(1);
   });
 
   it("keeps the marquee (Top Matchup) on top when kickoffs tie", () => {
     const marquee = match("marquee", "2026-08-16T14:00:00Z", "top_matchup");
     const random = match("random", "2026-08-16T14:00:00Z", "random_pick");
-    expect(order([marquee, random])).toEqual(["marquee", "random"]);
-    // also when the random pick is first in sourced order
-    expect(order([random, marquee])).toEqual(["marquee", "random"]);
+    expect(position([marquee, random], "marquee")).toBe(0);
+    expect(position([marquee, random], "random")).toBe(1);
+    expect(position([random, marquee], "marquee")).toBe(0);
+    expect(position([random, marquee], "random")).toBe(1);
   });
 
   it("keeps the marquee on top when it kicks off earlier", () => {
     const marquee = match("marquee", "2026-08-16T14:00:00Z", "top_matchup");
     const random = match("random", "2026-08-16T17:30:00Z", "random_pick");
-    expect(order([marquee, random])).toEqual(["marquee", "random"]);
+    expect(position([marquee, random], "marquee")).toBe(0);
+    expect(position([marquee, random], "random")).toBe(1);
   });
 
   it("sorts a Skipped Slot last, after the remaining match", () => {
-    const matchA = match("a", "2026-08-16T15:00:00Z", "top_matchup");
-    expect(order([skipped("s2"), matchA, skipped("s1")])).toEqual([
-      "a",
-      "s2",
-      "s1",
-    ]);
+    const present = match("a", "2026-08-16T15:00:00Z", "top_matchup");
+    expect(position([skipped("s1"), present, skipped("s2")], "a")).toBe(0);
+    expect(position([skipped("s1"), present, skipped("s2")], "s1")).toBe(1);
+    expect(position([skipped("s1"), present, skipped("s2")], "s2")).toBe(2);
   });
 
   it("keeps only-skipped input in place", () => {
-    expect(order([skipped("s1"), skipped("s2")])).toEqual(["s1", "s2"]);
+    expect(position([skipped("s1"), skipped("s2")], "s1")).toBe(0);
+    expect(position([skipped("s1"), skipped("s2")], "s2")).toBe(1);
   });
 
   it("does not mutate the input array", () => {
@@ -74,8 +79,8 @@ describe("orderBoardSlots", () => {
       match("marquee", "2026-08-16T17:00:00Z", "top_matchup"),
       match("random", "2026-08-16T12:30:00Z", "random_pick"),
     ];
-    const snapshot = [...input];
-    order(input);
-    expect(input).toEqual(snapshot);
+    orderBoardSlots(input, kickoffOf, topMatchupOf);
+    expect(position(input, "random")).toBe(0);
+    expect(position(input, "marquee")).toBe(1);
   });
 });
