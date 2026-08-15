@@ -109,11 +109,15 @@ function PlacedTeamCard({
       />
       <span className="flex min-w-0 flex-1 items-center gap-2.5">
         <ClubCodeBadge shortCode={team.shortCode} fill={fill} />
+        {/* displayName, not name: the badge beside it already identifies
+            the club exactly, and `name` truncates to "Brighton & Hove
+            Albi..." on a phone -- a full name that doesn't fit is worse
+            than a short one that does. */}
         <span
           title={team.name}
           className={`min-w-0 flex-1 truncate font-bold text-ink ${emphasis ? "text-lg" : "text-[0.95rem]"}`}
         >
-          {team.name}
+          {team.displayName}
         </span>
       </span>
       {nextOut ? (
@@ -211,15 +215,24 @@ function RosterChip({
 function CollapsedBandRow({
   band,
   teams,
+  boardComplete,
   onOpen,
 }: {
   band: (typeof TABLE_BANDS)[number];
   teams: Team[];
+  /** Every Band exactly filled. The per-Band count stops being information
+   * at that point -- eight identical "3/3"s restate what "20 of 20 placed"
+   * already said -- so it drops to a bare tick and the row is all clubs. */
+  boardComplete: boolean;
   onOpen: () => void;
 }) {
   const meta = BAND_META[band.key];
   const filled = teams.length;
   const tone = fillTone(filled, band.target);
+  // The one call the whole feature is about, and until now visually
+  // identical to Mid Table in the stack. It gets weight, not a different
+  // shape -- it is still a row of the same table.
+  const isChampion = band.key === "champion";
   return (
     <button
       type="button"
@@ -231,14 +244,19 @@ function CollapsedBandRow({
         <span className="inline-flex min-w-8 shrink-0 items-center justify-center rounded-badge bg-ink/[0.07] px-1.5 py-0.5 text-[0.65rem] font-extrabold text-ink/55 tabular-nums">
           {meta.positions}
         </span>
-        <meta.Icon className="size-4 shrink-0 text-ink/60" aria-hidden />
-        <span className="min-w-0 flex-1 truncate text-[0.8rem] font-extrabold text-ink">
+        <meta.Icon
+          className={`size-4 shrink-0 ${isChampion ? "text-accent" : "text-ink/60"}`}
+          aria-hidden
+        />
+        <span
+          className={`min-w-0 flex-1 truncate font-extrabold text-ink ${isChampion ? "text-[0.95rem]" : "text-[0.8rem]"}`}
+        >
           {band.label}
         </span>
         <span
           className={`shrink-0 text-[0.7rem] tabular-nums ${FILL_COUNT_TEXT[tone]}`}
         >
-          {countRead(filled, band.target)}
+          {boardComplete ? "✓" : countRead(filled, band.target)}
         </span>
         {/* The "you can open this" affordance. A chevron on every collapsed
             row, at full strength rather than a hover-only reveal -- on a
@@ -257,7 +275,9 @@ function CollapsedBandRow({
                 shortCode={team.shortCode}
                 fill={teamFill(team.shortCode)}
               />
-              <span className="text-[0.78rem] leading-snug font-bold text-ink/75">
+              <span
+                className={`leading-snug font-bold text-ink/75 ${isChampion ? "text-[0.95rem]" : "text-[0.78rem]"}`}
+              >
                 {team.displayName}
               </span>
             </span>
@@ -278,6 +298,7 @@ export function BandsBoard({
   openBand,
   nextBand,
   nextOutTeamId,
+  boardComplete,
   busyTeamIds,
   undo,
   justSwapped,
@@ -302,6 +323,8 @@ export function BandsBoard({
   /** PROTOTYPE: the club in the open Band that eviction would displace, or
    * null while that Band still has room. */
   nextOutTeamId: string | null;
+  /** Every Band exactly filled -- collapses the per-Band counts to ticks. */
+  boardComplete: boolean;
   busyTeamIds: string[];
   undo: UndoState | null;
   /** The two teams a swap just landed, for the swap-pulse animation --
@@ -348,6 +371,7 @@ export function BandsBoard({
               <CollapsedBandRow
                 band={band}
                 teams={inBand}
+                boardComplete={boardComplete}
                 onOpen={() => onOpenBand(band.key)}
               />
             </div>
@@ -461,7 +485,12 @@ export function BandsBoard({
                       .
                     </p>
                   ) : null}
-                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+                  {/* Two columns at phone width, not three. At three, "Man
+                      United" truncated to "Man Uni..." sits beside "Man
+                      City" -- two different clubs a tap apart, told apart
+                      only by an ellipsis. Costs height, buys not picking
+                      the wrong club. */}
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                     {teams.map((team) => (
                       <RosterChip
                         key={team.id}

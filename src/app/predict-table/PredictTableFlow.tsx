@@ -195,6 +195,7 @@ export function PredictTableFlow({
 
   const counts = useMemo(() => countsOf(assignments), [assignments]);
   const validation = useMemo(() => validateBandCounts(counts), [counts]);
+  const boardComplete = validation.ok;
 
   const nextBand = openBand ? nextUnfilledBand(openBand, counts) : null;
 
@@ -487,7 +488,7 @@ export function PredictTableFlow({
   }
 
   function handleSubmitClick() {
-    if (validation.ok) {
+    if (boardComplete) {
       void handleSubmit();
       return;
     }
@@ -537,11 +538,18 @@ export function PredictTableFlow({
       <h1 className="text-[1.9rem] font-extrabold text-ink">
         Predict the Table
       </h1>
-      <p className="-mt-2 text-ink/70">
-        {openBand
-          ? "Tap clubs to add them to the open Band. Tap a Band's name to open or close it."
-          : "Where will each Premier League club finish? Tap a Band to open it, then tap clubs to add them."}
-      </p>
+      {/* The instruction line is for someone who hasn't done this before.
+          Once a table has been submitted it is five lines of nothing,
+          pushing the player's actual table below the fold on a phone -- so
+          it goes, and the persistent `?` link covers anyone who wants it
+          back. */}
+      {submittedAt ? null : (
+        <p className="-mt-2 text-ink/70">
+          {openBand
+            ? "Tap clubs to add them to the open Band. Tap a Band's name to open or close it."
+            : "Where will each Premier League club finish? Tap a Band to open it, then tap clubs to add them."}
+        </p>
+      )}
       <ScoringSummary kind="table" />
 
       <div className="-mt-2 flex items-center justify-between gap-2">
@@ -631,6 +639,7 @@ export function PredictTableFlow({
         undo={undo}
         justSwapped={justSwapped}
         celebratingChampion={celebrating}
+        boardComplete={boardComplete}
         onOpenBand={setOpenBand}
         onCloseBand={() => setOpenBand(null)}
         onTapTeam={handleTeamTap}
