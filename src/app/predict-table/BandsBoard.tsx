@@ -66,6 +66,7 @@ function PlacedTeamCard({
   disabled,
   liftedHere,
   justSwapped,
+  celebrate,
 }: {
   team: Team;
   emphasis?: boolean;
@@ -76,6 +77,9 @@ function PlacedTeamCard({
   /** True for the two rows of a swap that just landed -- a brief pulse in
    * place of a confirm dialog (issue #131, ADR 0008). */
   justSwapped?: boolean;
+  /** True for the champion card the moment the ceremony fires -- the card
+   * landing with weight (issue #118), same pulse as a swap. */
+  celebrate?: boolean;
 }) {
   const fill = teamFill(team.shortCode);
   return (
@@ -85,7 +89,7 @@ function PlacedTeamCard({
       disabled={disabled}
       className={`group flex min-h-12 items-stretch gap-3 overflow-hidden rounded-btn border py-3 pr-3 pl-2.5 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
         emphasis ? "border-accent bg-accent/10 ring-1 ring-accent/40" : ""
-      } ${liftedHere ? "border-accent bg-accent/10 ring-2 ring-accent/50" : overfilled ? "border-danger/50 bg-danger/10 hover:border-danger" : !emphasis ? "border-paper-line bg-white hover:border-accent/50" : ""} ${justSwapped ? "motion-safe:animate-swap-pulse" : ""}`}
+      } ${liftedHere ? "border-accent bg-accent/10 ring-2 ring-accent/50" : overfilled ? "border-danger/50 bg-danger/10 hover:border-danger" : !emphasis ? "border-paper-line bg-white hover:border-accent/50" : ""} ${justSwapped || celebrate ? "motion-safe:animate-swap-pulse" : ""}`}
     >
       <span
         aria-hidden
@@ -221,6 +225,7 @@ export function BandsBoard({
   busyTeamIds,
   undo,
   justSwapped,
+  celebratingChampion,
   onOpenBand,
   onTapTeam,
   onDropInto,
@@ -241,6 +246,9 @@ export function BandsBoard({
   /** The two teams a swap just landed, for the swap-pulse animation --
    * null once it's played (issue #131). */
   justSwapped: [string, string] | null;
+  /** True while the champion ceremony is playing -- the champion card
+   * lands with weight (issue #118). */
+  celebratingChampion: boolean;
   onOpenBand: (band: BandKey) => void;
   onTapTeam: (teamId: string) => void;
   onDropInto: (band: BandKey) => void;
@@ -341,6 +349,7 @@ export function BandsBoard({
                         (justSwapped[0] === team.id ||
                           justSwapped[1] === team.id)
                       }
+                      celebrate={celebratingChampion && band.key === "champion"}
                       onTap={() => onTapTeam(team.id)}
                     />
                   ))}
