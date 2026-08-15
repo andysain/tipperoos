@@ -628,6 +628,19 @@ export function PredictTableFlow({
             role="alert"
             className="rounded-card border border-warning/50 bg-white p-4"
           >
+            {/* The "N too many" branch below is NOT dead code, despite
+                eviction making over-fill impossible to *create*. A Table
+                Prediction saved under the previous 7-Band structure loads
+                with Champions League holding 4 (its old target) against the
+                new target of 3, and Runners Up empty -- so an over-filled
+                Band is still reachable by loading old data, just no longer
+                by tapping. Deleting this branch would leave those players
+                with a warning that can't explain itself.
+
+                Such a board self-heals in one move: the return-visit
+                landing opens Runners Up (the first Band whose count is
+                wrong), and moving one club there from Champions League
+                fixes both Bands at once. */}
             <div className="flex items-start gap-3">
               <TriangleAlert
                 className="mt-0.5 size-5 shrink-0 text-warning"
