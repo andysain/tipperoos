@@ -14,6 +14,14 @@ export interface PinInputProps {
 // Four tap-friendly digit boxes instead of a single free-text field --
 // kid-friendly PIN entry, auto-advancing, numeric keyboard on mobile.
 //
+// Masking is done by rendering "•" in a `type="text"` box, never
+// `type="password"`: on iOS Safari a password field routes every keystroke
+// through the secure-text path and Password AutoFill heuristics, so the
+// bullets lag visibly behind typing (real regression, #139). A text box
+// keeps `inputMode="numeric"` working too -- iOS ignores it on password
+// fields. The real digits stay in state, so `onComplete` always receives
+// the actual PIN.
+//
 // To clear the boxes after a failed attempt, the parent should force a
 // remount by changing this component's `key` prop, rather than this
 // component watching a "reset" prop internally -- React's own mechanism for
@@ -86,11 +94,12 @@ export function PinInput({
             ref={(el) => {
               inputRefs.current[index] = el;
             }}
-            type={masked ? "password" : "text"}
+            type="text"
+            autoComplete="off"
             inputMode="numeric"
             pattern="[0-9]*"
             maxLength={1}
-            value={digit}
+            value={masked && digit !== "" ? "•" : digit}
             onChange={(e) => handleChange(index, e.target.value)}
             onKeyDown={(e) => handleKeyDown(index, e)}
             aria-label={`${label} digit ${index + 1}`}
