@@ -225,10 +225,11 @@ function RosterChip({
 // as the same red, so a wash of identical rails disambiguated nothing while
 // costing a column of width. The 3-letter badge is the app's existing club
 // token and is unambiguous by construction.
-/** One club inside a collapsed Band: a thin kit rail and the short name.
- * Shared by the three-column members grid and the one-club inline form, so
- * a club reads identically wherever it lands. */
-function MemberName({ team, emphasis }: { team: Team; emphasis?: boolean }) {
+/** One club in a collapsed Band's members grid: a thin kit rail and the
+ * short name. Only multi-club Bands render this -- a one-club Band puts its
+ * club on the header line instead, with a badge and full weight, since
+ * there it is the answer rather than one of three. */
+function MemberName({ team }: { team: Team }) {
   return (
     <span title={team.name} className="flex min-w-0 items-center gap-1.5">
       <span
@@ -236,9 +237,7 @@ function MemberName({ team, emphasis }: { team: Team; emphasis?: boolean }) {
         className="h-3.5 w-[3px] shrink-0 rounded-full"
         style={{ background: teamFill(team.shortCode) }}
       />
-      <span
-        className={`min-w-0 truncate leading-snug font-bold text-ink/75 ${emphasis ? "text-[0.9rem]" : "text-[0.8rem]"}`}
-      >
+      <span className="min-w-0 truncate text-[0.8rem] leading-snug font-bold text-ink/75">
         {team.displayName}
       </span>
     </span>
@@ -273,15 +272,33 @@ function CollapsedBandRow({
   // two-thirds empty space, which read as unfinished rather than decisive.
   // Different content earning a different shape, not an inconsistency.
   const inlineMember = band.target === 1;
+  // Pomp for the two single-club Bands, and a hierarchy between them.
+  // DESIGN_SYSTEM.md reserves `accent` for a short list of emotionally
+  // relevant spots including the 1st-place tint, so Champion takes it and
+  // Runners Up gets a quieter neutral lift -- which is the right ordering
+  // anyway. Only when the Band is correctly filled: an empty Champion still
+  // needs the "something to do here" wash more than it needs ceremony.
+  const marquee =
+    inlineMember && tone === "ok"
+      ? isChampion
+        ? "border-accent/50 bg-accent/[0.07]"
+        : "border-ink/20 bg-white"
+      : FILL_GROUND[tone];
   return (
     <button
       type="button"
       onClick={onOpen}
       aria-label={`Open ${band.label}`}
-      className={`group flex w-full flex-col gap-1.5 rounded-card border px-3 py-2.5 text-left transition hover:border-accent hover:bg-accent/[0.04] ${FILL_GROUND[tone]}`}
+      className={`group flex w-full flex-col gap-1.5 rounded-card border px-3 py-2.5 text-left transition hover:border-accent hover:bg-accent/[0.04] ${marquee}`}
     >
       <span className="flex w-full items-center gap-2">
-        <span className="inline-flex min-w-8 shrink-0 items-center justify-center rounded-badge bg-ink/[0.07] px-1.5 py-0.5 text-[0.65rem] font-extrabold text-ink/55 tabular-nums">
+        <span
+          className={`inline-flex min-w-8 shrink-0 items-center justify-center rounded-badge px-1.5 py-0.5 text-[0.65rem] font-extrabold tabular-nums ${
+            isChampion && tone === "ok"
+              ? "bg-accent text-accent-ink"
+              : "bg-ink/[0.07] text-ink/55"
+          }`}
+        >
           {meta.positions}
         </span>
         <meta.Icon
@@ -289,17 +306,40 @@ function CollapsedBandRow({
           aria-hidden
         />
         <span
-          className={`min-w-0 truncate font-extrabold text-ink ${isChampion ? "text-[0.95rem]" : "text-[0.8rem]"} ${inlineMember ? "shrink-0" : "flex-1"}`}
+          className={`min-w-0 truncate font-extrabold ${
+            inlineMember
+              ? "shrink-0 text-[0.8rem] text-ink/55"
+              : `flex-1 text-ink ${isChampion ? "text-[0.95rem]" : "text-[0.8rem]"}`
+          }`}
         >
           {band.label}
         </span>
-        {inlineMember ? (
-          <span className="flex min-w-0 flex-1 items-center gap-1.5">
-            {teams.map((team) => (
-              <MemberName key={team.id} team={team} emphasis={isChampion} />
-            ))}
-          </span>
-        ) : null}
+        {/* The club, not the label, is the answer -- so it is the loudest
+            thing in the row. It previously rendered at the same weight as a
+            group member and a step quieter than the word "Champion", which
+            made the category outrank its own result and left no visible
+            seam between the two. The kit badge does the separating: one
+            badge is a focal point, where three a row (the reason it was
+            dropped from the members grid) was noise. */}
+        {inlineMember
+          ? teams.map((team) => (
+              <span
+                key={team.id}
+                title={team.name}
+                className="flex min-w-0 flex-1 items-center gap-2"
+              >
+                <ClubCodeBadge
+                  shortCode={team.shortCode}
+                  fill={teamFill(team.shortCode)}
+                />
+                <span
+                  className={`min-w-0 truncate font-extrabold text-ink ${isChampion ? "text-[1.05rem]" : "text-[0.95rem]"}`}
+                >
+                  {team.displayName}
+                </span>
+              </span>
+            ))
+          : null}
         <span
           className={`shrink-0 text-[0.7rem] tabular-nums ${FILL_COUNT_TEXT[tone]}`}
         >
@@ -336,7 +376,7 @@ function CollapsedBandRow({
       {inlineMember ? null : teams.length ? (
         <span className="grid w-full grid-cols-3 gap-x-2 gap-y-1">
           {teams.map((team) => (
-            <MemberName key={team.id} team={team} emphasis={isChampion} />
+            <MemberName key={team.id} team={team} />
           ))}
         </span>
       ) : (
