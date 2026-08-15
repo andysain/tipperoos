@@ -1,0 +1,178 @@
+import { describe, expect, it } from "vitest";
+import { deriveTablePredictionStripState } from "./strip-state";
+import type { TablePredictionEditability } from "./rules";
+
+const CHAMPION = { id: "arsenal", name: "Arsenal", shortCode: "ARS" };
+
+const editable: TablePredictionEditability = {
+  editable: true,
+  locked: false,
+  isLateJoiner: false,
+};
+const locked: TablePredictionEditability = {
+  editable: false,
+  locked: true,
+  isLateJoiner: false,
+};
+const lateJoinerEditable: TablePredictionEditability = {
+  editable: true,
+  locked: false,
+  isLateJoiner: true,
+};
+
+describe("deriveTablePredictionStripState", () => {
+  it("shows the CTA when the player has never touched the flow and is still editable", () => {
+    const result = deriveTablePredictionStripState({
+      prediction: null,
+      editability: editable,
+      championTeam: null,
+      bandCountsOk: false,
+      leaguePosition: null,
+    });
+    expect(result).toEqual({ kind: "not_submitted" });
+  });
+
+  it("hides once the deadline has passed and the player never submitted", () => {
+    const result = deriveTablePredictionStripState({
+      prediction: null,
+      editability: locked,
+      championTeam: null,
+      bandCountsOk: false,
+      leaguePosition: null,
+    });
+    expect(result).toEqual({ kind: "hidden" });
+  });
+
+  it("hides for a skipped prediction regardless of editability", () => {
+    const result = deriveTablePredictionStripState({
+      prediction: { submittedAt: null, skipped: true },
+      editability: editable,
+      championTeam: null,
+      bandCountsOk: false,
+      leaguePosition: null,
+    });
+    expect(result).toEqual({ kind: "hidden" });
+  });
+
+  it("shows the CTA for an editable, submitted=null, skipped=false record", () => {
+    const result = deriveTablePredictionStripState({
+      prediction: { submittedAt: null, skipped: false },
+      editability: editable,
+      championTeam: null,
+      bandCountsOk: false,
+      leaguePosition: null,
+    });
+    expect(result).toEqual({ kind: "not_submitted" });
+  });
+
+  it("hides a submitted record whose Champion Band holds zero teams", () => {
+    const result = deriveTablePredictionStripState({
+      prediction: { submittedAt: "2026-08-01T00:00:00Z", skipped: false },
+      editability: editable,
+      championTeam: null,
+      bandCountsOk: true,
+      leaguePosition: 3,
+    });
+    expect(result).toEqual({ kind: "hidden" });
+  });
+
+  it("hides a submitted record whose Champion Band holds two teams", () => {
+    // championTeam is null here too -- the loader only ever resolves a
+    // single champion row; two rows in the Champion Band is exactly the
+    // "not exactly one team" case the loader collapses to null.
+    const result = deriveTablePredictionStripState({
+      prediction: { submittedAt: "2026-08-01T00:00:00Z", skipped: false },
+      editability: locked,
+      championTeam: null,
+      bandCountsOk: false,
+      leaguePosition: null,
+    });
+    expect(result).toEqual({ kind: "hidden" });
+  });
+
+  it("shows Champion + edit affordance, no warning, when submitted, editable and tidy", () => {
+    const result = deriveTablePredictionStripState({
+      prediction: { submittedAt: "2026-08-01T00:00:00Z", skipped: false },
+      editability: editable,
+      championTeam: CHAMPION,
+      bandCountsOk: true,
+      leaguePosition: 1,
+    });
+    expect(result).toEqual({
+      kind: "submitted_editable",
+      champion: CHAMPION,
+      bandsUntidy: false,
+    });
+  });
+
+  it("shows the untidy warning when submitted, editable and Bands are mismatched", () => {
+    const result = deriveTablePredictionStripState({
+      prediction: { submittedAt: "2026-08-01T00:00:00Z", skipped: false },
+      editability: editable,
+      championTeam: CHAMPION,
+      bandCountsOk: false,
+      leaguePosition: 1,
+    });
+    expect(result).toEqual({
+      kind: "submitted_editable",
+      champion: CHAMPION,
+      bandsUntidy: true,
+    });
+  });
+
+  it("shows Champion + league position, no edit affordance, once locked", () => {
+    const result = deriveTablePredictionStripState({
+      prediction: { submittedAt: "2026-08-01T00:00:00Z", skipped: false },
+      editability: locked,
+      championTeam: CHAMPION,
+      bandCountsOk: true,
+      leaguePosition: 4,
+    });
+    expect(result).toEqual({
+      kind: "submitted_locked",
+      champion: CHAMPION,
+      leaguePosition: 4,
+    });
+  });
+
+  it("degrades to a null league position when no team_standings row exists yet", () => {
+    const result = deriveTablePredictionStripState({
+      prediction: { submittedAt: "2026-08-01T00:00:00Z", skipped: false },
+      editability: locked,
+      championTeam: CHAMPION,
+      bandCountsOk: true,
+      leaguePosition: null,
+    });
+    expect(result).toEqual({
+      kind: "submitted_locked",
+      champion: CHAMPION,
+      leaguePosition: null,
+    });
+  });
+
+  it("shows the Champion for a Late Joiner who has submitted, despite locked: false being permanent for them", () => {
+    const result = deriveTablePredictionStripState({
+      prediction: { submittedAt: "2026-09-15T00:00:00Z", skipped: false },
+      editability: lateJoinerEditable,
+      championTeam: CHAMPION,
+      bandCountsOk: true,
+      leaguePosition: 7,
+    });
+    expect(result).toEqual({
+      kind: "submitted_editable",
+      champion: CHAMPION,
+      bandsUntidy: false,
+    });
+  });
+
+  it("keeps offering the CTA to a Late Joiner who hasn't submitted or skipped, with no deadline to expire it", () => {
+    const result = deriveTablePredictionStripState({
+      prediction: { submittedAt: null, skipped: false },
+      editability: lateJoinerEditable,
+      championTeam: null,
+      bandCountsOk: false,
+      leaguePosition: null,
+    });
+    expect(result).toEqual({ kind: "not_submitted" });
+  });
+});

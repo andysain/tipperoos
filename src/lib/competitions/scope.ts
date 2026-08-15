@@ -248,3 +248,36 @@ export async function resolveCompetitionId(
   if (error) throw error;
   return data?.competition_id ?? null;
 }
+
+export interface PlayerScope {
+  competitionId: string;
+  joinedAt: Date;
+}
+
+/**
+ * Same session-cookie -> player lookup as resolveCompetitionId, but also
+ * returns `joined_at` from the same round trip -- for callers that need
+ * both competition scoping and Late-Joiner-aware editability
+ * (getTablePredictionEditability) from the same player row, instead of two
+ * separate `players` queries for the same session player
+ * (docs/standards/PERFORMANCE_TESTING_STANDARD.md's "resolve shared loader
+ * inputs once" principle). The Pick Board route (issue #156) is the first
+ * caller; resolveCompetitionId above is left alone for callers that only
+ * ever needed the one column.
+ */
+export async function resolvePlayerScope(
+  supabase: SupabaseClient,
+  playerId: string,
+): Promise<PlayerScope | null> {
+  const { data, error } = await supabase
+    .from("players")
+    .select("competition_id, joined_at")
+    .eq("id", playerId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return {
+    competitionId: data.competition_id,
+    joinedAt: new Date(data.joined_at),
+  };
+}
