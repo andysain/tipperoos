@@ -27,14 +27,13 @@ import {
   nextUnfilledBand,
   planTapRequests,
   planUndoRequests,
-  resolveTapOutcome,
+  nextSeq,
   rosterOrder,
+  settleBoard,
   startAgain as startAgainBoard,
   tapWithEviction,
-  type Assignments,
-  type PlacedAt,
+  type BoardState,
   type EvictionTapResult,
-  type PriorBandByTeam,
   type TapRequestPlan,
   type TapSnapshot,
 } from "@/lib/table-predictions/board";
@@ -136,18 +135,18 @@ export function PredictTableFlow({
   initialIsSkipped,
   initialSubmittedAt,
 }: PredictTableFlowProps) {
-  const [assignments, setAssignments] =
-    useState<Assignments>(initialAssignments);
-  const [previous, setPrevious] = useState<PriorBandByTeam>({});
-  // Placement order, for the eviction rule's "next out". Seeded from the
-  // saved assignments in roster order so a resumed board still has a
-  // deterministic answer; the counter then runs on from there.
-  const [placedAt, setPlacedAt] = useState<PlacedAt>(() =>
-    Object.fromEntries(
+  // One board, not three states that have to be written in lockstep.
+  // `placedAt` is the placement order the eviction rule's "next out" reads,
+  // seeded from the saved assignments in roster order so a resumed board
+  // still has a deterministic answer.
+  const [board, setBoard] = useState<BoardState>(() => ({
+    assignments: initialAssignments,
+    previous: {},
+    placedAt: Object.fromEntries(
       Object.keys(initialAssignments).map((teamId, index) => [teamId, index]),
     ),
-  );
-  const placementSeq = useRef(Object.keys(initialAssignments).length);
+  }));
+  const { assignments, previous, placedAt } = board;
   // #118's return-visit landing: which Band opens on a visit is where the
   // work actually is, not always Champion -- Champion on a first (empty)
   // visit, the first incorrectly filled Band on a return (ADR 0008).
@@ -258,12 +257,16 @@ export function PredictTableFlow({
     if (touched.some((id) => busyTeamIds.includes(id))) return;
     setBusyTeamIds((prev) => [...prev, ...touched]);
     setSaveError(null);
-    const prevAssignments = assignments;
-    const prevPrevious = previous;
-    const prevPlacedAt = placedAt;
-    setAssignments(result.assignments);
-    setPrevious(result.previous);
-    if (result.placedAt) setPlacedAt(result.placedAt);
+    const before = board;
+    // Just the board fields: `result` also carries movedFrom/evicted, which
+    // describe the tap rather than the board, and shouldn't end up stored
+    // as state or copied into the undo snapshot.
+    const after: BoardState = {
+      assignments: result.assignments,
+      previous: result.previous,
+      placedAt: result.placedAt,
+    };
+    setBoard(after);
 
     // An eviction's undo names the club that *left*, not the one that
     // arrived -- the departure is the surprising half, and it is the half
@@ -290,22 +293,7 @@ export function PredictTableFlow({
 
     const results = await sendPlan(planTapRequests(teamId, result));
     const failed = results.find((r) => !r.ok);
-    const outcome = resolveTapOutcome(
-      {
-        assignments: prevAssignments,
-        previous: prevPrevious,
-        placedAt: prevPlacedAt,
-      },
-      {
-        assignments: result.assignments,
-        previous: result.previous,
-        placedAt: result.placedAt ?? prevPlacedAt,
-      },
-      !failed,
-    );
-    setAssignments(outcome.assignments);
-    setPrevious(outcome.previous);
-    setPlacedAt(outcome.placedAt);
+    setBoard(settleBoard(before, after, !failed));
 
     if (failed) {
       setUndo(null);
@@ -315,12 +303,7 @@ export function PredictTableFlow({
       setUndoSnapshot(null);
     } else {
       setIsSkipped(false);
-      setUndoSnapshot({
-        assignments: prevAssignments,
-        previous: prevPrevious,
-        placedAt: prevPlacedAt,
-        teamIds: touched,
-      });
+      setUndoSnapshot({ ...before, teamIds: touched });
       if (celebrateChampion && !championCelebrated.current) {
         championCelebrated.current = true;
         setCelebrating(true);
@@ -340,7 +323,7 @@ export function PredictTableFlow({
       teamId,
       openBand,
       openBandTarget,
-      placementSeq.current++,
+      nextSeq(placedAt),
     );
     // The champion ceremony: request the beat when this tap names the
     // champion (count 0 -> 1); persistTap spends it only on a saved move.
@@ -364,17 +347,13 @@ export function PredictTableFlow({
     setBusyTeamIds((prev) => [...prev, ...snapshot.teamIds]);
     setSaveError(null);
 
-    const current = { assignments, previous, placedAt };
-    setAssignments(snapshot.assignments);
-    setPrevious(snapshot.previous);
-    setPlacedAt(snapshot.placedAt);
+    const before = board;
+    setBoard(snapshot);
 
     const results = await sendPlan(planUndoRequests(snapshot));
     const failed = results.find((r) => !r.ok);
+    setBoard(settleBoard(before, snapshot, !failed));
     if (failed) {
-      setAssignments(current.assignments);
-      setPrevious(current.previous);
-      setPlacedAt(current.placedAt);
       setSaveError(failed.data.error ?? "Couldn't undo that -- try again.");
     }
     setBusyTeamIds((prev) =>
@@ -387,22 +366,14 @@ export function PredictTableFlow({
     setStartingAgain(true);
     setSaveError(null);
     const teamIds = Object.keys(assignments);
-    // Everything this function is about to reset has to be captured, not
-    // just the board itself: placedAt and placementSeq drive the eviction
-    // order and `demoted` drives the roster grouping, so restoring the
-    // board without them leaves a rolled-back Start again looking correct
-    // while "next out" answers from an empty sequence map.
-    const prevAssignments = assignments;
-    const prevPrevious = previous;
-    const prevPlacedAt = placedAt;
-    const prevSeq = placementSeq.current;
+    // Start again resets more than the board: `demoted` is the roster
+    // grouping and `openBand` is where the player is looking, and neither
+    // is board state, so both are captured separately for the rollback.
+    const before = board;
     const prevDemoted = demoted;
     const prevOpenBand = openBand;
     const cleared = startAgainBoard();
-    setAssignments(cleared.assignments);
-    setPrevious(cleared.previous);
-    setPlacedAt({});
-    placementSeq.current = 0;
+    setBoard(cleared);
     setUndo(null);
     setUndoSnapshot(null);
     setDemoted(demotePlaced(roster, {}));
@@ -414,11 +385,8 @@ export function PredictTableFlow({
       ),
     );
     const failed = results.find((result) => !result.ok);
+    setBoard(settleBoard(before, cleared, !failed));
     if (failed) {
-      setAssignments(prevAssignments);
-      setPrevious(prevPrevious);
-      setPlacedAt(prevPlacedAt);
-      placementSeq.current = prevSeq;
       setDemoted(prevDemoted);
       setOpenBand(prevOpenBand);
       setSaveError(

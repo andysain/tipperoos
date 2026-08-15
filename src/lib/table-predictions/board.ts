@@ -16,18 +16,34 @@ export type PriorBandByTeam = Record<string, BandKey | null>;
  * last-in-first-out, so the club most recently added is the one displaced. */
 export type PlacedAt = Record<string, number>;
 
+/**
+ * The whole capture board. These three always travel together -- every tap,
+ * every rollback and every snapshot moves all three or none of them -- so
+ * they are one type rather than three parameters that have to be kept in
+ * step by hand at each call site.
+ */
 export interface BoardState {
   assignments: Assignments;
   previous: PriorBandByTeam;
+  placedAt: PlacedAt;
 }
 
-export interface TapResult {
-  assignments: Assignments;
-  previous: PriorBandByTeam;
+export interface TapResult extends BoardState {
   /** The Band the team moved out of, for the undo affordance -- null for a
    * fresh placement or a toggle-revert (spec: undo only names a Band the
    * team came *from*). */
   movedFrom: BandKey | null;
+}
+
+/**
+ * The next placement sequence number, derived from the board rather than
+ * held alongside it. A separate counter is one more thing every rollback
+ * has to remember to restore, and forgetting it desyncs the eviction order
+ * from the board it describes -- which is exactly the bug a failed "Start
+ * again" used to have. Deriving it makes that class of desync unstateable.
+ */
+export function nextSeq(placedAt: PlacedAt): number {
+  return Math.max(-1, ...Object.values(placedAt)) + 1;
 }
 
 /**
@@ -60,7 +76,6 @@ export function nextOutTeam(
 }
 
 export interface EvictionTapResult extends TapResult {
-  placedAt: PlacedAt;
   /** The club pushed back to the roster to make room, or null if the Band
    * had a free slot. Never the tapped club itself. */
   evicted: { teamId: string; from: BandKey } | null;
@@ -85,7 +100,7 @@ export interface EvictionTapResult extends TapResult {
  * `previous[teamId]`, exactly as before -- that path never evicts.
  */
 export function tapWithEviction(
-  state: BoardState & { placedAt: PlacedAt },
+  state: BoardState,
   teamId: string,
   openBand: BandKey,
   target: number,
@@ -189,29 +204,25 @@ export function planTapRequests(
   return requests;
 }
 
-export interface TapOutcome {
-  assignments: Assignments;
-  previous: PriorBandByTeam;
-  placedAt: PlacedAt;
-}
-
 /**
- * What the board should show once a tap's request(s) have settled: the
- * tap's computed result if every request saved, or the pre-tap state
- * rolled back if any of them failed. Kept separate from the request
- * plumbing so "what does a failed save do to the board" is a pure,
- * testable decision rather than something only readable inside the
- * component's async handler.
+ * What the board should show once an optimistic change's requests have
+ * settled: the new state if every request saved, the pre-change state if
+ * any failed. Every path that writes to the server goes through this --
+ * a tap, an undo, and a Start again -- so "what does a failed save do to
+ * the board" is one decision in one place, made on the whole board at
+ * once, rather than three hand-rolled rollbacks that can each forget a
+ * field. Forgetting one is not hypothetical: Start again used to restore
+ * the assignments but not the placement order.
  */
-export function resolveTapOutcome(
-  before: TapOutcome,
-  result: TapOutcome,
+export function settleBoard(
+  before: BoardState,
+  after: BoardState,
   allRequestsSucceeded: boolean,
-): TapOutcome {
-  return allRequestsSucceeded ? result : before;
+): BoardState {
+  return allRequestsSucceeded ? after : before;
 }
 
-export interface TapSnapshot extends TapOutcome {
+export interface TapSnapshot extends BoardState {
   /** The team ids the tap touched -- one for a plain move, two for an
    * eviction -- and so the only ids the undo needs to re-persist. */
   teamIds: string[];
@@ -239,7 +250,7 @@ export function planUndoRequests(snapshot: TapSnapshot): TapRequestPlan[] {
  * table a player wants to bin, and the only operation that can't be
  * reconstructed from cheap individual moves. */
 export function startAgain(): BoardState {
-  return { assignments: {}, previous: {} };
+  return { assignments: {}, previous: {}, placedAt: {} };
 }
 
 /** Band fill counts, branded so an Assignments map can never be passed

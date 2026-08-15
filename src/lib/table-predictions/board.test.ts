@@ -15,14 +15,15 @@ import {
   nextUnfilledBand,
   planTapRequests,
   planUndoRequests,
-  resolveTapOutcome,
+  nextSeq,
+  settleBoard,
   rosterOrder,
   startAgain,
   tapWithEviction,
   type TapSnapshot,
 } from "./board";
 
-const empty: BoardState = { assignments: {}, previous: {} };
+const empty: BoardState = { assignments: {}, previous: {}, placedAt: {} };
 
 // Test-side constructor for the branded BandCounts shape -- countsOf is the
 // only production constructor, but tests want to write literals.
@@ -210,10 +211,10 @@ describe("tapWithEviction", () => {
 
 // The flow-level wiring around a tap: which HTTP requests it implies
 // (planTapRequests), and what the board shows once those requests settle
-// (resolveTapOutcome). PredictTableFlow's persistTap is built from exactly
-// these two functions, so testing them pins the two things that were only
-// checkable by reading the component before: an eviction fires both an
-// assign and an unassign, and a failed save rolls the whole tap back.
+// (settleBoard). PredictTableFlow's persistTap, handleUndo and
+// handleStartAgain are all built from these, so testing them pins what was
+// only checkable by reading the component before: an eviction fires both an
+// assign and an unassign, and a failed save rolls the whole board back.
 describe("planTapRequests", () => {
   it("plans a single assign for a plain placement, no eviction", () => {
     const result = {
@@ -244,26 +245,52 @@ describe("planTapRequests", () => {
   });
 });
 
-describe("resolveTapOutcome", () => {
-  const before = {
+describe("settleBoard", () => {
+  const before: BoardState = {
     assignments: { arsenal: "champion" } as Record<string, BandKey>,
     previous: {},
     placedAt: { arsenal: 0 },
   };
-  const afterEviction = {
+  const afterEviction: BoardState = {
     assignments: { chelsea: "champion" } as Record<string, BandKey>,
     previous: { chelsea: null, arsenal: "champion" as BandKey },
     placedAt: { chelsea: 1 },
   };
 
   it("keeps the tap's result when every request succeeded", () => {
-    expect(resolveTapOutcome(before, afterEviction, true)).toEqual(
-      afterEviction,
-    );
+    expect(settleBoard(before, afterEviction, true)).toEqual(afterEviction);
   });
 
   it("rolls the board back to its pre-tap state when a request failed -- an eviction's two requests are all-or-nothing, never half-applied", () => {
-    expect(resolveTapOutcome(before, afterEviction, false)).toEqual(before);
+    expect(settleBoard(before, afterEviction, false)).toEqual(before);
+  });
+
+  it("rolls a failed Start again back to the whole pre-reset board, placement order included", () => {
+    // The bug this replaced: Start again restored assignments and previous
+    // by hand but left placedAt cleared, so "next out" answered from an
+    // empty sequence map against a board that had been restored.
+    expect(settleBoard(before, startAgain(), false)).toEqual(before);
+    expect(settleBoard(before, startAgain(), false).placedAt).toEqual({
+      arsenal: 0,
+    });
+  });
+});
+
+// The placement counter is derived from the board rather than held beside
+// it, so no rollback can forget to restore it.
+describe("nextSeq", () => {
+  it("is 0 for an empty board", () => {
+    expect(nextSeq({})).toBe(0);
+  });
+
+  it("is one past the highest sequence in play", () => {
+    expect(nextSeq({ a: 0, b: 1, c: 2 })).toBe(3);
+    expect(nextSeq({ a: 7 })).toBe(8);
+  });
+
+  it("survives gaps left by evicted clubs", () => {
+    // An eviction deletes its club's entry, so the sequence is not dense.
+    expect(nextSeq({ a: 0, c: 5 })).toBe(6);
   });
 });
 
@@ -450,6 +477,7 @@ describe("startAgain", () => {
     const state: BoardState = {
       assignments: { arsenal: "champion", chelsea: "europe" },
       previous: { arsenal: null, chelsea: "mid_table" },
+      placedAt: { arsenal: 0, chelsea: 1 },
     };
     expect(startAgain()).toEqual(empty);
     expect(Object.keys(startAgain().assignments).length).toBe(0);
