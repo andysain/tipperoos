@@ -225,6 +225,26 @@ function RosterChip({
 // as the same red, so a wash of identical rails disambiguated nothing while
 // costing a column of width. The 3-letter badge is the app's existing club
 // token and is unambiguous by construction.
+/** One club inside a collapsed Band: a thin kit rail and the short name.
+ * Shared by the three-column members grid and the one-club inline form, so
+ * a club reads identically wherever it lands. */
+function MemberName({ team, emphasis }: { team: Team; emphasis?: boolean }) {
+  return (
+    <span title={team.name} className="flex min-w-0 items-center gap-1.5">
+      <span
+        aria-hidden
+        className="h-3.5 w-[3px] shrink-0 rounded-full"
+        style={{ background: teamFill(team.shortCode) }}
+      />
+      <span
+        className={`min-w-0 truncate leading-snug font-bold text-ink/75 ${emphasis ? "text-[0.9rem]" : "text-[0.8rem]"}`}
+      >
+        {team.displayName}
+      </span>
+    </span>
+  );
+}
+
 function CollapsedBandRow({
   band,
   teams,
@@ -246,6 +266,13 @@ function CollapsedBandRow({
   // identical to Mid Table in the stack. It gets weight, not a different
   // shape -- it is still a row of the same table.
   const isChampion = band.key === "champion";
+  // A one-club Band puts its club on the header line instead of giving it a
+  // row of its own. Three clubs can't fit beside the label; one can, and
+  // "Champion — Arsenal" is how you'd actually say it. The alternative left
+  // Champion and Runners Up as a full-width row holding one short name and
+  // two-thirds empty space, which read as unfinished rather than decisive.
+  // Different content earning a different shape, not an inconsistency.
+  const inlineMember = band.target === 1;
   return (
     <button
       type="button"
@@ -262,10 +289,17 @@ function CollapsedBandRow({
           aria-hidden
         />
         <span
-          className={`min-w-0 flex-1 truncate font-extrabold text-ink ${isChampion ? "text-[0.95rem]" : "text-[0.8rem]"}`}
+          className={`min-w-0 truncate font-extrabold text-ink ${isChampion ? "text-[0.95rem]" : "text-[0.8rem]"} ${inlineMember ? "shrink-0" : "flex-1"}`}
         >
           {band.label}
         </span>
+        {inlineMember ? (
+          <span className="flex min-w-0 flex-1 items-center gap-1.5">
+            {teams.map((team) => (
+              <MemberName key={team.id} team={team} emphasis={isChampion} />
+            ))}
+          </span>
+        ) : null}
         <span
           className={`shrink-0 text-[0.7rem] tabular-nums ${FILL_COUNT_TEXT[tone]}`}
         >
@@ -289,34 +323,20 @@ function CollapsedBandRow({
           is the thing actually being read here.
 
           A fixed three-column grid, flush to the card edge -- no gutter, no
-          wrapping, one line per Band. Three equal columns mean every Band
-          lands on the same two gridlines, so the stack aligns down the whole
-          page instead of each Band finding its own shape; a Band of one just
-          fills the first column.
+          wrapping, one line per Band. Three equal columns mean every
+          multi-club Band lands on the same two gridlines, so the stack
+          aligns down the whole page instead of each Band finding its own
+          shape. One-club Bands skip this block entirely and sit on the
+          header line instead -- see `inlineMember`.
 
           It also reads better as a *set* than the vertical stack did: a
           numbered-looking column is the canonical ordered form, while an
           evenly-spaced row is not. Only "Nottingham Forest" is long enough
           to clip at phone width, and `title` carries the full name. */}
-      {teams.length ? (
+      {inlineMember ? null : teams.length ? (
         <span className="grid w-full grid-cols-3 gap-x-2 gap-y-1">
           {teams.map((team) => (
-            <span
-              key={team.id}
-              title={team.name}
-              className="flex min-w-0 items-center gap-1.5"
-            >
-              <span
-                aria-hidden
-                className="h-3.5 w-[3px] shrink-0 rounded-full"
-                style={{ background: teamFill(team.shortCode) }}
-              />
-              <span
-                className={`min-w-0 truncate leading-snug font-bold text-ink/75 ${isChampion ? "text-[0.9rem]" : "text-[0.8rem]"}`}
-              >
-                {team.displayName}
-              </span>
-            </span>
+            <MemberName key={team.id} team={team} emphasis={isChampion} />
           ))}
         </span>
       ) : (
