@@ -193,7 +193,7 @@ describe("loadPickBoardGameweek", () => {
     expect(result).toBeNull();
   });
 
-  it("renders a skipped slot when a match id is null", async () => {
+  it("renders a skipped slot after the remaining match (kickoff display order)", async () => {
     const { from } = createSupabaseMock({
       gameweeks: {
         single: {
@@ -230,8 +230,81 @@ describe("loadPickBoardGameweek", () => {
       SEASON_ID,
       GAMEWEEK_NUMBER,
     );
-    expect(result?.slots[0]).toEqual({ kind: "skipped" });
-    expect(result?.slots[1].kind).toBe("match");
+    expect(result?.slots[0].kind).toBe("match");
+    expect(result?.slots[1]).toEqual({ kind: "skipped" });
+  });
+
+  it("shows the random pick on top when it kicks off before the marquee (kickoff display order)", async () => {
+    // DB keeps the sourced slots (match_1 = marquee, match_2 = random); the
+    // board renders by kickoff, the marquee only breaking a kickoff tie
+    // (Option B). Here match_2 (random) kicks off 22 Aug, match_1 (marquee)
+    // 23 Aug -- the random pick must render on top, keeping its provenance.
+    const { from } = createSupabaseMock({
+      gameweeks: {
+        single: {
+          match_1_id: "match-1",
+          match_2_id: "match-2",
+          match_1_voided_at: null,
+          match_2_voided_at: null,
+        },
+      },
+      matches: {
+        list: [
+          {
+            id: "match-1",
+            team_a_id: "team-a",
+            team_b_id: "team-b",
+            kickoff_time: "2026-08-23T15:00:00.000Z",
+            status: "scheduled",
+            team_a_score: null,
+            team_b_score: null,
+          },
+          {
+            id: "match-2",
+            team_a_id: "team-c",
+            team_b_id: "team-d",
+            kickoff_time: "2026-08-22T15:00:00.000Z",
+            status: "scheduled",
+            team_a_score: null,
+            team_b_score: null,
+          },
+        ],
+      },
+      picks: { list: [] },
+      scores: { list: [] },
+      teams: {
+        list: [
+          { id: "team-a", name: "Team A", short_code: "TMA" },
+          { id: "team-b", name: "Team B", short_code: "TMB" },
+          { id: "team-c", name: "Team C", short_code: "TMC" },
+          { id: "team-d", name: "Team D", short_code: "TMD" },
+        ],
+      },
+      team_standings: { list: [] },
+    });
+
+    const result = await loadPickBoardGameweek(
+      { from } as never,
+      COMPETITION_ID,
+      SESSION_PLAYER,
+      NOW,
+      SEASON_ID,
+      GAMEWEEK_NUMBER,
+    );
+
+    expect(result?.slots[0].kind).toBe("match");
+    expect((result?.slots[0] as { match: { id: string } }).match.id).toBe(
+      "match-2",
+    );
+    expect((result?.slots[0] as { provenance: string }).provenance).toBe(
+      "random_pick",
+    );
+    expect((result?.slots[1] as { match: { id: string } }).match.id).toBe(
+      "match-1",
+    );
+    expect((result?.slots[1] as { provenance: string }).provenance).toBe(
+      "top_matchup",
+    );
   });
 
   it("treats a postponed match as voided even when voided_at hasn't been set yet", async () => {
