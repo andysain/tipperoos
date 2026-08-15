@@ -4,8 +4,8 @@
  *
  * Three components, summing to a maximum of 200:
  *   Placement    5 / 2 / 1 / 0 by Band distance (0 / 1 / 2 / 3+)   max 100
- *   Band Bonus   exact full membership; 15 for Champion, Champions
- *                League and Relegated, 10 for the other four         max  85
+ *   Band Bonus   exact full membership; 15 for Relegated, 10 for the
+ *                other seven (see TABLE_BANDS)                       max  85
  *   Bold Call    +3 for a correct placement that fewer than a third
  *                of the frozen Gameweek-1 cohort also made; best 5   max  15
  *
@@ -33,14 +33,23 @@ export interface TableBand {
 }
 
 /**
- * Champion, Champions League and Relegated carry the larger bonus: they are
- * the Bands the season is actually about. They are also the easier ones to
- * hit (Champion needs a single team right, Mid Table needs three exact), so
- * the premium is larger per unit of effort than the 15-vs-10 gap suggests.
+ * PROTOTYPE (proto/predict-table-rethink): 8 Bands, with Runners Up split
+ * out of Champions League. Two consequences worth knowing before judging the
+ * feel:
+ *
+ *  1. Placement gets *harsher at the top*. Bands are finer up there now, so
+ *     a club you put in Champions League that finishes 2nd drops from
+ *     distance 0 (5 pts) to distance 1 (2 pts).
+ *  2. The bonus table is re-tuned to hold the 200 ceiling. An 8th Band means
+ *     an 8th bonus, so Champion comes down 15 -> 10 and Champions League
+ *     15 -> 10 (it is a 3-club Band like the others now). Relegated keeps 15
+ *     as the one Band a season is unambiguously about at the other end.
+ *     7 x 10 + 15 = 85, unchanged, so 100 + 85 + 15 = 200 still.
  */
 export const TABLE_BANDS: readonly TableBand[] = [
-  { name: "Champion", size: 1, bonus: 15 },
-  { name: "Champions League", size: 4, bonus: 15 },
+  { name: "Champion", size: 1, bonus: 10 },
+  { name: "Runners Up", size: 1, bonus: 10 },
+  { name: "Champions League", size: 3, bonus: 10 },
   { name: "Europe", size: 3, bonus: 10 },
   { name: "Mid Table", size: 3, bonus: 10 },
   { name: "Lower Table", size: 3, bonus: 10 },

@@ -4,21 +4,30 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CircleCheck, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ScoringSummary } from "@/components/scoring/ScoringSummary";
+// PROTOTYPE (proto/predict-table-rethink). Three changes to try together:
+//
+//  1. One grammar. There is no longer a "review mode" with its own tap
+//     rules that switched on silently at the 20th club. There is a board
+//     with zero or one *open* Band; the resting board (nothing open) is the
+//     review view, and Band headers are the only way in and out.
+//     -> modeFor, swapBands, dropInto-as-drop-target and `lifted` are all
+//        unused here now, and kept in board.ts rather than deleted.
+//  2. Bands cannot over-fill. Tapping into a full Band swaps in for its
+//     marked "Next out" club, which returns to the roster (tapWithEviction).
+//  3. An 8th Band, Runners Up, between Champion and Champions League.
 import {
   bandPosition,
   championWasNamed,
   countsOf,
-  dropInto,
   firstIncorrectlyFilledBand,
-  modeFor,
+  nextOutTeam,
   nextUnfilledBand,
   rosterOrder,
   startAgain as startAgainBoard,
-  swapBands,
-  tapWhileFilling,
+  tapWithEviction,
   type Assignments,
+  type PlacedAt,
   type PriorBandByTeam,
-  type SwapResult,
 } from "@/lib/table-predictions/board";
 import {
   TABLE_BANDS,
@@ -32,10 +41,9 @@ import { ChampionCelebration } from "./ChampionCelebration";
 import { SubmittedMoment } from "./SubmittedMoment";
 import { BAND_LABEL, type Team } from "./shared";
 
-// How long the swap-pulse animation (globals.css) plays before its
-// justSwapped flag clears -- kept in one place so the state timeout and
-// the CSS duration can't drift apart.
-const SWAP_PULSE_MS = 500;
+// PROTOTYPE: SWAP_PULSE_MS lived here for the review-mode swap animation.
+// With the swap path commented out nothing schedules that pulse any more,
+// so the constant goes with it; the CSS keyframes stay in globals.css.
 
 // How long the champion ceremony stays on screen: the confetti-fall
 // animation (globals.css) is 1.1s, plus a 100ms buffer so the beat clears
@@ -107,16 +115,40 @@ export function PredictTableFlow({
   const [assignments, setAssignments] =
     useState<Assignments>(initialAssignments);
   const [previous, setPrevious] = useState<PriorBandByTeam>({});
+  // PROTOTYPE: placement order, for the eviction rule's "Next out". Seeded
+  // from the saved assignments in roster order so a resumed board still has
+  // a deterministic answer; the counter then runs on from there.
+  const [placedAt, setPlacedAt] = useState<PlacedAt>(() =>
+    Object.fromEntries(
+      Object.keys(initialAssignments).map((teamId, index) => [teamId, index]),
+    ),
+  );
+  const placementSeq = useRef(Object.keys(initialAssignments).length);
   // #118's return-visit landing: which Band opens on a visit is where the
   // work actually is, not always Champion -- Champion on a first (empty)
   // visit, the first incorrectly filled Band on a return (ADR 0008).
-  const [openBand, setOpenBand] = useState<BandKey>(
-    () =>
-      firstIncorrectlyFilledBand(countsOf(initialAssignments)) ?? "champion",
+  // PROTOTYPE: now nullable. A board that is already complete opens at rest,
+  // showing the whole table, rather than dropping the player into a Band.
+  const [openBand, setOpenBand] = useState<BandKey | null>(() =>
+    Object.keys(initialAssignments).length === 0
+      ? "champion"
+      : firstIncorrectlyFilledBand(countsOf(initialAssignments)),
   );
-  const [lifted, setLifted] = useState<string | null>(null);
   const [undo, setUndo] = useState<UndoState | null>(null);
-  const [justSwapped, setJustSwapped] = useState<[string, string] | null>(null);
+  // PROTOTYPE: undo restores a snapshot rather than replaying an inverse
+  // move. An eviction changes two clubs at once, and the Band the evicted
+  // club came from is full again by the time you'd want to put it back --
+  // so "drop it back where it was" is not a legal move, while "put the board
+  // back how it was" always is.
+  const [undoSnapshot, setUndoSnapshot] = useState<{
+    assignments: Assignments;
+    previous: PriorBandByTeam;
+    placedAt: PlacedAt;
+    teamIds: string[];
+  } | null>(null);
+  // PROTOTYPE: only the commented-out swap path ever set this. Held as a
+  // constant so BandsBoard keeps its prop and the pulse can be re-armed.
+  const justSwapped: [string, string] | null = null;
 
   const [isSkipped, setIsSkipped] = useState(initialIsSkipped);
   const [submittedAt, setSubmittedAt] = useState(initialSubmittedAt);
@@ -158,15 +190,23 @@ export function PredictTableFlow({
   const roster = useMemo(() => rosterOrder(teams), [teams]);
 
   const placedCount = Object.keys(assignments).length;
-  const mode = modeFor(placedCount, teams.length);
 
   const counts = useMemo(() => countsOf(assignments), [assignments]);
   const validation = useMemo(() => validateBandCounts(counts), [counts]);
 
-  // Only meaningful while filling -- review mode has no single open Band to
-  // report a position for or advance from (issue #130).
-  const nextBand =
-    mode === "filling" ? nextUnfilledBand(openBand, counts) : null;
+  // Only meaningful with a Band open -- the resting board has no single Band
+  // to report a position for or advance from (issue #130).
+  const nextBand = openBand ? nextUnfilledBand(openBand, counts) : null;
+
+  // PROTOTYPE: the club eviction would displace, or null while the open Band
+  // still has room. Drives the "Next out" marker and the roster hint.
+  const openBandTarget = openBand
+    ? (TABLE_BANDS.find((b) => b.key === openBand)?.target ?? 0)
+    : 0;
+  const nextOutTeamId =
+    openBand && (counts[openBand] ?? 0) >= openBandTarget
+      ? nextOutTeam(assignments, placedAt, openBand)
+      : null;
 
   // Applies a tap's computed board change optimistically, fires the one
   // request it implies (assign if the team landed in a Band, unassign if
@@ -180,17 +220,37 @@ export function PredictTableFlow({
       assignments: Assignments;
       previous: PriorBandByTeam;
       movedFrom: BandKey | null;
+      placedAt?: PlacedAt;
+      /** PROTOTYPE: the club displaced to make room, if any. Persisted as a
+       * second request (an unassign) alongside the tapped club's assign. */
+      evicted?: { teamId: string; from: BandKey } | null;
     },
     celebrateChampion = false,
   ) {
-    if (busyTeamIds.includes(teamId)) return;
-    setBusyTeamIds((prev) => [...prev, teamId]);
+    const evicted = result.evicted ?? null;
+    const touched = evicted ? [teamId, evicted.teamId] : [teamId];
+    if (touched.some((id) => busyTeamIds.includes(id))) return;
+    setBusyTeamIds((prev) => [...prev, ...touched]);
     setSaveError(null);
     const prevAssignments = assignments;
     const prevPrevious = previous;
+    const prevPlacedAt = placedAt;
     setAssignments(result.assignments);
     setPrevious(result.previous);
-    if (result.movedFrom) {
+    if (result.placedAt) setPlacedAt(result.placedAt);
+
+    // PROTOTYPE: an eviction's undo names the club that *left*, not the one
+    // that arrived -- the departure is the surprising half, and it is the
+    // half that costs points (unplaced scores 0, a mis-Banded club doesn't).
+    if (evicted) {
+      const out = teamsById.get(evicted.teamId);
+      setUndo({
+        kind: "move",
+        teamId: evicted.teamId,
+        band: evicted.from,
+        label: `${out?.name ?? "That team"} came out of ${BAND_LABEL[evicted.from]}`,
+      });
+    } else if (result.movedFrom) {
       const team = teamsById.get(teamId);
       setUndo({
         kind: "move",
@@ -202,28 +262,48 @@ export function PredictTableFlow({
       setUndo(null);
     }
 
-    const nextBand = result.assignments[teamId];
-    const { ok, data } = nextBand
-      ? await postJson("/api/table-predictions/assign", {
-          teamId,
-          band: nextBand,
-        })
-      : await postJson("/api/table-predictions/unassign", { teamId });
+    const landedIn = result.assignments[teamId];
+    const requests = [
+      landedIn
+        ? postJson("/api/table-predictions/assign", { teamId, band: landedIn })
+        : postJson("/api/table-predictions/unassign", { teamId }),
+    ];
+    if (evicted) {
+      requests.push(
+        postJson("/api/table-predictions/unassign", { teamId: evicted.teamId }),
+      );
+    }
+    const results = await Promise.all(requests);
+    const failed = results.find((r) => !r.ok);
 
-    if (!ok) {
+    if (failed) {
       setAssignments(prevAssignments);
       setPrevious(prevPrevious);
+      setPlacedAt(prevPlacedAt);
       setUndo(null);
-      setSaveError(data.error ?? "Couldn't save that move -- try again.");
+      setSaveError(
+        failed.data.error ?? "Couldn't save that move -- try again.",
+      );
+      setUndoSnapshot(null);
     } else {
       setIsSkipped(false);
+      setUndoSnapshot({
+        assignments: prevAssignments,
+        previous: prevPrevious,
+        placedAt: prevPlacedAt,
+        teamIds: touched,
+      });
       if (celebrateChampion && !championCelebrated.current) {
         championCelebrated.current = true;
         setCelebrating(true);
       }
     }
-    setBusyTeamIds((prev) => prev.filter((id) => id !== teamId));
+    setBusyTeamIds((prev) => prev.filter((id) => !touched.includes(id)));
   }
+
+  /* PROTOTYPE: persistSwap is unreachable -- review mode is gone, so there
+     is no lifted club and nothing to swap with. Left commented rather than
+     deleted so ADR 0008's two-grammar board can be restored from here.
 
   // Swap is always two assigns (both teams are already placed -- review
   // mode only exists once all 20 are), never an unassign.
@@ -280,35 +360,22 @@ export function PredictTableFlow({
       prev.filter((id) => id !== teamAId && id !== teamBId),
     );
   }
+  */
 
+  // PROTOTYPE: the only tap rule left. A club tap always means "put this
+  // club in the open Band" -- from the roster, from another Band, or from
+  // this one (which toggle-reverts it). No club is tappable at rest, so the
+  // gesture never quietly changes meaning under the player.
   function handleTeamTap(teamId: string) {
-    if (mode === "review") {
-      if (lifted === teamId) {
-        setLifted(null);
-        return;
-      }
-      if (lifted) {
-        // Every team visible in review is already placed (review mode
-        // only exists once all 20 are), so a second tap on a different
-        // placed team is a swap, not a move (issue #131) -- unless the two
-        // are already in the same Band, in which case swapping would be a
-        // no-op: nothing to persist, animate, or offer an undo for. Treat
-        // that tap as just re-lifting the newly tapped team instead.
-        const teamAId = lifted;
-        const teamBId = teamId;
-        if (assignments[teamAId] === assignments[teamBId]) {
-          setLifted(teamBId);
-          return;
-        }
-        setLifted(null);
-        const result = swapBands({ assignments, previous }, teamAId, teamBId);
-        void persistSwap(teamAId, teamBId, result);
-        return;
-      }
-      setLifted(teamId);
-      return;
-    }
-    const result = tapWhileFilling({ assignments, previous }, teamId, openBand);
+    if (!openBand) return;
+    const target = TABLE_BANDS.find((b) => b.key === openBand)?.target ?? 0;
+    const result = tapWithEviction(
+      { assignments, previous, placedAt },
+      teamId,
+      openBand,
+      target,
+      placementSeq.current++,
+    );
     // The champion ceremony: request the beat when this tap names the
     // champion (count 0 -> 1); persistTap spends it only on a saved move.
     void persistTap(
@@ -319,32 +386,41 @@ export function PredictTableFlow({
     );
   }
 
-  function handleDropInto(band: BandKey) {
-    if (!lifted) return;
-    const teamId = lifted;
-    const result = dropInto({ assignments, previous }, teamId, band);
-    setLifted(null);
-    void persistTap(teamId, result);
-  }
-
-  function handleUndo() {
-    if (!undo) return;
+  // PROTOTYPE: restore the snapshot taken before the last saved tap, and
+  // re-persist only the clubs that tap touched (one for a plain move, two
+  // for an eviction). Rolls the whole thing back if any request fails, so a
+  // half-applied undo can't leave the board disagreeing with the server.
+  async function handleUndo() {
+    const snapshot = undoSnapshot;
+    if (!snapshot) return;
     setUndo(null);
-    if (undo.kind === "move") {
-      const { teamId, band } = undo;
-      const result = dropInto({ assignments, previous }, teamId, band);
-      void persistTap(teamId, result);
-      return;
-    }
-    // Swap undo: swapBands is symmetric, so swapping the same pair again
-    // restores both teams to their pre-swap Bands.
-    const { teamA, teamB } = undo;
-    const result = swapBands(
-      { assignments, previous },
-      teamA.teamId,
-      teamB.teamId,
+    setUndoSnapshot(null);
+    setBusyTeamIds((prev) => [...prev, ...snapshot.teamIds]);
+    setSaveError(null);
+
+    const current = { assignments, previous, placedAt };
+    setAssignments(snapshot.assignments);
+    setPrevious(snapshot.previous);
+    setPlacedAt(snapshot.placedAt);
+
+    const results = await Promise.all(
+      snapshot.teamIds.map((teamId) => {
+        const band = snapshot.assignments[teamId];
+        return band
+          ? postJson("/api/table-predictions/assign", { teamId, band })
+          : postJson("/api/table-predictions/unassign", { teamId });
+      }),
     );
-    void persistSwap(teamA.teamId, teamB.teamId, result);
+    const failed = results.find((r) => !r.ok);
+    if (failed) {
+      setAssignments(current.assignments);
+      setPrevious(current.previous);
+      setPlacedAt(current.placedAt);
+      setSaveError(failed.data.error ?? "Couldn't undo that -- try again.");
+    }
+    setBusyTeamIds((prev) =>
+      prev.filter((id) => !snapshot.teamIds.includes(id)),
+    );
   }
 
   async function handleStartAgain() {
@@ -357,8 +433,10 @@ export function PredictTableFlow({
     const cleared = startAgainBoard();
     setAssignments(cleared.assignments);
     setPrevious(cleared.previous);
+    setPlacedAt({});
+    placementSeq.current = 0;
     setUndo(null);
-    setLifted(null);
+    setUndoSnapshot(null);
     setOpenBand("champion");
 
     const results = await Promise.all(
@@ -461,8 +539,9 @@ export function PredictTableFlow({
         Predict the Table
       </h1>
       <p className="-mt-2 text-ink/70">
-        Where will each Premier League club finish? Tap a Band to open it, then
-        tap clubs to add them.
+        {openBand
+          ? "Where will each Premier League club finish? Tap clubs to add them to the open Band. Tap the Band's name again to close it and see your whole table."
+          : "Here's your table. Tap any Band to open it and change who's in it."}
       </p>
       <ScoringSummary kind="table" />
 
@@ -471,7 +550,7 @@ export function PredictTableFlow({
           <span>
             {placedCount} of {teams.length} placed
           </span>
-          {mode === "filling" ? (
+          {openBand ? (
             <>
               <span aria-hidden>&middot;</span>
               <span>
@@ -544,21 +623,19 @@ export function PredictTableFlow({
       ) : null}
 
       <BandsBoard
-        mode={mode}
         teams={roster}
-        teamsById={teamsById}
         assignments={assignments}
         openBand={openBand}
         nextBand={nextBand}
-        lifted={lifted}
+        nextOutTeamId={nextOutTeamId}
         busyTeamIds={busyTeamIds}
         undo={undo}
         justSwapped={justSwapped}
         celebratingChampion={celebrating}
         onOpenBand={setOpenBand}
+        onCloseBand={() => setOpenBand(null)}
         onTapTeam={handleTeamTap}
-        onDropInto={handleDropInto}
-        onUndo={handleUndo}
+        onUndo={() => void handleUndo()}
       />
 
       {actionError ? (

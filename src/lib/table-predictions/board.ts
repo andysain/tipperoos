@@ -10,6 +10,12 @@ export type Assignments = Record<string, BandKey>;
  * filling-phase toggle-revert and the undo affordance replay back to. */
 export type PriorBandByTeam = Record<string, BandKey | null>;
 
+/** PROTOTYPE: a monotonic sequence number per placed team, recording the
+ * order clubs landed in their current Band. Only ever read to answer "which
+ * club leaves if one more arrives in a full Band" -- the eviction rule is
+ * last-in-first-out, so the club most recently added is the one displaced. */
+export type PlacedAt = Record<string, number>;
+
 export interface BoardState {
   assignments: Assignments;
   previous: PriorBandByTeam;
@@ -25,6 +31,10 @@ export interface TapResult {
 }
 
 /**
+ * PROTOTYPE: superseded by `tapWithEviction`, which is the same rule plus a
+ * hard cap at the Band's target size. Kept (and still unit-tested) so the
+ * over-fill-permitted behaviour ADR 0008 decided is one import swap away.
+ *
  * Filling-phase tap (group-first): assign `teamId` to `openBand`, unless
  * it's already there, in which case it reverts to `previous[teamId]` (its
  * prior Band, or unplaced) -- standard multi-select toggle semantics, the
@@ -48,6 +58,119 @@ export function tapWhileFilling(
   const assignments = { ...state.assignments, [teamId]: openBand };
   const previous = { ...state.previous, [teamId]: current };
   return { assignments, previous, movedFrom: current };
+}
+
+/**
+ * PROTOTYPE: which club leaves `band` if one more arrives while it is full.
+ * Last-in-first-out -- the most recently added club is the one displaced,
+ * because "I've just changed my mind about that one" is the only rule a
+ * player can predict. Ties (and clubs with no recorded sequence, e.g. an
+ * assignment loaded from the server) fall back to team id so the answer is
+ * deterministic. Null when the Band is empty.
+ *
+ * This is what makes eviction *stated before it happens*: the returned club
+ * is marked "Next out" in the open Band whenever that Band is full.
+ */
+export function nextOutTeam(
+  assignments: Assignments,
+  placedAt: PlacedAt,
+  band: BandKey,
+): string | null {
+  const members = Object.keys(assignments).filter(
+    (teamId) => assignments[teamId] === band,
+  );
+  if (members.length === 0) return null;
+  return members.reduce((latest, teamId) => {
+    const a = placedAt[teamId] ?? -1;
+    const b = placedAt[latest] ?? -1;
+    if (a !== b) return a > b ? teamId : latest;
+    return teamId > latest ? teamId : latest;
+  });
+}
+
+export interface EvictionTapResult extends TapResult {
+  placedAt: PlacedAt;
+  /** The club pushed back to the roster to make room, or null if the Band
+   * had a free slot. Never the tapped club itself. */
+  evicted: { teamId: string; from: BandKey } | null;
+}
+
+/**
+ * PROTOTYPE tap rule, replacing `tapWhileFilling`: a Band can never exceed
+ * its target size. Tapping a club into a full Band swaps it in for that
+ * Band's "next out" club, which returns to the roster.
+ *
+ * The point is the invariant it buys: with over-filling impossible,
+ * `placed === 20` implies every Band is exactly its target size, which
+ * implies every Band Bonus is in play. One number tells the player
+ * everything, instead of eight counters plus a submit-time warning.
+ *
+ * The cost, which is real: an evicted club is *unplaced*, and unplaced
+ * scores 0 while a mis-Banded club still scores 1-2 on Band distance. That
+ * is why eviction is marked in advance and always undoable, and why the
+ * evicted club is never silently re-homed somewhere the player didn't choose.
+ *
+ * Tapping a club already in `openBand` still toggle-reverts it to
+ * `previous[teamId]`, exactly as before -- that path never evicts.
+ */
+export function tapWithEviction(
+  state: BoardState & { placedAt: PlacedAt },
+  teamId: string,
+  openBand: BandKey,
+  target: number,
+  seq: number,
+): EvictionTapResult {
+  const current = state.assignments[teamId] ?? null;
+
+  if (current === openBand) {
+    const back = state.previous[teamId] ?? null;
+    const assignments = { ...state.assignments };
+    const placedAt = { ...state.placedAt };
+    if (back) {
+      assignments[teamId] = back;
+      placedAt[teamId] = seq;
+    } else {
+      delete assignments[teamId];
+      delete placedAt[teamId];
+    }
+    return {
+      assignments,
+      previous: state.previous,
+      placedAt,
+      movedFrom: null,
+      evicted: null,
+    };
+  }
+
+  const occupancy = Object.values(state.assignments).filter(
+    (band) => band === openBand,
+  ).length;
+  const evictedId =
+    occupancy >= target
+      ? nextOutTeam(state.assignments, state.placedAt, openBand)
+      : null;
+
+  const assignments = { ...state.assignments };
+  const previous = { ...state.previous };
+  const placedAt = { ...state.placedAt };
+
+  if (evictedId) {
+    delete assignments[evictedId];
+    delete placedAt[evictedId];
+    previous[evictedId] = openBand;
+  }
+
+  assignments[teamId] = openBand;
+  previous[teamId] = current;
+  placedAt[teamId] = seq;
+
+  return {
+    assignments,
+    previous,
+    placedAt,
+    movedFrom: current,
+    evicted: evictedId ? { teamId: evictedId, from: openBand } : null,
+  };
 }
 
 /**
@@ -77,6 +200,11 @@ export interface SwapResult {
 }
 
 /**
+ * PROTOTYPE: unused. The review *phase* is gone -- there is one grammar now
+ * (open a Band, tap clubs into it), so there is no lifted club and nothing
+ * to swap with. Kept intact, with its tests, so restoring the two-grammar
+ * board is a matter of re-wiring PredictTableFlow rather than rewriting it.
+ *
  * Review-phase swap (team-first): exchange the Bands of two already-placed
  * teams in one move (issue #131). Both teams are assumed already placed --
  * the review-mode tap grammar only ever calls this with two placed teams,
@@ -205,14 +333,21 @@ export function nextUnfilledBand(
   return null;
 }
 
-/** 1-based position of `band` in the canonical 7-Band sequence, for the
- * "Band 3 of 7" progress readout. */
+/** 1-based position of `band` in the canonical Band sequence, for the
+ * "Band 3 of 8" progress readout. */
 export function bandPosition(band: BandKey): number {
   return TABLE_BANDS.findIndex((b) => b.key === band) + 1;
 }
 
 export type Mode = "filling" | "review";
 
+/**
+ * PROTOTYPE: unused. The board no longer has two modes at all -- it has zero
+ * or one *open Band*, and "review" is simply what the board looks like when
+ * nothing is open. That removes the unsignalled grammar switch which fired
+ * the instant the 20th club landed, and which is the thing that made this
+ * screen feel unintuitive. Kept so ADR 0008's model can be restored.
+ */
 export function modeFor(placedCount: number, totalTeams: number): Mode {
   return placedCount === totalTeams ? "review" : "filling";
 }

@@ -9,14 +9,15 @@ import {
   validateBandCounts,
 } from "./rules";
 
-// Golden values hand-derived from CLAUDE.md -> "Season-long feature: Predict
-// the Table" and docs/adr/0003-predict-the-table-shape.md:
-// "Champion (1), Champions League (2-5), Europe (6-8), Mid Table (9-11),
-// Lower Table (12-14), Relegation Battle (15-17), Relegated (18-20)."
+// PROTOTYPE (proto/predict-table-rethink) golden values:
+// "Champion (1), Runners Up (2), Champions League (3-5), Europe (6-8), Mid
+// Table (9-11), Lower Table (12-14), Relegation Battle (15-17), Relegated
+// (18-20)." Splitting Runners Up out leaves every multi-club Band at 3.
 describe("TABLE_BANDS", () => {
-  it("has the 7 bands in table order with their fixed target sizes", () => {
+  it("has the 8 bands in table order with their fixed target sizes", () => {
     expect(TABLE_BANDS.map((b) => b.key)).toEqual([
       "champion",
+      "runners_up",
       "champions_league",
       "europe",
       "mid_table",
@@ -24,13 +25,7 @@ describe("TABLE_BANDS", () => {
       "relegation_battle",
       "relegated",
     ]);
-    expect(TABLE_BANDS[0].target).toBe(1);
-    expect(TABLE_BANDS[1].target).toBe(4);
-    expect(TABLE_BANDS[2].target).toBe(3);
-    expect(TABLE_BANDS[3].target).toBe(3);
-    expect(TABLE_BANDS[4].target).toBe(3);
-    expect(TABLE_BANDS[5].target).toBe(3);
-    expect(TABLE_BANDS[6].target).toBe(3);
+    expect(TABLE_BANDS.map((b) => b.target)).toEqual([1, 1, 3, 3, 3, 3, 3, 3]);
   });
 
   it("targets sum to all 20 teams", () => {
@@ -40,7 +35,7 @@ describe("TABLE_BANDS", () => {
   });
 
   it("BAND_KEYS mirrors TABLE_BANDS order", () => {
-    expect(BAND_KEYS.length).toBe(7);
+    expect(BAND_KEYS.length).toBe(8);
     expect(BAND_KEYS).toEqual(TABLE_BANDS.map((b) => b.key));
   });
 });
@@ -61,7 +56,8 @@ describe("isBandKey", () => {
 
 const fullTargetCounts = {
   champion: 1,
-  champions_league: 4,
+  runners_up: 1,
+  champions_league: 3,
   europe: 3,
   mid_table: 3,
   lower_table: 3,
@@ -80,12 +76,12 @@ describe("validateBandCounts", () => {
   it("flags an over-filled band and the resulting under-filled one, with expected/actual counts", () => {
     const result = validateBandCounts({
       ...fullTargetCounts,
-      champions_league: 6,
+      champions_league: 5,
       europe: 1,
     });
     expect(result.ok).toBe(false);
     expect(result.mismatches).toEqual([
-      { band: "champions_league", expected: 4, actual: 6 },
+      { band: "champions_league", expected: 3, actual: 5 },
       { band: "europe", expected: 3, actual: 1 },
     ]);
   });
@@ -93,7 +89,8 @@ describe("validateBandCounts", () => {
   it("counts teams not yet placed in any band as unsorted, not a band mismatch", () => {
     const result = validateBandCounts({
       champion: 1,
-      champions_league: 4,
+      runners_up: 1,
+      champions_league: 3,
       europe: 3,
       mid_table: 3,
       lower_table: 3,
@@ -111,7 +108,7 @@ describe("validateBandCounts", () => {
     const result = validateBandCounts({});
     expect(result.ok).toBe(false);
     expect(result.unsortedCount).toBe(20);
-    expect(result.mismatches.length).toBe(7);
+    expect(result.mismatches.length).toBe(8);
   });
 
   // Submission never blocks on this result (docs/adr/0008-predict-the-table-group-fill-capture.md)
@@ -121,7 +118,7 @@ describe("validateBandCounts", () => {
     const result = validateBandCounts({ champion: 20 });
     expect(result.ok).toBe(false);
     expect(result.unsortedCount).toBe(0);
-    expect(result.mismatches.length).toBe(7);
+    expect(result.mismatches.length).toBe(8);
   });
 });
 
