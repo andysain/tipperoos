@@ -6,11 +6,8 @@ import {
   PLACEMENT_POINTS_BY_DISTANCE,
   TABLE_BANDS,
 } from "@/lib/scoring/predict-table";
-import {
-  getMatchBreakdown,
-  NO_PICK_POINTS,
-  WRONG_WAY_ROUND_POINTS,
-} from "@/components/scoring/match-breakdown";
+import { NO_PICK_POINTS, WRONG_WAY_ROUND_POINTS } from "@/lib/scoring/match";
+import { getMatchBreakdown } from "@/components/scoring/match-breakdown";
 import {
   TableScoringTable,
   WeeklyScoringTable,

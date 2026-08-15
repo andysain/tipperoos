@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isMatchLocked, scoresForCompetition } from "@/lib/competitions/scope";
 import { rankScores } from "@/lib/leaderboard/rank";
+import { orderBoardSlots } from "@/lib/pick-board/order-slots";
 
 // DB-fetching glue for the Pick Board route (issue #90) -- deliberately
 // outside src/lib/** (same rationale as gameweek-access.ts and
@@ -312,9 +313,20 @@ export async function loadPickBoardGameweek(
     .map((slot) => slot.match.kickoffUtcIso)
     .sort();
 
+  // The DB stores the sourced slots (match_1 = marquee, match_2 = random pick);
+  // the board renders them in kickoff order, the marquee breaking a kickoff tie
+  // (docs/adr/0007's "fixed order, never reordered" display rule is superseded
+  // by CLAUDE.md's "shown in kickoff order"). Sourced provenance per card is
+  // preserved as-is.
+  const orderedSlots = orderBoardSlots(
+    [slot1, slot2],
+    (slot) => (slot.kind === "match" ? slot.match.kickoffUtcIso : null),
+    (slot) => slot.kind === "match" && slot.provenance === "top_matchup",
+  );
+
   return {
     number: gameweekNumber,
-    slots: [slot1, slot2],
+    slots: [orderedSlots[0], orderedSlots[1]] as [PickBoardSlot, PickBoardSlot],
     earliestOpenKickoffUtcIso: openKickoffs[0] ?? null,
   };
 }
