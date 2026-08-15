@@ -31,6 +31,14 @@ export interface TeamStandingRow {
 export interface MapStandingsResult {
   readonly rows: readonly TeamStandingRow[];
   readonly unmatchedProviderTeamIds: readonly string[];
+  /**
+   * True when the TOTAL table is non-empty but every team shares the same
+   * position -- a pre-season placeholder football-data.org emits (all
+   * teams at position 1, 0 played) before real results exist. A real
+   * standings table always has distinct positions, so this is a reliable
+   * "don't clobber existing rows with placeholder garbage" signal.
+   */
+  readonly degenerate: boolean;
 }
 
 export function mapStandingsToRows(
@@ -40,12 +48,16 @@ export function mapStandingsToRows(
   now: Date,
 ): MapStandingsResult {
   const totalGroup = response.standings.find((group) => group.type === "TOTAL");
+  const table = totalGroup?.table ?? [];
   const updatedAt = now.toISOString();
 
   const rows: TeamStandingRow[] = [];
   const unmatchedProviderTeamIds: string[] = [];
+  const degenerate =
+    table.length > 0 &&
+    new Set(table.map((entry) => entry.position)).size === 1;
 
-  for (const entry of totalGroup?.table ?? []) {
+  for (const entry of table) {
     const providerTeamId = String(entry.team.id);
     const teamId = teamIdByProviderId.get(providerTeamId);
     if (!teamId) {
@@ -61,5 +73,5 @@ export function mapStandingsToRows(
     });
   }
 
-  return { rows, unmatchedProviderTeamIds };
+  return { rows, unmatchedProviderTeamIds, degenerate };
 }

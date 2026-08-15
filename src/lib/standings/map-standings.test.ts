@@ -90,6 +90,74 @@ describe("mapStandingsToRows", () => {
 
     expect(result.rows.length).toBe(0);
     expect(result.unmatchedProviderTeamIds.length).toBe(0);
+    expect(result.degenerate).toBe(false);
+  });
+
+  it("flags a degenerate pre-season placeholder (every team at position 1, 0 played) while still mapping the rows", () => {
+    const result = mapStandingsToRows(
+      payload([
+        { position: 1, teamId: "2", playedGames: 0 },
+        { position: 1, teamId: "1", playedGames: 0 },
+        { position: 1, teamId: "3", playedGames: 0 },
+      ]),
+      TEAM_ID_BY_PROVIDER_ID,
+      SEASON_ID,
+      NOW,
+    );
+
+    expect(result.degenerate).toBe(true);
+    expect(result.rows.length).toBe(3);
+    expect(result.rows[0].position).toBe(1);
+    expect(result.rows[1].position).toBe(1);
+    expect(result.unmatchedProviderTeamIds.length).toBe(0);
+  });
+
+  it("does not flag a real table with distinct positions", () => {
+    const result = mapStandingsToRows(
+      payload([
+        { position: 1, teamId: "2", playedGames: 10 },
+        { position: 2, teamId: "1", playedGames: 10 },
+        { position: 3, teamId: "3", playedGames: 9 },
+      ]),
+      TEAM_ID_BY_PROVIDER_ID,
+      SEASON_ID,
+      NOW,
+    );
+
+    expect(result.degenerate).toBe(false);
+    expect(result.rows.length).toBe(3);
+    expect(result.rows[0].position).toBe(1);
+    expect(result.rows[1].position).toBe(2);
+    expect(result.rows[2].position).toBe(3);
+  });
+
+  it("flags a degenerate table even when some teams are unmatched", () => {
+    const result = mapStandingsToRows(
+      payload([
+        { position: 1, teamId: "2", playedGames: 0 },
+        { position: 1, teamId: "999", playedGames: 0 },
+      ]),
+      TEAM_ID_BY_PROVIDER_ID,
+      SEASON_ID,
+      NOW,
+    );
+
+    expect(result.degenerate).toBe(true);
+    expect(result.rows.length).toBe(1);
+    expect(result.rows[0].team_id).toBe("team-city");
+    expect(result.unmatchedProviderTeamIds).toEqual(["999"]);
+  });
+
+  it("does not flag an empty TOTAL table as degenerate", () => {
+    const result = mapStandingsToRows(
+      { standings: [{ type: "TOTAL", table: [] }] },
+      TEAM_ID_BY_PROVIDER_ID,
+      SEASON_ID,
+      NOW,
+    );
+
+    expect(result.degenerate).toBe(false);
+    expect(result.rows.length).toBe(0);
   });
 
   it("is idempotent: mapping the same payload twice with the same clock produces identical rows", () => {
