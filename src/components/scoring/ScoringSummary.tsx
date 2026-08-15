@@ -4,16 +4,16 @@ import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 import { useId, useState } from "react";
 import {
+  MATCH_SCORING_TERMS,
+  NO_PICK_POINTS,
+  WRONG_WAY_ROUND_POINTS,
+} from "@/lib/scoring/match";
+import {
   BOLD_CALL_BONUS,
   MAX_BOLD_CALLS,
   PLACEMENT_POINTS_BY_DISTANCE,
   TABLE_BANDS,
 } from "@/lib/scoring/predict-table";
-import {
-  MATCH_SCORING_TERMS,
-  NO_PICK_POINTS,
-  WRONG_WAY_ROUND_POINTS,
-} from "./match-breakdown";
 
 const bandBonusValues = [...new Set(TABLE_BANDS.map((band) => band.bonus))];
 
