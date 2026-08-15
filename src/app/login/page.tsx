@@ -246,6 +246,20 @@ function LoginFlow() {
     setStep("list");
   }
 
+  // "Using a different competition?" -- a player logged into one competition
+  // who needs another (e.g. a shared family device, or a friend in a second
+  // comp) must be able to get back to the code step. The stored code is
+  // what the mount-time replay effect reads, so evicting it here is what
+  // stops the next /login visit from silently replaying the old competition.
+  function goToCode() {
+    window.localStorage.removeItem(STORED_CODE_KEY);
+    setCompetitionCode(null);
+    setCodeInput("");
+    setCodeError(null);
+    setSelected(null);
+    setStep("code");
+  }
+
   if (step === "checking") {
     return (
       <main className="flex min-h-full flex-1 items-center justify-center bg-paper p-4">
@@ -317,6 +331,14 @@ function LoginFlow() {
               className="mt-6 flex w-full items-center justify-center rounded-btn border-2 border-accent bg-accent/10 px-4 py-3 text-center text-[1.0625rem] font-extrabold text-ink transition hover:bg-accent/20"
             >
               New here? Join the competition
+            </button>
+
+            <button
+              type="button"
+              onClick={goToCode}
+              className="mt-3 text-center text-sm font-bold text-ink/60 transition hover:text-ink"
+            >
+              Using a different competition? Enter another code
             </button>
           </>
         ) : null}
