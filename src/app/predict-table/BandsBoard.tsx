@@ -544,7 +544,27 @@ export function BandsBoard({
                     : null}
                 </div>
 
-                {tone === "ok" && nextBand ? (
+                {/* The forward prompt. While there's still work ahead it
+                    advances to the next under-filled Band; on the tap that
+                    places the twentieth club it becomes "Review my table"
+                    and closes this Band instead, which is what shows the
+                    finished table. Same slot, same shape, so finishing is
+                    the same motion as advancing rather than a new control
+                    appearing at the end.
+
+                    The two are mutually exclusive by construction: every
+                    Band being exactly filled is precisely when
+                    nextUnfilledBand has nothing left to return. */}
+                {boardComplete ? (
+                  <button
+                    type="button"
+                    onClick={onCloseBand}
+                    className="mt-3 flex w-full items-center justify-center gap-1 rounded-btn border-2 border-accent bg-accent/10 px-3 py-2.5 text-sm font-extrabold text-ink transition hover:bg-accent/20"
+                  >
+                    Review my table
+                    <ChevronUp className="size-4" aria-hidden />
+                  </button>
+                ) : tone === "ok" && nextBand ? (
                   <button
                     type="button"
                     onClick={() => onOpenBand(nextBand)}
