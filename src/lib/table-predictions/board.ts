@@ -97,12 +97,30 @@ export function tapWithEviction(
     const back = state.previous[teamId] ?? null;
     const assignments = { ...state.assignments };
     const placedAt = { ...state.placedAt };
-    if (back) {
+    delete assignments[teamId];
+    delete placedAt[teamId];
+
+    // The toggle-revert has to respect the capacity rule too, or the
+    // headline invariant ("a Band can never exceed its target") is
+    // breakable: move a club out of a full Band, refill that Band, then
+    // toggle the club back and it lands in a Band that is full again.
+    //
+    // When there is no longer room the club goes back to the roster
+    // unplaced rather than evicting a third club to make space. Evicting
+    // here would be an eviction the player was never shown -- the "next
+    // out" marker only ever describes the *open* Band -- and an unannounced
+    // one is exactly what the eviction design is careful to avoid.
+    const backTarget = back
+      ? (TABLE_BANDS.find((b) => b.key === back)?.target ?? 0)
+      : 0;
+    const backHasRoom =
+      back !== null &&
+      Object.values(assignments).filter((band) => band === back).length <
+        backTarget;
+
+    if (backHasRoom) {
       assignments[teamId] = back;
       placedAt[teamId] = seq;
-    } else {
-      delete assignments[teamId];
-      delete placedAt[teamId];
     }
     return {
       assignments,
@@ -161,10 +179,7 @@ export interface TapRequestPlan {
  */
 export function planTapRequests(
   teamId: string,
-  result: {
-    assignments: Assignments;
-    evicted?: EvictionTapResult["evicted"] | null;
-  },
+  result: Pick<EvictionTapResult, "assignments" | "evicted">,
 ): TapRequestPlan[] {
   const landedIn = result.assignments[teamId] ?? null;
   const requests: TapRequestPlan[] = [{ teamId, band: landedIn }];
@@ -251,10 +266,11 @@ export function countsOf(assignments: Assignments): BandCounts {
 /** The #118 return-visit landing: the first Band in canonical table order
  * whose fill count is incorrect (actual !== target, over-filled included --
  * that is still work in filling mode). Champion for an empty board, so a
- * first visit is unchanged; null when every Band is exactly filled (which
- * in practice means the board is in review mode, where the landing does not
- * apply). Distinct from nextUnfilledBand, which is the in-session advance
- * prompt: forward-from-current only and strictly under target. */
+ * first visit is unchanged; null when every Band is exactly filled, which
+ * is what lands a finished board with every Band collapsed -- the whole
+ * table on one screen -- rather than dropping the player into an edit.
+ * Distinct from nextUnfilledBand, which is the in-session advance prompt:
+ * forward-from-current only and strictly under target. */
 export function firstIncorrectlyFilledBand(counts: BandCounts): BandKey | null {
   for (const band of TABLE_BANDS) {
     if ((counts[band.key] ?? 0) !== band.target) return band.key;

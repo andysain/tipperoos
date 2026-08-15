@@ -33,7 +33,9 @@ import {
   tapWithEviction,
   type Assignments,
   type PlacedAt,
+  type EvictionTapResult,
   type PriorBandByTeam,
+  type TapRequestPlan,
   type TapSnapshot,
 } from "@/lib/table-predictions/board";
 import {
@@ -82,6 +84,25 @@ function LockCountdown({
     <span className={soon ? "text-warning" : "text-ink/50"}>
       Locks in {formatCountdown(remainingMs)}
     </span>
+  );
+}
+
+/** Fires one tap/undo plan: an assign for every request that names a Band,
+ * an unassign for every one that doesn't. Parallel because the requests in
+ * a plan always touch different rows, so there is no ordering dependency.
+ * `board.ts` builds the plans; this is the only place that sends them. */
+async function sendPlan(plan: readonly TapRequestPlan[]) {
+  return Promise.all(
+    plan.map((request) =>
+      request.band
+        ? postJson("/api/table-predictions/assign", {
+            teamId: request.teamId,
+            band: request.band,
+          })
+        : postJson("/api/table-predictions/unassign", {
+            teamId: request.teamId,
+          }),
+    ),
   );
 }
 
@@ -229,15 +250,7 @@ export function PredictTableFlow({
   // move, so a failed save never consumes the once-per-session beat.
   async function persistTap(
     teamId: string,
-    result: {
-      assignments: Assignments;
-      previous: PriorBandByTeam;
-      movedFrom: BandKey | null;
-      placedAt?: PlacedAt;
-      /** The club displaced to make room, if any. Persisted as a second
-       * request (an unassign) alongside the tapped club's assign. */
-      evicted?: { teamId: string; from: BandKey } | null;
-    },
+    result: EvictionTapResult,
     celebrateChampion = false,
   ) {
     const evicted = result.evicted ?? null;
@@ -275,19 +288,7 @@ export function PredictTableFlow({
       setUndo(null);
     }
 
-    const plan = planTapRequests(teamId, result);
-    const results = await Promise.all(
-      plan.map((request) =>
-        request.band
-          ? postJson("/api/table-predictions/assign", {
-              teamId: request.teamId,
-              band: request.band,
-            })
-          : postJson("/api/table-predictions/unassign", {
-              teamId: request.teamId,
-            }),
-      ),
-    );
+    const results = await sendPlan(planTapRequests(teamId, result));
     const failed = results.find((r) => !r.ok);
     const outcome = resolveTapOutcome(
       {
@@ -368,18 +369,7 @@ export function PredictTableFlow({
     setPrevious(snapshot.previous);
     setPlacedAt(snapshot.placedAt);
 
-    const results = await Promise.all(
-      planUndoRequests(snapshot).map((request) =>
-        request.band
-          ? postJson("/api/table-predictions/assign", {
-              teamId: request.teamId,
-              band: request.band,
-            })
-          : postJson("/api/table-predictions/unassign", {
-              teamId: request.teamId,
-            }),
-      ),
-    );
+    const results = await sendPlan(planUndoRequests(snapshot));
     const failed = results.find((r) => !r.ok);
     if (failed) {
       setAssignments(current.assignments);
@@ -397,8 +387,17 @@ export function PredictTableFlow({
     setStartingAgain(true);
     setSaveError(null);
     const teamIds = Object.keys(assignments);
+    // Everything this function is about to reset has to be captured, not
+    // just the board itself: placedAt and placementSeq drive the eviction
+    // order and `demoted` drives the roster grouping, so restoring the
+    // board without them leaves a rolled-back Start again looking correct
+    // while "next out" answers from an empty sequence map.
     const prevAssignments = assignments;
     const prevPrevious = previous;
+    const prevPlacedAt = placedAt;
+    const prevSeq = placementSeq.current;
+    const prevDemoted = demoted;
+    const prevOpenBand = openBand;
     const cleared = startAgainBoard();
     setAssignments(cleared.assignments);
     setPrevious(cleared.previous);
@@ -418,6 +417,10 @@ export function PredictTableFlow({
     if (failed) {
       setAssignments(prevAssignments);
       setPrevious(prevPrevious);
+      setPlacedAt(prevPlacedAt);
+      placementSeq.current = prevSeq;
+      setDemoted(prevDemoted);
+      setOpenBand(prevOpenBand);
       setSaveError(
         "Couldn't start again -- check your connection and try again.",
       );

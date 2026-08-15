@@ -23,6 +23,12 @@ import {
   type Team,
 } from "./shared";
 
+/** The forward prompt at the foot of the open Band. One appearance, two
+ * meanings -- advance while there's work ahead, finish once there isn't --
+ * so the styling lives in one place and the two can't drift apart. */
+const FORWARD_PROMPT =
+  "mt-3 flex w-full items-center justify-center gap-1 rounded-btn border-2 border-accent bg-accent/10 px-3 py-2.5 text-sm font-extrabold text-ink transition hover:bg-accent/20";
+
 interface MoveUndo {
   kind: "move";
   teamId: string;
@@ -552,14 +558,19 @@ export function BandsBoard({
                     the same motion as advancing rather than a new control
                     appearing at the end.
 
-                    The two are mutually exclusive by construction: every
-                    Band being exactly filled is precisely when
-                    nextUnfilledBand has nothing left to return. */}
+                    Gated on boardComplete rather than on `!nextBand`,
+                    which is not the same thing: nextUnfilledBand searches
+                    forward only, so it returns null on the last Band no
+                    matter what is empty above it. A legacy 7-Band
+                    prediction (Champions League 4, Runners Up 0) can
+                    therefore show neither prompt -- correctly, since it is
+                    neither finished nor advanceable from where it sits;
+                    the tinted Band headers are what point at the work. */}
                 {boardComplete ? (
                   <button
                     type="button"
                     onClick={onCloseBand}
-                    className="mt-3 flex w-full items-center justify-center gap-1 rounded-btn border-2 border-accent bg-accent/10 px-3 py-2.5 text-sm font-extrabold text-ink transition hover:bg-accent/20"
+                    className={FORWARD_PROMPT}
                   >
                     Review my table
                     <ChevronUp className="size-4" aria-hidden />
@@ -568,7 +579,7 @@ export function BandsBoard({
                   <button
                     type="button"
                     onClick={() => onOpenBand(nextBand)}
-                    className="mt-3 flex w-full items-center justify-center gap-1 rounded-btn border-2 border-accent bg-accent/10 px-3 py-2.5 text-sm font-extrabold text-ink transition hover:bg-accent/20"
+                    className={FORWARD_PROMPT}
                   >
                     Next: {BAND_LABEL[nextBand]}
                     <ChevronRight className="size-4" aria-hidden />

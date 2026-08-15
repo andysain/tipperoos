@@ -60,7 +60,11 @@ collapsed, which already reads as the whole table on one screen.
   Band's summary) — only meaningful while a Band is open:
   - already in `openBand` → **toggle-revert**: it goes back to
     `previous[teamId]` (its prior Band, or unplaced). Standard multi-select
-    toggle semantics; this is the misclick escape.
+    toggle semantics; this is the misclick escape. The revert obeys the
+    capacity rule too: if that prior Band has refilled in the meantime, the
+    club returns to the roster unplaced instead. It never evicts a third
+    club to make room, because the "next out" marker only ever describes the
+    _open_ Band — an eviction there would be one the player was never shown.
   - anywhere else, or unplaced, **and `openBand` has room** → record
     `previous[teamId] = current`, assign to `openBand`.
   - anywhere else, or unplaced, **and `openBand` is already at its target
@@ -99,6 +103,28 @@ it will cost.
   clubs to the roster. The only escape from a table the player wants to
   bin, and the only operation that can't be reconstructed from cheap
   individual moves.
+
+## The forward prompt
+
+At the foot of the open Band, one slot carries one of two mutually-exclusive
+prompts, or nothing:
+
+| Shown                   | When                                                                                                                              |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| **"Next: [Band] →"**    | the open Band is exactly its target size, and some Band _after_ it in table order is still under target. Tapping opens that Band. |
+| **"Review my table ^"** | every Band is exactly its target size. Tapping closes the open Band, leaving the whole table visible.                             |
+| nothing                 | otherwise                                                                                                                         |
+
+The finish prompt is gated on the **whole board** being correct, not on
+`nextUnfilledBand` returning null. Those differ: the search runs forward
+only, so it returns null on the last Band regardless of what is empty above
+it. A Table Prediction saved under the previous 7-Band structure can
+therefore show neither prompt — correctly, since it is neither finished nor
+advanceable from where it sits, and the tinted Band headers are what point
+at the remaining work.
+
+Both render identically and in the same position, so finishing reads as the
+same motion as advancing rather than as a new control appearing at the end.
 
 ## The roster
 

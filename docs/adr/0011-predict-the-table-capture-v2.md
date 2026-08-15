@@ -34,6 +34,17 @@ The known cost, recorded plainly: an evicted club becomes **unplaced**, and unpl
 
 `tapWhileFilling` (superseded by `tapWithEviction`), `dropInto` (the review-phase drop-target move), `swapBands`/`SwapResult` (the review-phase swap), and `modeFor`/`Mode` (the derived filling/review mode) — all from `src/lib/table-predictions/board.ts`. The `justSwapped` swap-pulse prop threading through `PredictTableFlow`, `BandsBoard`, and `PlacedTeamCard`, and the `SwapUndo` variant of `BandsBoard`'s `UndoState`. All were kept alive through the prototype phase specifically so the two-grammar board could be restored without a rewrite; now that the product owner has signed off on this design, that reversibility is no longer worth the standing cost of dead code paths and their tests.
 
+The invariant binds **every** path that assigns a club, not just the obvious
+one. The toggle-revert (tapping a club that is already in the open Band, to
+send it back where it came from) is also an assignment, and it was possible
+to break the invariant through it: move a club out of a full Band, refill
+that Band, then toggle the club back and it lands in a Band that is full
+again. The revert therefore checks capacity too, and returns the club to the
+roster unplaced when its old Band no longer has room. It deliberately does
+**not** evict a third club to make space — the "next out" marker only ever
+describes the open Band, so an eviction there would be one the player was
+never shown, which is precisely what the design is careful to avoid.
+
 ## Considered and rejected
 
 - **Keeping the review board as a read-only stage**, reached the same way but rendered without the swap grammar — a middle ground that still signals "you're done." Rejected because the signal that mattered wasn't "you're in a different stage," it was "your taps mean something different now" — and a read-only stage doesn't fix that; it just delays the same silent switch to whenever the player next wants to edit.

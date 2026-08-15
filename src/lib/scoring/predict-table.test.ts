@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  TABLE_BANDS as CAPTURE_BANDS,
+  TOTAL_TEAMS as CAPTURE_TOTAL_TEAMS,
+} from "../table-predictions/rules";
+import {
   BOLD_CALL_BONUS,
   CHAMPION_BAND_INDEX,
   MAX_BOLD_CALLS,
@@ -117,6 +121,29 @@ describe("constants", () => {
     expect(TABLE_BANDS.reduce((sum, b) => sum + b.bonus, 0)).toBe(85);
     expect(MAX_BOLD_CALLS * BOLD_CALL_BONUS).toBe(15);
     expect(MAX_PREDICT_TABLE_SCORE).toBe(200);
+  });
+});
+
+// The Band structure is declared twice -- here as name/size/bonus for
+// scoring, and in src/lib/table-predictions/rules.ts as key/label/target for
+// the capture UI. Nothing in the type system ties them together, so a Band
+// edited in one and not the other would silently score a prediction against
+// a structure the player never saw. This test is the tie.
+describe("agreement with the capture rules module", () => {
+  it("has the same Bands, in the same order, at the same sizes", () => {
+    expect(TABLE_BANDS.map((b) => b.name)).toEqual(
+      CAPTURE_BANDS.map((b) => b.label),
+    );
+    expect(TABLE_BANDS.map((b) => b.size)).toEqual(
+      CAPTURE_BANDS.map((b) => b.target),
+    );
+  });
+
+  it("agrees on the total team count", () => {
+    expect(TOTAL_TEAMS).toBe(CAPTURE_TOTAL_TEAMS);
+    expect(CAPTURE_BANDS.reduce((sum, b) => sum + b.target, 0)).toBe(
+      TOTAL_TEAMS,
+    );
   });
 });
 

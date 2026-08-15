@@ -140,6 +140,59 @@ describe("tapWithEviction", () => {
     expect(result.evicted).toBeNull();
   });
 
+  it("never over-fills via toggle-revert into a Band that refilled meanwhile", () => {
+    // The capacity rule has to hold on the revert path too, or the headline
+    // invariant is breakable: move a club out of a full Band, refill that
+    // Band, then toggle the club back. Europe holds 3; `a` leaves for
+    // Champion; `d` takes the free slot; toggling `a` must not make it 4.
+    let state: {
+      assignments: Record<string, BandKey>;
+      previous: Record<string, BandKey | null>;
+      placedAt: Record<string, number>;
+    } = {
+      assignments: { a: "europe", b: "europe", c: "europe" },
+      previous: {},
+      placedAt: { a: 0, b: 1, c: 2 },
+    };
+    const step = (
+      teamId: string,
+      band: BandKey,
+      target: number,
+      seq: number,
+    ) => {
+      const result = tapWithEviction(state, teamId, band, target, seq);
+      state = {
+        assignments: result.assignments,
+        previous: result.previous,
+        placedAt: result.placedAt,
+      };
+      return result;
+    };
+
+    step("a", "champion", 1, 3);
+    step("d", "europe", 3, 4);
+    const reverted = step("a", "champion", 1, 5);
+
+    expect(
+      Object.values(reverted.assignments).filter((band) => band === "europe"),
+    ).toHaveLength(3);
+    // No room to go back to, so it returns to the roster rather than
+    // evicting a third club the player was never warned about.
+    expect(reverted.assignments.a).toBeUndefined();
+    expect(reverted.evicted).toBeNull();
+  });
+
+  it("still toggle-reverts into the old Band when it kept its free slot", () => {
+    const state = {
+      assignments: { a: "champion", b: "europe" } as Record<string, BandKey>,
+      previous: { a: "europe" as BandKey },
+      placedAt: { a: 1, b: 0 },
+    };
+    const result = tapWithEviction(state, "a", "champion", 1, 2);
+    expect(result.assignments.a).toBe("europe");
+    expect(result.evicted).toBeNull();
+  });
+
   it("moving a club between Bands frees its old Band's slot", () => {
     // Champion is full with arsenal; moving arsenal to Europe must not
     // evict arsenal from Champion as a side effect of its own move.
