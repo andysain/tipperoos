@@ -26,12 +26,12 @@ Does not exist:
 
 ## The three surfaces
 
-| # | Surface | Where | Ships in this issue |
-|---|---|---|---|
-| 1 | Points breakdown | Settled slot on the Pick Board | Yes |
-| 2 | Scoring summary expander | Pick Board and Predict the Table | Yes |
-| 3 | "How it works" page | New route `/how-it-works` | Yes |
-| — | Live table-score breakdown | Predict the Table | **No — blocked**, see _Out of scope_ |
+| #   | Surface                    | Where                            | Ships in this issue                  |
+| --- | -------------------------- | -------------------------------- | ------------------------------------ |
+| 1   | Points breakdown           | Settled slot on the Pick Board   | Yes                                  |
+| 2   | Scoring summary expander   | Pick Board and Predict the Table | Yes                                  |
+| 3   | "How it works" page        | New route `/how-it-works`        | Yes                                  |
+| —   | Live table-score breakdown | Predict the Table                | **No — blocked**, see _Out of scope_ |
 
 ---
 
@@ -65,7 +65,7 @@ Rules:
 
 ## Surface 2 — scoring summary expander
 
-A collapsed, one-line affordance on both the Pick Board and Predict the Table, opening into a short plain-language summary of how *that page's* scoring works, ending in a link to Surface 3. It carries no player data, so it renders identically for every player and needs no new data fetch.
+A collapsed, one-line affordance on both the Pick Board and Predict the Table, opening into a short plain-language summary of how _that page's_ scoring works, ending in a link to Surface 3. It carries no player data, so it renders identically for every player and needs no new data fetch.
 
 - On the **Pick Board** it summarises weekly pick scoring.
 - On **Predict the Table** it summarises Bands, the three scoring components, and what makes a Bold Call bold.
@@ -85,7 +85,7 @@ New authenticated route `/how-it-works`, wrapped by `AppShell` like every other 
 
 **Entry points:**
 
-- A persistent **?** affordance in the top corner beside `SwitchPlayerButton`, on every authenticated page. This is deliberately *not* a tab: ADR 0005 admits only real destinations to the tab bar, and Leaderboard (#24) and Match Centre (#91) are still to land there. `SwitchPlayerButton` is the precedent for a persistent, top-corner, non-destination affordance — follow its placement and sizing rather than inventing a new slot.
+- A persistent **?** affordance in the top corner beside `SwitchPlayerButton`, on every authenticated page. This is deliberately _not_ a tab: ADR 0005 admits only real destinations to the tab bar, and Leaderboard (#24) and Match Centre (#91) are still to land there. `SwitchPlayerButton` is the precedent for a persistent, top-corner, non-destination affordance — follow its placement and sizing rather than inventing a new slot.
 - The footer link on Surface 1 and Surface 2, deep-linking to the relevant section rather than the top of the page.
 
 **Authentication:** the page requires a session, like every route except `/login`. A visitor cannot read it before joining.
@@ -96,7 +96,7 @@ New authenticated route `/how-it-works`, wrapped by `AppShell` like every other 
 2. **How your pick scores** — the ladder, shown as worked examples rather than a formula. Derive from `CLAUDE.md` → _Scoring_.
 3. **Wrong Way Round** — its own section. Nobody guesses this rule.
 4. **If you don't pick** — no points, never auto-filled, and what the leaderboard's points-per-gameweek-played column is for. Derive from `CLAUDE.md` → _Scoring_ and `docs/adr/0009`.
-5. **Predict the Table** — the seven Bands, the three components, and what makes a Bold Call bold. Derive from `CLAUDE.md` → _Season-long feature: Predict the Table_ and `docs/adr/0010`.
+5. **Predict the Table** — the eight Bands, the three components, and what makes a Bold Call bold. Derive from `CLAUDE.md` → _Season-long feature: Predict the Table_ and `docs/adr/0010`/`docs/adr/0011`.
 6. **Who wins** — the season winner is always a person; bots play for fun; the Median Bot is a benchmark line to beat. Derive from `CLAUDE.md` → _Identity and auth_.
 
 ---
@@ -173,6 +173,6 @@ Adding the **?** affordance means editing `src/components/nav/AppShell.tsx`, whi
 ## Notes for the implementer
 
 - Surface 1 is the only part with meaningful logic; Surfaces 2 and 3 are copy and layout. Budget accordingly — and note that the hardest thing here is the writing, not the code.
-- The scoring formula was finalised on 2026-08-13 — read `docs/adr/0009-match-scoring-formula-and-title-eligibility.md` and `docs/adr/0010-predict-the-table-scoring.md` before writing any copy. Both record what the scoring deliberately does *not* reward, which is usually what a player is actually asking about. The blank-week and no-pick-filed states exist because of specific decisions in 0009, not as afterthoughts.
+- The scoring formula was finalised on 2026-08-13 — read `docs/adr/0009-match-scoring-formula-and-title-eligibility.md` and `docs/adr/0010-predict-the-table-scoring.md` before writing any copy. Both record what the scoring deliberately does _not_ reward, which is usually what a player is actually asking about. The blank-week and no-pick-filed states exist because of specific decisions in 0009, not as afterthoughts.
 - If any source document disagrees with another on a number, `CLAUDE.md` wins and the disagreement is a bug to fix in the same change, not to route around.
 - If something in this spec turns out to be wrong or stale when you get to it, fix the spec in the same change rather than working around it — `ISSUE_STANDARD.md` §4 treats a stale spec as a bug, not a footnote.

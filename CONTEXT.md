@@ -87,18 +87,18 @@ A Player who signs up after Gameweek 1 has begun. Not eligible for Season Winner
 A Player's full 20-team finishing-order prediction for the season, captured by sorting teams into Table Bands. Submitted once during onboarding, re-submittable any number of times until the end of 31 August 2026 in Australia/Sydney, then locked at the exclusive UTC cutoff `2026-08-31T14:00:00Z`. Optional for a Late Joiner, who is identified by joining after Gameweek 1's first kickoff and remains unrestricted.
 
 **Table Band**:
-One of 7 fixed groupings of final Premier League position, used to score a Table Prediction: Champion (1), Champions League (2–5), Europe (6–8), Mid Table (9–11), Lower Table (12–14), Relegation Battle (15–17), Relegated (18–20). A team's predicted Table Band is compared against its actual Table Band to score points; the order of teams within a Band carries no scoring weight.
+One of 8 fixed groupings of final Premier League position, used to score a Table Prediction: Champion (1), Runners Up (2), Champions League (3–5), Europe (6–8), Mid Table (9–11), Lower Table (12–14), Relegation Battle (15–17), Relegated (18–20). A team's predicted Table Band is compared against its actual Table Band to score points; the order of teams within a Band carries no scoring weight. See `docs/adr/0011-predict-the-table-capture-v2.md` for the Runners Up split (Bands were previously 7, with Champions League starting at position 2).
 
 **Table Prediction Score**:
 A standalone points total (max 200) earned from a Table Prediction, recomputed continuously against current Premier League standings. Three components: Placement (5/2/1/0 by Band distance, max 100), Band Bonus (max 85) and Bold Call (max 15). Distinct from Season Total — does not affect Season Winner. Has its own leaderboard and its own title, which a Late Joiner appears on but cannot win.
 _Avoid_: assuming this contributes to Season Total — it deliberately doesn't, for now.
 
 **Table Prediction Strip**:
-The Pick Board's standing presence for a Player's own Table Prediction. Nudges a Player who hasn't submitted one, then — once submitted — shows the Champion they picked and that club's current league position, for the rest of the season. Shows nothing for a Player who skipped, or whose Champion Band doesn't hold exactly one team; the Predict the Table tab remains the route back in both cases.
+The Pick Board's standing presence for a Player's own Table Prediction. Nudges a Player who hasn't submitted one, then — once submitted — shows the Champion they picked and that club's current league position, for the rest of the season. Shows nothing for a Player who skipped, or who hasn't named a Champion yet; the Predict the Table tab remains the route back in both cases.
 _Avoid_: Champion chip, Table banner (the Strip outlives the Champion as its content)
 
 **Band Bonus**:
-Points for predicting one Table Band's full membership exactly, in any order within it: 15 for Champion, Champions League and Relegated, 10 for the other four. An over- or under-filled Band simply forfeits its bonus rather than being rejected.
+Points for predicting one Table Band's full membership exactly, in any order within it: 15 for Relegated, 10 for the other seven. A Band can never be over-filled (the capture UI evicts to make room instead); an under-filled Band simply forfeits its bonus rather than being rejected.
 
 **Bold Call**:
 A correct placement made by no more than roughly one in 10 eligible players, worth +3; a Player's best 5 count. Competitions with fewer than 10 eligible players still allow one lone correct call, then the threshold grows by one agreement per 10 players. Rewards being right where almost nobody else was, so the score pays for judgement rather than common knowledge. A Late Joiner sits outside the process in both directions — earns none, and counts toward nobody's rarity.
