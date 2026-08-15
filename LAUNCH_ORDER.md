@@ -10,7 +10,7 @@ Launch is defined as: _a player logs in, lands on the Pick Board, sees gameweek 
 #18 ──> #19 ──> #89 ──┘
 #86 ──────────────────┘
 #88 (migration, standalone)
-#11 (sync cadence, standalone — wave 1)
+#11 (sync cadence — see gap below)
 ```
 
 ---
@@ -49,10 +49,6 @@ Anything touching `src/lib/**` needs your explicit approval before merge (CODEOW
 
   _Head of the selection chain. Pure logic; positions are an input, so it does not wait on #88._
 
-- [ ] **#11 — GitHub Actions sync workflow**
-
-  _Moved into wave 1 from the "Open gap" below (decision made 2026-08-14 via `/ship`): #88's standings sync assumes this cadence exists, and a rescheduled GW1 fixture has no mechanism to correct its pick-lock time without it. See #11's own decision log for the build shape._
-
 ## Wave 2 — two in parallel
 
 - [x] **#19 — Match 2: uniform-random rule** (after #18)
@@ -77,6 +73,16 @@ Anything touching `src/lib/**` needs your explicit approval before merge (CODEOW
 
 ---
 
+## Open gap to resolve before wave 1
+
+- [x] **#11 — GitHub Actions sync workflow.** Already `launch-critical` but sitting in _Fixtures &amp; Results Sync_, not the launch milestone. Two reasons it belongs in wave 1:
+  - #88's standings fetch is written as "wired into the existing sync cadence" — and that cadence does not exist yet.
+  - Kickoff times drive lock times, so a rescheduled gameweek-1 fixture with no sync locks at the wrong moment.
+
+  **Decision needed:** move #11 into the launch milestone and build it in wave 1, or ship #88 as a route the seed script invokes manually for day one (works, but leaves kickoff drift unhandled).
+
+---
+
 ## Predict the Table deadline
 
 - [x] **#26 — Predict the Table capture UI.** The table is editable through the end of 31 August 2026 in Australia/Sydney, then locks for on-time Players. Late Joiners remain unrestricted. **Run as an independent track, not after the picks work.**
@@ -85,7 +91,7 @@ Anything touching `src/lib/**` needs your explicit approval before merge (CODEOW
 
 - [x] Run the #89 seed script against **production**, not only staging.
 - [x] Confirm production and staging schemas match (no drift from #88's migration).
-- [ ] Walk the deployed Production URL end to end as a real player: enter competition code → sign up → file both picks → re-edit one → confirm the other players' picks are not visible anywhere.
+- [x] Walk the deployed Production URL end to end as a real player: enter competition code → sign up → file both picks → re-edit one → confirm the other players' picks are not visible anywhere.
 - [x] Confirm at least one other household can log in on their own device.
 
 ---
@@ -119,9 +125,9 @@ Sizes are rough t-shirt estimates (XS ≈ &lt;1hr, S ≈ half day, M ≈ 1–2 d
     - [x] When logging in remove the "**Welcome back, Test2345!** You're logged in. Let's Go" screen. Have it just go straight to the home page
     - [x] **#126 — Login/signup polish: mask PIN on login, hide email input** — **XS** (bundles the PIN-mask and email-hide items)
     - [x] **#127 — Make emoji selection mandatory + add random-pick button** — **S** (`cut-if-behind`: the full emoji-library tier)
-  - [x] Pick Board
+  - [ ] Pick Board
     - [x] **#128 — Pick Board: show calendar date alongside kickoff time** — **S**
-    - [ ] Show the viewing player's own Champion pick (from Predict the Table) on the pick board, as a personal reference chip
+    - [ ] **#156 — Table Prediction Strip** — **S/M**. Replaces the onboarding-only prompt with a permanent mini-card carrying the player's own Champion pick and that club's current league position, so Predict the Table doesn't vanish from home once the deadline passes. Champion gates on `submitted_at`, not on the deadline (a Late Joiner never locks). Renders nothing for a skipped table, or one whose Champion Band doesn't hold exactly one team. Shape settled by prototype — branch `prototype/table-prediction-strip`, verdict on the issue.
   - [x] Predict the Table
     - [x] new predict the table input approach
     - [x] **#129 — Fix "locked in" confirmation to a fixed modal** — **S**
@@ -130,8 +136,8 @@ Sizes are rough t-shirt estimates (XS ≈ &lt;1hr, S ≈ half day, M ≈ 1–2 d
     - [x] **#132 — Extend lock deadline to 31 August** — **S**
 
 - [ ] POST Launch
-  - [ ] Performance
-    - [x] Investigate shared server-side root cause behind slow login, slow screen loads/saves, and the laggy "grey card → full contrast" team-add commit on Predict the Table — treat as one investigation, not three separate fixes. Fix root cause only; no optimistic-UI masking. — **M** (investigation), follow-on fix size TBD by finding - partly resolved by having vercel moved to apac region. Investigation and remediation plan live in `docs/standards/PERFORMANCE_TESTING_STANDARD.md` §4. `table-predictions/assign`/`unassign`/`submit` already collapsed to single RPCs (pre-existing migration); scrypt now non-blocking + competition-code lookup cached; Pick Board (`src/app/page.tsx`) season/gameweek resolution deduped and last-week summary moved into the parallel wave (~11 serial round trips → ~6); `/api/picks` membership check + kickoff-time lookup parallelized (filtered query instead of a full gameweeks scan); `table-predictions/skip`'s two independent reads parallelized; `/predict-table` collapsed from 3 serial stages to a single 5-way parallel wave plus one dependent tail query. A real-device Chrome trace of the Pick Board found the actual dominant cause was not server-side at all: every tap paid a ~230ms browser double-tap-zoom disambiguation delay (`GestureTapUnconfirmed` -> `GestureTap`) because no `touch-action` was declared anywhere in the app. Fixed with `touch-action: manipulation` on `body` — **confirmed on a real device**: INP dropped from ~280ms to ~80ms, matching localhost.
+  - [x] Performance
+    - [x] Investigate shared server-side root cause behind slow login, slow screen loads/saves, and the laggy "grey card → full contrast" team-add commit on Predict the Table — treat as one investigation, not three separate fixes. Fix root cause only; no optimistic-UI masking. — **M** (investigation), follow-on fix size TBD by finding - partly resolved by having vercel moved to apac region. Investigation and remediation plan live in `docs/standards/PERFORMANCE_TESTING_STANDARD.md` §4. `table-predictions/assign`/`unassign`/`submit` already collapsed to single RPCs (pre-existing migration); scrypt now non-blocking + competition-code lookup cached; Pick Board (`src/app/page.tsx`) season/gameweek resolution deduped and last-week summary moved into the parallel wave (~11 serial round trips → ~6); `/api/picks` membership check + kickoff-time lookup parallelized (filtered query instead of a full gameweeks scan); `table-predictions/skip`'s two independent reads parallelized; `/predict-table` collapsed from 3 serial stages to a single 5-way parallel wave plus one dependent tail query. A real-device Chrome trace of the Pick Board found the actual dominant cause was not server-side at all: every tap paid a ~230ms browser double-tap-zoom disambiguation delay (`GestureTapUnconfirmed` -&gt; `GestureTap`) because no `touch-action` was declared anywhere in the app. Fixed with `touch-action: manipulation` on `body` — **confirmed on a real device**: INP dropped from ~280ms to ~80ms, matching localhost.
   - [ ] Login / Onboarding
     - [ ] Replace the full player list on login with type-ahead search: as the player types, show a small filtered dropdown of close/partial matches only — never the full roster — balances usability for younger players against not exposing an enumerable name list as the group scales past ~5 — **M**
   - [ ] Pick Board
@@ -140,6 +146,7 @@ Sizes are rough t-shirt estimates (XS ≈ &lt;1hr, S ≈ half day, M ≈ 1–2 d
     - [ ] Reorder Match 1 / Match 2 by kickoff time (chronological), Top Pick as tiebreak only — supersedes the current fixed Match-1-first ordering in `docs/adr/0007` — **S**
     - [ ] Decide on redesigning the score input (buttons vs. free text) — must resolve the "single digit on 5+" case too: multi-digit entry above the valid range currently fails with a vague error instead of being prevented or clearly explained — open design question, not committed — **M**
   - [ ] Predict the Table
+    - [ ] **#157 — Live Table Prediction Score on the Strip** — **M**. Surfaces the continuously-computed score (`CLAUDE.md` → Predict the Table) in #156's card as points plus a meter. Precomputed on the standings sync, not per request — Bold Call rarity needs the whole cohort, so it can't be scored per player on `/`. Depends on #156.
     - [ ] _Future direction, not committed:_ after lock, mirror the weekly pick visibility rule — other players' full Table predictions become visible, plus a comparison against actual current standings
   - [ ] Leaderboard
     - [ ] Build it  - **Due by end of Gameweek 1**
