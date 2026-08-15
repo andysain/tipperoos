@@ -62,6 +62,7 @@ export async function getTablePredictionEditabilityForPlayer(
 
 export interface TablePredictionPlayer {
   id: string;
+  competitionId: string;
   joinedAt: Date;
 }
 
@@ -183,16 +184,28 @@ export async function getTablePredictionStripData(
 
 // Shared by all three table-predictions routes (assign/submit/skip), each of
 // which needs the same "look up the session's player" step before applying
-// any lock/late-joiner rule.
+// any lock/late-joiner rule. Also the Pick Board route's (issue #156) sole
+// `players` lookup -- it needs both `competitionId` (for every other
+// loader's scoping) and `joinedAt` (for Late-Joiner-aware editability) from
+// the same session player, so a second `resolveCompetitionId` round trip
+// for the same row would be pure duplication
+// (docs/standards/PERFORMANCE_TESTING_STANDARD.md's "resolve shared loader
+// inputs once" principle). `resolveCompetitionId` in
+// src/lib/competitions/scope.ts is left alone for callers that only ever
+// needed the one column.
 export async function getPlayerForTablePrediction(
   supabase: SupabaseClient,
   playerId: string,
 ): Promise<TablePredictionPlayer | null> {
   const { data: player, error } = await supabase
     .from("players")
-    .select("id, joined_at")
+    .select("id, competition_id, joined_at")
     .eq("id", playerId)
     .maybeSingle();
   if (error || !player) return null;
-  return { id: player.id, joinedAt: new Date(player.joined_at) };
+  return {
+    id: player.id,
+    competitionId: player.competition_id,
+    joinedAt: new Date(player.joined_at),
+  };
 }

@@ -133,6 +133,54 @@ describe("deriveTablePredictionStripState", () => {
       champion: CHAMPION,
       leaguePosition: 4,
     });
+    if (result.kind !== "submitted_locked") throw new Error("expected locked");
+    expect(result.leaguePosition).toBe(4);
+  });
+
+  describe("leaguePosition passthrough for a locked, submitted Champion", () => {
+    function locked(leaguePosition: number | null) {
+      return deriveTablePredictionStripState({
+        prediction: { submittedAt: "2026-08-01T00:00:00Z", skipped: false },
+        editability: {
+          editable: false,
+          locked: true,
+          isLateJoiner: false,
+        },
+        championTeam: CHAMPION,
+        bandCountsOk: true,
+        leaguePosition,
+      });
+    }
+
+    it("keeps 1st exactly", () => {
+      const result = locked(1);
+      if (result.kind !== "submitted_locked") throw new Error("expected locked");
+      expect(result.leaguePosition).toBe(1);
+    });
+
+    it("keeps 2nd exactly", () => {
+      const result = locked(2);
+      if (result.kind !== "submitted_locked") throw new Error("expected locked");
+      expect(result.leaguePosition).toBe(2);
+    });
+
+    it("keeps 11th exactly", () => {
+      const result = locked(11);
+      if (result.kind !== "submitted_locked") throw new Error("expected locked");
+      expect(result.leaguePosition).toBe(11);
+    });
+
+    it("keeps 17th exactly", () => {
+      const result = locked(17);
+      if (result.kind !== "submitted_locked") throw new Error("expected locked");
+      expect(result.leaguePosition).toBe(17);
+    });
+
+    it("keeps 20th exactly (bottom of the table)", () => {
+      const result = locked(20);
+      if (result.kind !== "submitted_locked") throw new Error("expected locked");
+      expect(result.leaguePosition).toBe(20);
+    });
   });
 
   it("degrades to a null league position when no team_standings row exists yet", () => {

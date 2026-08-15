@@ -8,6 +8,7 @@ import {
 import {
   getDatabaseTime,
   getGameweekOneKickoff,
+  getPlayerForTablePrediction,
   getTablePredictionRecord,
   getTablePredictionStripData,
 } from "@/app/_lib/table-prediction-access";
@@ -16,7 +17,7 @@ import {
   loadPickBoardGameweek,
   loadSeasonStats,
 } from "@/app/_lib/pick-board-access";
-import { isMatchLocked, resolvePlayerScope } from "@/lib/competitions/scope";
+import { isMatchLocked } from "@/lib/competitions/scope";
 import {
   getTablePredictionEditability,
   validateBandCounts,
@@ -53,11 +54,11 @@ export default async function PickBoardPage() {
   }
 
   const supabase = createServerSupabaseClient();
-  const playerScope = await resolvePlayerScope(supabase, playerId);
-  if (!playerScope) {
+  const player = await getPlayerForTablePrediction(supabase, playerId);
+  if (!player) {
     redirect("/login");
   }
-  const { competitionId, joinedAt } = playerScope;
+  const { competitionId, joinedAt } = player;
 
   const now = new Date();
   const cookieStore = await cookies();
