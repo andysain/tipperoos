@@ -93,6 +93,10 @@ One of 7 fixed groupings of final Premier League position, used to score a Table
 A standalone points total (max 200) earned from a Table Prediction, recomputed continuously against current Premier League standings. Three components: Placement (5/2/1/0 by Band distance, max 100), Band Bonus (max 85) and Bold Call (max 15). Distinct from Season Total — does not affect Season Winner. Has its own leaderboard and its own title, which a Late Joiner appears on but cannot win.
 _Avoid_: assuming this contributes to Season Total — it deliberately doesn't, for now.
 
+**Table Prediction Strip**:
+The Pick Board's standing presence for a Player's own Table Prediction. Nudges a Player who hasn't submitted one, then — once submitted — shows the Champion they picked and that club's current league position, for the rest of the season. Shows nothing for a Player who skipped, or whose Champion Band doesn't hold exactly one team; the Predict the Table tab remains the route back in both cases.
+_Avoid_: Champion chip, Table banner (the Strip outlives the Champion as its content)
+
 **Band Bonus**:
 Points for predicting one Table Band's full membership exactly, in any order within it: 15 for Champion, Champions League and Relegated, 10 for the other four. An over- or under-filled Band simply forfeits its bonus rather than being rejected.
 
