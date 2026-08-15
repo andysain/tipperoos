@@ -1,5 +1,6 @@
 import {
   ArrowDown,
+  Medal,
   Plane,
   Minus,
   Star,
@@ -37,7 +38,8 @@ export const BAND_META: Record<
   { Icon: typeof Trophy; positions: string }
 > = {
   champion: { Icon: Trophy, positions: "1" },
-  champions_league: { Icon: Star, positions: "2-5" },
+  runners_up: { Icon: Medal, positions: "2" },
+  champions_league: { Icon: Star, positions: "3-5" },
   europe: { Icon: Plane, positions: "6-8" },
   mid_table: { Icon: Minus, positions: "9-11" },
   lower_table: { Icon: TrendingDown, positions: "12-14" },

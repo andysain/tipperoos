@@ -140,8 +140,10 @@ Requirements, not solutions.
 The framing question turned out to be subtly wrong, which is the most useful thing this
 document produced. It asks how to make _moving_ a club graceful. The answer that worked
 was to stop iterating per club at all: fill one group at a time from a roster that never
-leaves the screen, so there is no subject to hold, no destination list to house, and — since
-over- and under-filling is legal — nothing to displace. See ADR 0008.
+leaves the screen, so there is no subject to hold and no destination list to house. See
+ADR 0008. (Over-filling was legal at the time this document was written; ADR 0011 later
+closed that off in favour of a stated, undoable eviction rule — displacement returned, but
+on different terms than the ones this document was worried about.)
 
 Scorecard against the eight requirements above:
 
