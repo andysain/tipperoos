@@ -280,27 +280,39 @@ function CollapsedBandRow({
           aria-hidden
         />
       </span>
-      {/* One club per line, left-aligned on a single edge.
-          Members used to wrap inline, which meant three clubs broke 2 + 1,
+      {/* Members used to wrap inline, which meant three clubs broke 2 + 1,
           nothing lined up with anything, and every Band ended up a different
-          shape -- the "messy" read. Stacking them makes the whole board one
-          aligned column, and removes truncation as a possibility at any
-          width, which an inline or multi-column layout can't promise.
-          The club-code badge goes with it: badge *and* name is the same club
-          said twice, and three saturated badges a row was most of the visual
-          noise. A thin kit rail keeps the identity cue without competing
-          with the name, which is the thing actually being read here. */}
+          shape -- the "messy" read. The club-code badge went at the same
+          time: badge *and* name is the same club said twice, and three
+          saturated badges a row was most of the visual noise. A thin kit
+          rail keeps the identity cue without competing with the name, which
+          is the thing actually being read here.
+
+          A fixed three-column grid, flush to the card edge -- no gutter, no
+          wrapping, one line per Band. Three equal columns mean every Band
+          lands on the same two gridlines, so the stack aligns down the whole
+          page instead of each Band finding its own shape; a Band of one just
+          fills the first column.
+
+          It also reads better as a *set* than the vertical stack did: a
+          numbered-looking column is the canonical ordered form, while an
+          evenly-spaced row is not. Only "Nottingham Forest" is long enough
+          to clip at phone width, and `title` carries the full name. */}
       {teams.length ? (
-        <span className="flex w-full flex-col gap-1 pl-10">
+        <span className="grid w-full grid-cols-3 gap-x-2 gap-y-1">
           {teams.map((team) => (
-            <span key={team.id} className="flex items-center gap-2">
+            <span
+              key={team.id}
+              title={team.name}
+              className="flex min-w-0 items-center gap-1.5"
+            >
               <span
                 aria-hidden
                 className="h-3.5 w-[3px] shrink-0 rounded-full"
                 style={{ background: teamFill(team.shortCode) }}
               />
               <span
-                className={`truncate leading-snug font-bold text-ink/75 ${isChampion ? "text-[0.95rem]" : "text-[0.82rem]"}`}
+                className={`min-w-0 truncate leading-snug font-bold text-ink/75 ${isChampion ? "text-[0.9rem]" : "text-[0.8rem]"}`}
               >
                 {team.displayName}
               </span>
@@ -308,7 +320,7 @@ function CollapsedBandRow({
           ))}
         </span>
       ) : (
-        <span className="w-full pl-10 text-[0.82rem] leading-snug font-semibold text-ink/35">
+        <span className="w-full text-[0.8rem] leading-snug font-semibold text-ink/35">
           Nobody yet
         </span>
       )}
