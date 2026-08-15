@@ -144,6 +144,82 @@ export function tapWithEviction(
   };
 }
 
+/** One assign-or-unassign request a tap implies. `band: null` means
+ * unassign (the team ends up back in the roster); any other value means
+ * assign into that Band. */
+export interface TapRequestPlan {
+  teamId: string;
+  band: BandKey | null;
+}
+
+/**
+ * The request(s) a tap implies: one for the tapped club (assign into the
+ * Band it landed in, or unassign if the tap was a toggle-revert to
+ * unplaced), plus a second unassign for the evicted club if the tap caused
+ * an eviction. PredictTableFlow fires both in parallel -- they touch
+ * different rows, so there's no ordering dependency between them.
+ */
+export function planTapRequests(
+  teamId: string,
+  result: {
+    assignments: Assignments;
+    evicted?: EvictionTapResult["evicted"] | null;
+  },
+): TapRequestPlan[] {
+  const landedIn = result.assignments[teamId] ?? null;
+  const requests: TapRequestPlan[] = [{ teamId, band: landedIn }];
+  if (result.evicted) {
+    requests.push({ teamId: result.evicted.teamId, band: null });
+  }
+  return requests;
+}
+
+export interface TapOutcome {
+  assignments: Assignments;
+  previous: PriorBandByTeam;
+  placedAt: PlacedAt;
+}
+
+/**
+ * What the board should show once a tap's request(s) have settled: the
+ * tap's computed result if every request saved, or the pre-tap state
+ * rolled back if any of them failed. Kept separate from the request
+ * plumbing so "what does a failed save do to the board" is a pure,
+ * testable decision rather than something only readable inside the
+ * component's async handler.
+ */
+export function resolveTapOutcome(
+  before: TapOutcome,
+  result: TapOutcome,
+  allRequestsSucceeded: boolean,
+): TapOutcome {
+  return allRequestsSucceeded ? result : before;
+}
+
+export interface TapSnapshot extends TapOutcome {
+  /** The team ids the tap touched -- one for a plain move, two for an
+   * eviction -- and so the only ids the undo needs to re-persist. */
+  teamIds: string[];
+}
+
+/**
+ * The undo affordance's replay: assign or unassign each team the tap
+ * touched back to its Band **as recorded in the snapshot**, taken
+ * immediately before the tap -- not as an inverse of the tap itself. An
+ * eviction changes two clubs in one action, and by the time undo runs the
+ * evicted club's old Band is full again (the club that replaced it is
+ * still there), so "move it back" is not always a legal tap. Reading the
+ * target Band straight from the snapshot sidesteps that: both clubs are
+ * restored to states that were legal a moment ago, independent of what
+ * order the two requests land in.
+ */
+export function planUndoRequests(snapshot: TapSnapshot): TapRequestPlan[] {
+  return snapshot.teamIds.map((teamId) => ({
+    teamId,
+    band: snapshot.assignments[teamId] ?? null,
+  }));
+}
+
 /** Start again: every club back to the roster. The only escape from a
  * table a player wants to bin, and the only operation that can't be
  * reconstructed from cheap individual moves. */

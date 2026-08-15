@@ -13,9 +13,13 @@ import {
   firstIncorrectlyFilledBand,
   nextOutTeam,
   nextUnfilledBand,
+  planTapRequests,
+  planUndoRequests,
+  resolveTapOutcome,
   rosterOrder,
   startAgain,
   tapWithEviction,
+  type TapSnapshot,
 } from "./board";
 
 const empty: BoardState = { assignments: {}, previous: {} };
@@ -151,6 +155,127 @@ describe("tapWithEviction", () => {
   });
 });
 
+// The flow-level wiring around a tap: which HTTP requests it implies
+// (planTapRequests), and what the board shows once those requests settle
+// (resolveTapOutcome). PredictTableFlow's persistTap is built from exactly
+// these two functions, so testing them pins the two things that were only
+// checkable by reading the component before: an eviction fires both an
+// assign and an unassign, and a failed save rolls the whole tap back.
+describe("planTapRequests", () => {
+  it("plans a single assign for a plain placement, no eviction", () => {
+    const result = {
+      assignments: { arsenal: "europe" } as Record<string, BandKey>,
+      evicted: null,
+    };
+    expect(planTapRequests("arsenal", result)).toEqual([
+      { teamId: "arsenal", band: "europe" },
+    ]);
+  });
+
+  it("plans an unassign for a toggle-revert to unplaced", () => {
+    const result = { assignments: {}, evicted: null };
+    expect(planTapRequests("arsenal", result)).toEqual([
+      { teamId: "arsenal", band: null },
+    ]);
+  });
+
+  it("plans BOTH an assign for the tapped club and an unassign for the evicted club", () => {
+    const result = {
+      assignments: { chelsea: "champion" } as Record<string, BandKey>,
+      evicted: { teamId: "arsenal", from: "champion" as BandKey },
+    };
+    expect(planTapRequests("chelsea", result)).toEqual([
+      { teamId: "chelsea", band: "champion" },
+      { teamId: "arsenal", band: null },
+    ]);
+  });
+});
+
+describe("resolveTapOutcome", () => {
+  const before = {
+    assignments: { arsenal: "champion" } as Record<string, BandKey>,
+    previous: {},
+    placedAt: { arsenal: 0 },
+  };
+  const afterEviction = {
+    assignments: { chelsea: "champion" } as Record<string, BandKey>,
+    previous: { chelsea: null, arsenal: "champion" as BandKey },
+    placedAt: { chelsea: 1 },
+  };
+
+  it("keeps the tap's result when every request succeeded", () => {
+    expect(resolveTapOutcome(before, afterEviction, true)).toEqual(
+      afterEviction,
+    );
+  });
+
+  it("rolls the board back to its pre-tap state when a request failed -- an eviction's two requests are all-or-nothing, never half-applied", () => {
+    expect(resolveTapOutcome(before, afterEviction, false)).toEqual(before);
+  });
+});
+
+// The undo affordance replays a *snapshot* taken before the tap, not an
+// inverse move -- see planUndoRequests's docstring for why dropInto-style
+// replay is illegal for an eviction (the vacated Band is full again by the
+// time undo runs). These tests pin that both the tapped and the evicted
+// club come back, from the snapshot's recorded Bands.
+describe("planUndoRequests", () => {
+  it("restores a plain move to its pre-tap Band", () => {
+    const snapshot: TapSnapshot = {
+      assignments: { arsenal: "europe" },
+      previous: {},
+      placedAt: { arsenal: 0 },
+      teamIds: ["arsenal"],
+    };
+    expect(planUndoRequests(snapshot)).toEqual([
+      { teamId: "arsenal", band: "europe" },
+    ]);
+  });
+
+  it("restores BOTH clubs from an eviction -- the evicted club back to its Band, the tapped club back to unplaced", () => {
+    // Pre-tap snapshot: arsenal held champion (the only slot), chelsea was
+    // unplaced. The tap put chelsea in and evicted arsenal.
+    const snapshot: TapSnapshot = {
+      assignments: { arsenal: "champion" },
+      previous: {},
+      placedAt: { arsenal: 0 },
+      teamIds: ["chelsea", "arsenal"],
+    };
+    expect(planUndoRequests(snapshot)).toEqual([
+      { teamId: "chelsea", band: null },
+      { teamId: "arsenal", band: "champion" },
+    ]);
+  });
+
+  it("reads the target Band from the snapshot, not from a live re-tap -- so undo works even though champion is full again at the moment undo runs", () => {
+    // If undo tried to replay an inverse tap (tapWithEviction(state,
+    // "arsenal", "champion", ...)) instead, it would itself trigger a
+    // second eviction, since chelsea currently occupies champion's one
+    // slot. planUndoRequests never calls tapWithEviction -- it just reads
+    // snapshot.assignments -- so this can't happen.
+    const liveState = {
+      assignments: { chelsea: "champion" } as Record<string, BandKey>,
+      previous: { chelsea: null as BandKey | null },
+      placedAt: { chelsea: 1 },
+    };
+    const snapshot: TapSnapshot = {
+      assignments: { arsenal: "champion" },
+      previous: {},
+      placedAt: { arsenal: 0 },
+      teamIds: ["chelsea", "arsenal"],
+    };
+    const requests = planUndoRequests(snapshot);
+    // Both requests are plain assign/unassign calls, independent of
+    // `liveState` -- nothing about the live board's current occupancy
+    // changes what gets requested.
+    expect(requests).toEqual([
+      { teamId: "chelsea", band: null },
+      { teamId: "arsenal", band: "champion" },
+    ]);
+    expect(liveState.assignments.chelsea).toBe("champion");
+  });
+});
+
 // Order inside a Band is alphabetical and carries no meaning -- see
 // bandMemberOrder for why a stack under a "3-5" badge would otherwise
 // assert a ranking this feature never records or scores.
@@ -230,6 +355,40 @@ describe("demotePlaced", () => {
     const result = demotePlaced(roster, all);
     expect(result.demotedFrom).toBe(0);
     expect(result.ordered.map((t) => t.id)).toEqual(["a", "b", "c", "d", "e"]);
+  });
+
+  // PredictTableFlow's `handleOpenBand` is the *only* call site for
+  // demotePlaced -- a plain tap never calls it. These tests model that
+  // exact two-entry-point contract (a "tap" step that only ever touches
+  // assignments/previous/placedAt, and an "open a Band" step that's the
+  // sole thing allowed to call demotePlaced) to pin the ordering guarantee
+  // without needing to render PredictTableFlow itself: a roster grouping
+  // captured before a run of taps must still equal what demotePlaced would
+  // return for the assignments *at capture time*, not for whatever the taps
+  // moved on to since.
+  it("stays frozen across a run of taps, and only reflects new placements once re-grouped", () => {
+    const teams = roster.map((t) => ({ ...t }));
+
+    // Snapshot at the start: nothing placed, so grouping is a no-op.
+    let demoted = demotePlaced(teams, {});
+    const capturedAtStart = demoted.ordered.map((t) => t.id);
+
+    // Two taps land, exactly as handleTeamTap would apply them --
+    // `demoted` is deliberately never touched here, mirroring the real
+    // component only ever calling demotePlaced from handleOpenBand.
+    let state = { assignments: {}, previous: {}, placedAt: {} };
+    state = { ...state, ...tapWithEviction(state, "b", "champion", 1, 0) };
+    state = { ...state, ...tapWithEviction(state, "d", "europe", 3, 1) };
+
+    // The grouping captured before the taps is untouched by them -- this
+    // is the guarantee the "never on a tap" rule buys.
+    expect(demoted.ordered.map((t) => t.id)).toEqual(capturedAtStart);
+
+    // Only a simulated "open a Band" step (the sole caller of demotePlaced
+    // in the real component) advances the grouping to match.
+    demoted = demotePlaced(teams, state.assignments);
+    expect(demoted.ordered.map((t) => t.id)).toEqual(["a", "c", "e", "b", "d"]);
+    expect(demoted.demotedFrom).toBe(3);
   });
 });
 

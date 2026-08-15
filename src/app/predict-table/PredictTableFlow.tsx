@@ -25,12 +25,16 @@ import {
   firstIncorrectlyFilledBand,
   nextOutTeam,
   nextUnfilledBand,
+  planTapRequests,
+  planUndoRequests,
+  resolveTapOutcome,
   rosterOrder,
   startAgain as startAgainBoard,
   tapWithEviction,
   type Assignments,
   type PlacedAt,
   type PriorBandByTeam,
+  type TapSnapshot,
 } from "@/lib/table-predictions/board";
 import {
   TABLE_BANDS,
@@ -140,12 +144,7 @@ export function PredictTableFlow({
   // from is full again by the time you'd want to put it back -- so "drop it
   // back where it was" is not a legal move, while "put the board back how
   // it was" always is.
-  const [undoSnapshot, setUndoSnapshot] = useState<{
-    assignments: Assignments;
-    previous: PriorBandByTeam;
-    placedAt: PlacedAt;
-    teamIds: string[];
-  } | null>(null);
+  const [undoSnapshot, setUndoSnapshot] = useState<TapSnapshot | null>(null);
 
   const [isSkipped, setIsSkipped] = useState(initialIsSkipped);
   const [submittedAt, setSubmittedAt] = useState(initialSubmittedAt);
@@ -276,24 +275,38 @@ export function PredictTableFlow({
       setUndo(null);
     }
 
-    const landedIn = result.assignments[teamId];
-    const requests = [
-      landedIn
-        ? postJson("/api/table-predictions/assign", { teamId, band: landedIn })
-        : postJson("/api/table-predictions/unassign", { teamId }),
-    ];
-    if (evicted) {
-      requests.push(
-        postJson("/api/table-predictions/unassign", { teamId: evicted.teamId }),
-      );
-    }
-    const results = await Promise.all(requests);
+    const plan = planTapRequests(teamId, result);
+    const results = await Promise.all(
+      plan.map((request) =>
+        request.band
+          ? postJson("/api/table-predictions/assign", {
+              teamId: request.teamId,
+              band: request.band,
+            })
+          : postJson("/api/table-predictions/unassign", {
+              teamId: request.teamId,
+            }),
+      ),
+    );
     const failed = results.find((r) => !r.ok);
+    const outcome = resolveTapOutcome(
+      {
+        assignments: prevAssignments,
+        previous: prevPrevious,
+        placedAt: prevPlacedAt,
+      },
+      {
+        assignments: result.assignments,
+        previous: result.previous,
+        placedAt: result.placedAt ?? prevPlacedAt,
+      },
+      !failed,
+    );
+    setAssignments(outcome.assignments);
+    setPrevious(outcome.previous);
+    setPlacedAt(outcome.placedAt);
 
     if (failed) {
-      setAssignments(prevAssignments);
-      setPrevious(prevPrevious);
-      setPlacedAt(prevPlacedAt);
       setUndo(null);
       setSaveError(
         failed.data.error ?? "Couldn't save that move -- try again.",
@@ -356,12 +369,16 @@ export function PredictTableFlow({
     setPlacedAt(snapshot.placedAt);
 
     const results = await Promise.all(
-      snapshot.teamIds.map((teamId) => {
-        const band = snapshot.assignments[teamId];
-        return band
-          ? postJson("/api/table-predictions/assign", { teamId, band })
-          : postJson("/api/table-predictions/unassign", { teamId });
-      }),
+      planUndoRequests(snapshot).map((request) =>
+        request.band
+          ? postJson("/api/table-predictions/assign", {
+              teamId: request.teamId,
+              band: request.band,
+            })
+          : postJson("/api/table-predictions/unassign", {
+              teamId: request.teamId,
+            }),
+      ),
     );
     const failed = results.find((r) => !r.ok);
     if (failed) {
