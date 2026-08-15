@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { TriangleAlert } from "lucide-react";
 import { ClubCodeBadge } from "@/components/ui/ClubCodeBadge";
-import { kitColors, stripeStyle } from "@/lib/teams/kit-colors";
+import { applyContrastFloor, kitColors } from "@/lib/teams/kit-colors";
 import type { TablePredictionStripState } from "@/lib/table-predictions/strip-state";
 
 function ordinalSuffix(n: number): string {
@@ -46,18 +46,31 @@ export function TablePredictionStrip({
   }
 
   const { champion } = state;
-  const [c1, c2] = kitColors(champion.shortCode);
-  const stripe = stripeStyle(c1, c2, 90);
+  // Same single contrast-floored primary kit colour as the capture flow's
+  // own club-identity rail (predict-table/shared.tsx's teamFill()) --
+  // matching it here rather than the two-tone matchBadgeColors() stripe
+  // (Tipped Match cards) keeps a Champion's colour reading identical
+  // wherever the Player sees it. A two-colour gradient stripe was tried
+  // first and read as a visual mismatch for a club whose kit already reads
+  // as one colour here (Arsenal's white trim isn't part of its identity in
+  // this feature).
+  const fill = applyContrastFloor(kitColors(champion.shortCode)[0], [
+    "#ffffff",
+  ]);
 
   const championRow = (
     <div className="flex flex-1 items-center gap-3">
-      <div className="h-10 w-1.5 shrink-0 rounded-full" style={stripe} />
+      <span
+        aria-hidden
+        className="h-10 w-1.5 shrink-0 rounded-full"
+        style={{ background: fill }}
+      />
       <div className="flex flex-col gap-0.5">
         <span className="text-xs font-bold uppercase tracking-[0.06em] text-ink/50">
           Your predicted Champion
         </span>
         <div className="flex items-center gap-2">
-          <ClubCodeBadge shortCode={champion.shortCode} fill={c1} />
+          <ClubCodeBadge shortCode={champion.shortCode} fill={fill} />
           <span className="text-sm font-bold text-ink">{champion.name}</span>
         </div>
       </div>
