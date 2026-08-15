@@ -173,3 +173,37 @@ export const confettiPiece = tv({
     },
   },
 });
+
+/** The falling-confetti render shared by the submit moment and the
+ * champion ceremony -- one home for the visual so the "no other colors"
+ * rule stays enforceable in a single place. Invariantly decorative:
+ * aria-hidden, pointer-events-none, skipped outright under
+ * prefers-reduced-motion. The call site picks the positioning: `absolute`
+ * inside the submit moment's dialog, `fixed` for the viewport overlay. */
+export function ConfettiBurst({
+  position,
+}: {
+  position: "fixed" | "absolute";
+}) {
+  return (
+    <div
+      aria-hidden
+      className={`pointer-events-none motion-reduce:hidden ${
+        position === "fixed"
+          ? "fixed inset-x-0 top-0 z-20"
+          : "absolute inset-x-0 top-0"
+      }`}
+    >
+      {CONFETTI.map((piece, index) => (
+        <span
+          key={index}
+          className={confettiPiece({ tone: piece.tone })}
+          style={{
+            left: `${piece.left}%`,
+            animationDelay: `${piece.delay}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}

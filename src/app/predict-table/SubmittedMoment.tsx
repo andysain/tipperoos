@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Trophy } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { type BandKey } from "@/lib/table-predictions/rules";
-import { CONFETTI, confettiPiece, TeamIdentity, type Team } from "./shared";
+import { ConfettiBurst, TeamIdentity, type Team } from "./shared";
 
 // Stays on screen until the player explicitly dismisses it -- no
 // auto-timeout. This is a "you're locked in" confirmation, not a passive
@@ -45,19 +45,7 @@ export function SubmittedMoment({
       }}
       className="fixed inset-0 z-30 flex flex-col items-center justify-center gap-1 overflow-auto bg-paper/95 p-4 text-center backdrop-blur-sm"
     >
-      <div className="pointer-events-none absolute inset-x-0 top-0 motion-reduce:hidden">
-        {CONFETTI.map((piece, i) => (
-          <span
-            key={i}
-            aria-hidden
-            className={confettiPiece({ tone: piece.tone })}
-            style={{
-              left: `${piece.left}%`,
-              animationDelay: `${piece.delay}s`,
-            }}
-          />
-        ))}
-      </div>
+      <ConfettiBurst position="absolute" />
 
       <div
         className={`flex flex-col items-center transition motion-reduce:transition-none motion-safe:duration-500 ${

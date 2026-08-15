@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/Button";
 import { ScoringSummary } from "@/components/scoring/ScoringSummary";
 import {
   bandPosition,
+  championWasNamed,
   countsOf,
   dropInto,
   firstIncorrectlyFilledBand,
-  isChampionNamed,
   modeFor,
   nextUnfilledBand,
   rosterOrder,
@@ -171,6 +171,9 @@ export function PredictTableFlow({
   // Applies a tap's computed board change optimistically, fires the one
   // request it implies (assign if the team landed in a Band, unassign if
   // it landed back in the roster), and rolls the change back on failure.
+  // `celebrateChampion` is the ceremony request from the filling tap that
+  // named the champion -- spent only if the server actually accepts the
+  // move, so a failed save never consumes the once-per-session beat.
   async function persistTap(
     teamId: string,
     result: {
@@ -178,6 +181,7 @@ export function PredictTableFlow({
       previous: PriorBandByTeam;
       movedFrom: BandKey | null;
     },
+    celebrateChampion = false,
   ) {
     if (busyTeamIds.includes(teamId)) return;
     setBusyTeamIds((prev) => [...prev, teamId]);
@@ -213,6 +217,10 @@ export function PredictTableFlow({
       setSaveError(data.error ?? "Couldn't save that move -- try again.");
     } else {
       setIsSkipped(false);
+      if (celebrateChampion && !championCelebrated.current) {
+        championCelebrated.current = true;
+        setCelebrating(true);
+      }
     }
     setBusyTeamIds((prev) => prev.filter((id) => id !== teamId));
   }
@@ -301,17 +309,14 @@ export function PredictTableFlow({
       return;
     }
     const result = tapWhileFilling({ assignments, previous }, teamId, openBand);
-    // The champion ceremony: fires once per page-load session, only on the
-    // tap that actually names the champion (champion count 0 -> 1) --
-    // never on undo, review drops, or a second team into the band.
-    if (
-      !championCelebrated.current &&
-      isChampionNamed(counts, result.assignments)
-    ) {
-      championCelebrated.current = true;
-      setCelebrating(true);
-    }
-    void persistTap(teamId, result);
+    // The champion ceremony: request the beat when this tap names the
+    // champion (count 0 -> 1); persistTap spends it only on a saved move.
+    void persistTap(
+      teamId,
+      result,
+      championWasNamed(counts, result.assignments) &&
+        !championCelebrated.current,
+    );
   }
 
   function handleDropInto(band: BandKey) {

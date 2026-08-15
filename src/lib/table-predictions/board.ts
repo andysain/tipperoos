@@ -116,8 +116,8 @@ export function startAgain(): BoardState {
   return { assignments: {}, previous: {} };
 }
 
-/** Band fill counts from an assignments map -- the shape every fill-state
- * helper (countRead, validateBandCounts, the landing, the ceremony) reads. */
+/** Band fill counts from an assignments map -- the shape the landing, the
+ * ceremony trigger, and validateBandCounts read. */
 export function countsOf(
   assignments: Assignments,
 ): Partial<Record<BandKey, number>> {
@@ -145,10 +145,12 @@ export function firstIncorrectlyFilledBand(
 }
 
 /** The #118 champion ceremony trigger: the champion band's count moved from
- * 0 to 1 -- the champion was *named*, as opposed to any assignment into the
- * band (a second team over-fills it), a review-mode drop or swap (the count
- * never returns to 0), or an undo (which moves counts the other way). */
-export function isChampionNamed(
+ * 0 to 1 -- the champion was *named*. A second team into the band only
+ * over-fills it (never returns to 0), an undo moves counts the other way,
+ * and a swap leaves the count unchanged. Review-mode drops can move the
+ * count 0 -> 1 too, but the ceremony belongs to the filling tap that names
+ * the champion -- the flow only checks this on the tap path. */
+export function championWasNamed(
   previousCounts: Partial<Record<BandKey, number>>,
   nextCounts: Partial<Record<BandKey, number>>,
 ): boolean {

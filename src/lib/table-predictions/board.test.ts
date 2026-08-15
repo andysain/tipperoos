@@ -7,7 +7,7 @@ import {
   dropInto,
   fillTone,
   firstIncorrectlyFilledBand,
-  isChampionNamed,
+  championWasNamed,
   modeFor,
   nextUnfilledBand,
   rosterOrder,
@@ -260,24 +260,24 @@ describe("firstIncorrectlyFilledBand", () => {
   });
 });
 
-describe("isChampionNamed", () => {
+describe("championWasNamed", () => {
   it("is true only when the champion count moves from 0 to 1", () => {
-    expect(isChampionNamed({}, { champion: 1 })).toBe(true);
-    expect(isChampionNamed({ champion: 0 }, { champion: 1 })).toBe(true);
+    expect(championWasNamed({}, { champion: 1 })).toBe(true);
+    expect(championWasNamed({ champion: 0 }, { champion: 1 })).toBe(true);
   });
 
   it("is false when the champion was already named", () => {
-    expect(isChampionNamed({ champion: 1 }, { champion: 1 })).toBe(false);
-    expect(isChampionNamed({ champion: 1 }, { champion: 2 })).toBe(false);
+    expect(championWasNamed({ champion: 1 }, { champion: 1 })).toBe(false);
+    expect(championWasNamed({ champion: 1 }, { champion: 2 })).toBe(false);
   });
 
   it("is false when no champion was named", () => {
-    expect(isChampionNamed({}, { champion: 0 })).toBe(false);
-    expect(isChampionNamed({ champion: 1 }, { champion: 0 })).toBe(false);
+    expect(championWasNamed({}, { champion: 0 })).toBe(false);
+    expect(championWasNamed({ champion: 1 }, { champion: 0 })).toBe(false);
   });
 
   it("is false when a different Band got a team", () => {
-    expect(isChampionNamed({}, { europe: 1 })).toBe(false);
+    expect(championWasNamed({}, { europe: 1 })).toBe(false);
   });
 });
 
