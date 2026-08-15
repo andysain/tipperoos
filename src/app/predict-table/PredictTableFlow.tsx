@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CircleCheck, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ScoringSummary } from "@/components/scoring/ScoringSummary";
 import {
   bandPosition,
+  championWasNamed,
+  countsOf,
   dropInto,
+  firstIncorrectlyFilledBand,
   modeFor,
   nextUnfilledBand,
   rosterOrder,
@@ -25,6 +28,7 @@ import {
 } from "@/lib/table-predictions/rules";
 import { BandSummary } from "./BandSummary";
 import { BandsBoard, type UndoState } from "./BandsBoard";
+import { ChampionCelebration } from "./ChampionCelebration";
 import { SubmittedMoment } from "./SubmittedMoment";
 import { BAND_LABEL, type Team } from "./shared";
 
@@ -32,6 +36,12 @@ import { BAND_LABEL, type Team } from "./shared";
 // justSwapped flag clears -- kept in one place so the state timeout and
 // the CSS duration can't drift apart.
 const SWAP_PULSE_MS = 500;
+
+// How long the champion ceremony stays on screen: the confetti-fall
+// animation (globals.css) is 1.1s, plus a 100ms buffer so the beat clears
+// cleanly. Kept in one place so the timeout and the CSS duration can't
+// drift apart.
+const CHAMPION_CELEBRATION_MS = 1200;
 
 function formatCountdown(msRemaining: number): string {
   const totalMinutes = Math.max(0, Math.floor(msRemaining / 60000));
@@ -97,10 +107,13 @@ export function PredictTableFlow({
   const [assignments, setAssignments] =
     useState<Assignments>(initialAssignments);
   const [previous, setPrevious] = useState<PriorBandByTeam>({});
-  // Which Band is armed while filling -- always Champion on load. Which Band
-  // opens on a *return* visit is #118's scope (return-visit landing), not
-  // this one's.
-  const [openBand, setOpenBand] = useState<BandKey>("champion");
+  // #118's return-visit landing: which Band opens on a visit is where the
+  // work actually is, not always Champion -- Champion on a first (empty)
+  // visit, the first incorrectly filled Band on a return (ADR 0008).
+  const [openBand, setOpenBand] = useState<BandKey>(
+    () =>
+      firstIncorrectlyFilledBand(countsOf(initialAssignments)) ?? "champion",
+  );
   const [lifted, setLifted] = useState<string | null>(null);
   const [undo, setUndo] = useState<UndoState | null>(null);
   const [justSwapped, setJustSwapped] = useState<[string, string] | null>(null);
@@ -116,6 +129,18 @@ export function PredictTableFlow({
   const [warnedIncomplete, setWarnedIncomplete] = useState(false);
   const [confirmingStartAgain, setConfirmingStartAgain] = useState(false);
   const [startingAgain, setStartingAgain] = useState(false);
+  // The champion ceremony (#118): fires once per page-load session on the
+  // first time the champion is named, re-armed by a Start again. A ref so
+  // the beat can't double-fire inside one session; a state flag so the
+  // celebration unmounts itself after CHAMPION_CELEBRATION_MS.
+  const championCelebrated = useRef(false);
+  const [celebrating, setCelebrating] = useState(false);
+
+  useEffect(() => {
+    if (!celebrating) return;
+    const id = setTimeout(() => setCelebrating(false), CHAMPION_CELEBRATION_MS);
+    return () => clearTimeout(id);
+  }, [celebrating]);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60_000);
@@ -135,13 +160,7 @@ export function PredictTableFlow({
   const placedCount = Object.keys(assignments).length;
   const mode = modeFor(placedCount, teams.length);
 
-  const counts = useMemo(() => {
-    const result: Partial<Record<BandKey, number>> = {};
-    for (const band of Object.values(assignments)) {
-      result[band] = (result[band] ?? 0) + 1;
-    }
-    return result;
-  }, [assignments]);
+  const counts = useMemo(() => countsOf(assignments), [assignments]);
   const validation = useMemo(() => validateBandCounts(counts), [counts]);
 
   // Only meaningful while filling -- review mode has no single open Band to
@@ -152,6 +171,9 @@ export function PredictTableFlow({
   // Applies a tap's computed board change optimistically, fires the one
   // request it implies (assign if the team landed in a Band, unassign if
   // it landed back in the roster), and rolls the change back on failure.
+  // `celebrateChampion` is the ceremony request from the filling tap that
+  // named the champion -- spent only if the server actually accepts the
+  // move, so a failed save never consumes the once-per-session beat.
   async function persistTap(
     teamId: string,
     result: {
@@ -159,6 +181,7 @@ export function PredictTableFlow({
       previous: PriorBandByTeam;
       movedFrom: BandKey | null;
     },
+    celebrateChampion = false,
   ) {
     if (busyTeamIds.includes(teamId)) return;
     setBusyTeamIds((prev) => [...prev, teamId]);
@@ -194,6 +217,10 @@ export function PredictTableFlow({
       setSaveError(data.error ?? "Couldn't save that move -- try again.");
     } else {
       setIsSkipped(false);
+      if (celebrateChampion && !championCelebrated.current) {
+        championCelebrated.current = true;
+        setCelebrating(true);
+      }
     }
     setBusyTeamIds((prev) => prev.filter((id) => id !== teamId));
   }
@@ -282,7 +309,14 @@ export function PredictTableFlow({
       return;
     }
     const result = tapWhileFilling({ assignments, previous }, teamId, openBand);
-    void persistTap(teamId, result);
+    // The champion ceremony: request the beat when this tap names the
+    // champion (count 0 -> 1); persistTap spends it only on a saved move.
+    void persistTap(
+      teamId,
+      result,
+      championWasNamed(counts, countsOf(result.assignments)) &&
+        !championCelebrated.current,
+    );
   }
 
   function handleDropInto(band: BandKey) {
@@ -339,6 +373,12 @@ export function PredictTableFlow({
       setSaveError(
         "Couldn't start again -- check your connection and try again.",
       );
+    } else {
+      // The rebuilt board's first champion deserves the ceremony too -- a
+      // Start again is a deliberate reset, not the same session's churn.
+      // Reset only on success: a rolled-back board still has its champion
+      // named, and spending the once-per-session beat there loses it.
+      championCelebrated.current = false;
     }
     setStartingAgain(false);
   }
@@ -514,6 +554,7 @@ export function PredictTableFlow({
         busyTeamIds={busyTeamIds}
         undo={undo}
         justSwapped={justSwapped}
+        celebratingChampion={celebrating}
         onOpenBand={setOpenBand}
         onTapTeam={handleTeamTap}
         onDropInto={handleDropInto}
@@ -620,6 +661,8 @@ export function PredictTableFlow({
           onDismiss={() => setJustSubmitted(false)}
         />
       ) : null}
+
+      {celebrating ? <ChampionCelebration /> : null}
     </main>
   );
 }
