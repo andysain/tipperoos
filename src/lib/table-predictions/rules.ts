@@ -5,11 +5,11 @@
 
 export type BandKey =
   | "champion"
-  // PROTOTYPE (proto/predict-table-rethink): the 8th Band. Splitting
-  // position 2 out of Champions League makes the top of the table two sharp
-  // single-club calls instead of one call plus a 4-blob, and makes every
-  // multi-club Band exactly 3 -- which also retires the "Champions League
-  // holds 4, give it 2x2 on a phone" layout special case in the capture spec.
+  // The 8th Band. Splitting position 2 out of Champions League makes the
+  // top of the table two sharp single-club calls instead of one call plus a
+  // 4-blob, and makes every multi-club Band exactly 3 -- which also retires
+  // the "Champions League holds 4, give it 2x2 on a phone" layout special
+  // case that the earlier 7-Band capture spec carried.
   | "runners_up"
   | "champions_league"
   | "europe"
@@ -24,12 +24,11 @@ export interface TableBand {
   target: number;
 }
 
-// PROTOTYPE order and target sizes: Champion (1), Runners Up (2), Champions
-// League (3-5), Europe (6-8), Mid Table (9-11), Lower Table (12-14),
-// Relegation Battle (15-17), Relegated (18-20). Still sums to 20, and the
-// Band names stay honest -- positions 1-5 all qualify for the Champions
-// League under the current format. Supersedes CLAUDE.md's 7-Band list while
-// this branch is live.
+// Order and target sizes: Champion (1), Runners Up (2), Champions League
+// (3-5), Europe (6-8), Mid Table (9-11), Lower Table (12-14), Relegation
+// Battle (15-17), Relegated (18-20). Sums to 20, and the Band names stay
+// honest -- positions 1-5 all qualify for the Champions League under the
+// current format. See docs/adr/0011-predict-the-table-capture-v2.md.
 export const TABLE_BANDS: readonly TableBand[] = [
   { key: "champion", label: "Champion", target: 1 },
   { key: "runners_up", label: "Runners Up", target: 1 },

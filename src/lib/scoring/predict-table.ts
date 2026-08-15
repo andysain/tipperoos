@@ -33,9 +33,9 @@ export interface TableBand {
 }
 
 /**
- * PROTOTYPE (proto/predict-table-rethink): 8 Bands, with Runners Up split
- * out of Champions League. Two consequences worth knowing before judging the
- * feel:
+ * 8 Bands, with Runners Up split out of Champions League (see
+ * docs/adr/0011-predict-the-table-capture-v2.md). Two consequences worth
+ * knowing:
  *
  *  1. Placement gets *harsher at the top*. Bands are finer up there now, so
  *     a club you put in Champions League that finishes 2nd drops from

@@ -1,7 +1,7 @@
 // Pure state-transition logic for the Band-fill capture board
 // (docs/predict-table-capture-spec.md). Kept free of React so the tap
-// rules for both phases -- the actual product behaviour -- can be unit
-// tested directly, without rendering anything.
+// rule -- the actual product behaviour -- can be unit tested directly,
+// without rendering anything.
 
 import { TABLE_BANDS, type BandKey } from "./rules";
 
@@ -10,9 +10,9 @@ export type Assignments = Record<string, BandKey>;
  * filling-phase toggle-revert and the undo affordance replay back to. */
 export type PriorBandByTeam = Record<string, BandKey | null>;
 
-/** PROTOTYPE: a monotonic sequence number per placed team, recording the
- * order clubs landed in their current Band. Only ever read to answer "which
- * club leaves if one more arrives in a full Band" -- the eviction rule is
+/** A monotonic sequence number per placed team, recording the order clubs
+ * landed in their current Band. Only ever read to answer "which club leaves
+ * if one more arrives in a full Band" -- the eviction rule is
  * last-in-first-out, so the club most recently added is the one displaced. */
 export type PlacedAt = Record<string, number>;
 
@@ -31,45 +31,16 @@ export interface TapResult {
 }
 
 /**
- * PROTOTYPE: superseded by `tapWithEviction`, which is the same rule plus a
- * hard cap at the Band's target size. Kept (and still unit-tested) so the
- * over-fill-permitted behaviour ADR 0008 decided is one import swap away.
- *
- * Filling-phase tap (group-first): assign `teamId` to `openBand`, unless
- * it's already there, in which case it reverts to `previous[teamId]` (its
- * prior Band, or unplaced) -- standard multi-select toggle semantics, the
- * misclick escape.
- */
-export function tapWhileFilling(
-  state: BoardState,
-  teamId: string,
-  openBand: BandKey,
-): TapResult {
-  const current = state.assignments[teamId] ?? null;
-
-  if (current === openBand) {
-    const back = state.previous[teamId] ?? null;
-    const assignments = { ...state.assignments };
-    if (back) assignments[teamId] = back;
-    else delete assignments[teamId];
-    return { assignments, previous: state.previous, movedFrom: null };
-  }
-
-  const assignments = { ...state.assignments, [teamId]: openBand };
-  const previous = { ...state.previous, [teamId]: current };
-  return { assignments, previous, movedFrom: current };
-}
-
-/**
- * PROTOTYPE: which club leaves `band` if one more arrives while it is full.
+ * Which club leaves `band` if one more arrives while it is full.
  * Last-in-first-out -- the most recently added club is the one displaced,
  * because "I've just changed my mind about that one" is the only rule a
  * player can predict. Ties (and clubs with no recorded sequence, e.g. an
  * assignment loaded from the server) fall back to team id so the answer is
  * deterministic. Null when the Band is empty.
  *
- * This is what makes eviction *stated before it happens*: the returned club
- * is marked "Next out" in the open Band whenever that Band is full.
+ * This is what makes eviction *stated before it happens*: the plain-English
+ * line above the roster (see PredictTableFlow) names the returned club
+ * whenever the open Band is full.
  */
 export function nextOutTeam(
   assignments: Assignments,
@@ -96,9 +67,9 @@ export interface EvictionTapResult extends TapResult {
 }
 
 /**
- * PROTOTYPE tap rule, replacing `tapWhileFilling`: a Band can never exceed
- * its target size. Tapping a club into a full Band swaps it in for that
- * Band's "next out" club, which returns to the roster.
+ * The tap rule: a Band can never exceed its target size. Tapping a club
+ * into a full Band swaps it in for that Band's "next out" club, which
+ * returns to the roster.
  *
  * The point is the invariant it buys: with over-filling impossible,
  * `placed === 20` implies every Band is exactly its target size, which
@@ -170,70 +141,6 @@ export function tapWithEviction(
     placedAt,
     movedFrom: current,
     evicted: evictedId ? { teamId: evictedId, from: openBand } : null,
-  };
-}
-
-/**
- * Review-phase move (team-first): drop the lifted `teamId` into `band`.
- * There is no toggle-revert here and no unplace -- an unplaced club scores
- * zero while a badly placed one still scores band distance.
- */
-export function dropInto(
-  state: BoardState,
-  teamId: string,
-  band: BandKey,
-): TapResult {
-  const current = state.assignments[teamId] ?? null;
-  const assignments = { ...state.assignments, [teamId]: band };
-  const previous = { ...state.previous, [teamId]: current };
-  return { assignments, previous, movedFrom: current };
-}
-
-export interface SwapResult {
-  assignments: Assignments;
-  previous: PriorBandByTeam;
-  /** Each team's Band before the swap, for the swap undo affordance. */
-  swapped: [
-    { teamId: string; movedFrom: BandKey },
-    { teamId: string; movedFrom: BandKey },
-  ];
-}
-
-/**
- * PROTOTYPE: unused. The review *phase* is gone -- there is one grammar now
- * (open a Band, tap clubs into it), so there is no lifted club and nothing
- * to swap with. Kept intact, with its tests, so restoring the two-grammar
- * board is a matter of re-wiring PredictTableFlow rather than rewriting it.
- *
- * Review-phase swap (team-first): exchange the Bands of two already-placed
- * teams in one move (issue #131). Both teams are assumed already placed --
- * the review-mode tap grammar only ever calls this with two placed teams,
- * since review mode itself only exists once all 20 teams are placed.
- *
- * Symmetric: calling swapBands again with the same two ids restores both
- * teams to their pre-swap Bands, which is what the swap undo affordance
- * relies on instead of a separate undo primitive.
- */
-export function swapBands(
-  state: BoardState,
-  teamA: string,
-  teamB: string,
-): SwapResult {
-  const bandA = state.assignments[teamA];
-  const bandB = state.assignments[teamB];
-  const assignments = {
-    ...state.assignments,
-    [teamA]: bandB,
-    [teamB]: bandA,
-  };
-  const previous = { ...state.previous, [teamA]: bandA, [teamB]: bandB };
-  return {
-    assignments,
-    previous,
-    swapped: [
-      { teamId: teamA, movedFrom: bandA },
-      { teamId: teamB, movedFrom: bandB },
-    ],
   };
 }
 
@@ -339,19 +246,6 @@ export function bandPosition(band: BandKey): number {
   return TABLE_BANDS.findIndex((b) => b.key === band) + 1;
 }
 
-export type Mode = "filling" | "review";
-
-/**
- * PROTOTYPE: unused. The board no longer has two modes at all -- it has zero
- * or one *open Band*, and "review" is simply what the board looks like when
- * nothing is open. That removes the unsignalled grammar switch which fired
- * the instant the 20th club landed, and which is the thing that made this
- * screen feel unintuitive. Kept so ADR 0008's model can be restored.
- */
-export function modeFor(placedCount: number, totalTeams: number): Mode {
-  return placedCount === totalTeams ? "review" : "filling";
-}
-
 interface RosterTeam {
   id: string;
   previousSeasonPosition: number | null;
@@ -372,7 +266,7 @@ export function rosterOrder<T extends RosterTeam>(teams: readonly T[]): T[] {
 }
 
 /**
- * PROTOTYPE: the order clubs are listed in *within* a Band -- alphabetical,
+ * The order clubs are listed in *within* a Band -- alphabetical,
  * deliberately.
  *
  * Only Band membership scores; order inside a Band carries no weight at all
@@ -406,7 +300,7 @@ export interface DemotedRoster<T> {
 }
 
 /**
- * PROTOTYPE: pushes already-placed clubs to the bottom of the roster.
+ * Pushes already-placed clubs to the bottom of the roster.
  *
  * Called only when the open Band changes, never on a tap. That is the whole
  * point: while you are filling one Band the list is frozen, so nothing

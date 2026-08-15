@@ -1,6 +1,8 @@
--- PROTOTYPE (proto/predict-table-rethink): add the Runners Up Band, so the
--- top of the table is two single-club calls (Champion, Runners Up) and
--- Champions League becomes positions 3-5. Still 20 clubs across the Bands.
+-- Add the Runners Up Band, so the top of the table is two single-club
+-- calls (Champion, Runners Up) and Champions League becomes positions 3-5.
+-- Still 20 clubs across the Bands. See
+-- docs/adr/0011-predict-the-table-capture-v2.md. Applied to staging only;
+-- production is untouched pending the owner's call.
 --
 -- Data-safe as a pure constraint widening: no stored row can currently hold
 -- 'runners_up', so nothing needs rewriting. Reverting is only safe while no

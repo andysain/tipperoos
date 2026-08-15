@@ -30,17 +30,9 @@ interface MoveUndo {
   label: string;
 }
 
-interface SwapUndo {
-  kind: "swap";
-  teamA: { teamId: string; band: BandKey };
-  teamB: { teamId: string; band: BandKey };
-  label: string;
-}
-
-/** What the undo affordance replays: a single move (dropInto back to
- * `band`), or a swap pair (dropInto both teams back to their prior Bands).
- * See PredictTableFlow's handleUndo for the replay logic. */
-export type UndoState = MoveUndo | SwapUndo;
+/** What the undo affordance replays: the moved team back to `band`. See
+ * PredictTableFlow's handleUndo for the replay logic. */
+export type UndoState = MoveUndo;
 
 /** The undo affordance for the move that just happened, shown inside the
  * Band the team landed in -- not as a page-level banner, so it reads next
@@ -69,7 +61,6 @@ function PlacedTeamCard({
   onTap,
   disabled,
   nextOut,
-  justSwapped,
   celebrate,
 }: {
   team: Team;
@@ -77,15 +68,13 @@ function PlacedTeamCard({
   overfilled?: boolean;
   onTap: () => void;
   disabled?: boolean;
-  /** PROTOTYPE: true for the club that will be displaced if another arrives
-   * while this Band is full. Renders as a warm tint and nothing else -- the
+  /** True for the club that will be displaced if another arrives while
+   * this Band is full. Renders as a warm tint and nothing else -- the
    * sentence above the roster is what explains it. */
   nextOut?: boolean;
-  /** True for the two rows of a swap that just landed -- a brief pulse in
-   * place of a confirm dialog (issue #131, ADR 0008). */
-  justSwapped?: boolean;
   /** True for the champion card the moment the ceremony fires -- the card
-   * landing with weight (issue #118), same pulse as a swap. */
+   * landing with weight (issue #118), a brief pulse in place of a confirm
+   * dialog. */
   celebrate?: boolean;
 }) {
   const fill = teamFill(team.shortCode);
@@ -103,7 +92,7 @@ function PlacedTeamCard({
       disabled={disabled}
       className={`group flex min-h-12 items-stretch gap-3 overflow-hidden rounded-btn border py-3 pr-3 pl-2.5 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
         emphasis ? "border-accent bg-accent/10 ring-1 ring-accent/40" : ""
-      } ${ground} ${justSwapped || celebrate ? "motion-safe:animate-swap-pulse" : ""}`}
+      } ${ground} ${celebrate ? "motion-safe:animate-swap-pulse" : ""}`}
     >
       <span
         aria-hidden
@@ -138,8 +127,8 @@ function PlacedTeamCard({
 /**
  * The roster: every club, always present, tappable into the open Band.
  *
- * PROTOTYPE: one line, not two. Last season's position now sits in a leading
- * slot beside the name rather than on its own second line, which nearly
+ * One line, not two. Last season's position sits in a leading slot beside
+ * the name rather than on its own second line, which nearly
  * halves the chip and so the roster. A placed club drops its Band label
  * entirely -- the collapsed Bands directly above already state, in full,
  * who is in each one, so repeating it 20 times here was the same fact at
@@ -213,8 +202,8 @@ function RosterChip({
 // placed team, labelled with its current Band -- so it's gone; this row
 // only ever opens.
 //
-// PROTOTYPE: this row is now doing two jobs, not one. With no separate
-// review board, the collapsed rows *are* the player's table, so this has to
+// This row does two jobs, not one. With no separate review board, the
+// collapsed rows *are* the player's table, so this has to
 // read as a finished answer and not just as a waypoint: the position range
 // is shown (so the stack reads as an actual league table, 1 through 20) and
 // members carry their club-code badge plus name at real weight.
@@ -398,7 +387,6 @@ export function BandsBoard({
   boardComplete,
   busyTeamIds,
   undo,
-  justSwapped,
   celebratingChampion,
   onOpenBand,
   onCloseBand,
@@ -407,18 +395,18 @@ export function BandsBoard({
 }: {
   teams: Team[];
   assignments: Record<string, BandKey>;
-  /** PROTOTYPE: zero or one Band is open. Band headers are the only
-   * navigation and they toggle -- tapping the open one closes it, so
-   * everything collapsed is a reachable state rather than a separate
-   * "review board". The collapsed rows carry full membership, so all-closed
-   * already is the review of the table. */
+  /** Zero or one Band is open. Band headers are the only navigation and
+   * they toggle -- tapping the open one closes it, so everything collapsed
+   * is a reachable state rather than a separate "review board". The
+   * collapsed rows carry full membership, so all-closed already is the
+   * review of the table. */
   openBand: BandKey | null;
   /** The Band the "Next: [Band] →" prompt advances to, once the open Band
    * is exactly filled -- null while there's nothing under-filled ahead
    * (issue #130). */
   nextBand: BandKey | null;
-  /** PROTOTYPE: the club in the open Band that eviction would displace, or
-   * null while that Band still has room. */
+  /** The club in the open Band that eviction would displace, or null while
+   * that Band still has room. */
   nextOutTeamId: string | null;
   /** Index in `teams` where the already-placed group begins. Re-computed
    * only when the open Band changes, so the roster never reflows mid-tap. */
@@ -427,9 +415,6 @@ export function BandsBoard({
   boardComplete: boolean;
   busyTeamIds: string[];
   undo: UndoState | null;
-  /** The two teams a swap just landed, for the swap-pulse animation --
-   * null once it's played (issue #131). */
-  justSwapped: [string, string] | null;
   /** True while the champion ceremony is playing -- the champion card
    * lands with weight (issue #118). */
   celebratingChampion: boolean;
@@ -443,17 +428,12 @@ export function BandsBoard({
   // ranking that this feature deliberately doesn't record or score.
   const teamsInBand = (band: BandKey) =>
     bandMemberOrder(teams.filter((t) => assignments[t.id] === band));
-  // The undo affordance shows inside whichever Band(s) the move landed in.
-  // A team evicted back to the roster has no Band, so its undo falls back to
-  // the Band it was evicted from -- which is the open one, and therefore
-  // always visible.
+  // The undo affordance shows inside the Band the move landed in. A team
+  // evicted back to the roster has no Band, so its undo falls back to the
+  // Band it was evicted from -- which is the open one, and therefore always
+  // visible.
   const undoBands: BandKey[] = undo
-    ? undo.kind === "move"
-      ? [assignments[undo.teamId] ?? undo.band]
-      : [
-          assignments[undo.teamA.teamId] ?? undo.teamA.band,
-          assignments[undo.teamB.teamId] ?? undo.teamB.band,
-        ]
+    ? [assignments[undo.teamId] ?? undo.band]
     : [];
 
   return (
@@ -545,11 +525,6 @@ export function BandsBoard({
                       overfilled={inBand.length > band.target}
                       disabled={busyTeamIds.includes(team.id)}
                       nextOut={nextOutTeamId === team.id}
-                      justSwapped={
-                        justSwapped != null &&
-                        (justSwapped[0] === team.id ||
-                          justSwapped[1] === team.id)
-                      }
                       celebrate={celebratingChampion && band.key === "champion"}
                       onTap={() => onTapTeam(team.id)}
                     />
@@ -584,10 +559,10 @@ export function BandsBoard({
                   <p className="mt-3 mb-2 px-0.5 text-[0.68rem] font-bold tracking-[0.12em] text-ink/40 uppercase">
                     Still to place
                   </p>
-                  {/* PROTOTYPE: the eviction rule, stated where the tap
-                        that triggers it happens. Only shown while the Band
-                        is genuinely full, so it reads as a live consequence
-                        rather than a standing instruction. */}
+                  {/* The eviction rule, stated where the tap that triggers
+                        it happens. Only shown while the Band is genuinely
+                        full, so it reads as a live consequence rather than
+                        a standing instruction. */}
                   {nextOutTeamId ? (
                     <p className="-mt-1 mb-2 px-0.5 text-[0.75rem] font-semibold text-ink/60">
                       {band.label} is full. Tapping another club swaps it in for{" "}

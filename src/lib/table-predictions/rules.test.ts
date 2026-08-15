@@ -9,10 +9,10 @@ import {
   validateBandCounts,
 } from "./rules";
 
-// PROTOTYPE (proto/predict-table-rethink) golden values:
-// "Champion (1), Runners Up (2), Champions League (3-5), Europe (6-8), Mid
-// Table (9-11), Lower Table (12-14), Relegation Battle (15-17), Relegated
-// (18-20)." Splitting Runners Up out leaves every multi-club Band at 3.
+// Golden values: "Champion (1), Runners Up (2), Champions League (3-5),
+// Europe (6-8), Mid Table (9-11), Lower Table (12-14), Relegation Battle
+// (15-17), Relegated (18-20)." Splitting Runners Up out leaves every
+// multi-club Band at 3 -- see docs/adr/0011-predict-the-table-capture-v2.md.
 describe("TABLE_BANDS", () => {
   it("has the 8 bands in table order with their fixed target sizes", () => {
     expect(TABLE_BANDS.map((b) => b.key)).toEqual([

@@ -9,16 +9,12 @@ import {
   countRead,
   countsOf,
   demotePlaced,
-  dropInto,
   fillTone,
   firstIncorrectlyFilledBand,
-  modeFor,
   nextOutTeam,
   nextUnfilledBand,
   rosterOrder,
   startAgain,
-  swapBands,
-  tapWhileFilling,
   tapWithEviction,
 } from "./board";
 
@@ -30,9 +26,9 @@ function bandCounts(counts: Partial<Record<BandKey, number>>): BandCounts {
   return counts as BandCounts;
 }
 
-// PROTOTYPE (proto/predict-table-rethink): a Band can never exceed its
-// target. Tapping a club into a full Band swaps it in for that Band's "next
-// out" club -- last in, first out -- which returns to the roster.
+// A Band can never exceed its target. Tapping a club into a full Band
+// swaps it in for that Band's "next out" club -- last in, first out --
+// which returns to the roster.
 describe("nextOutTeam", () => {
   it("is the most recently placed club in the Band", () => {
     const assignments = { arsenal: "europe", chelsea: "europe" } as const;
@@ -155,8 +151,8 @@ describe("tapWithEviction", () => {
   });
 });
 
-// PROTOTYPE: order inside a Band is alphabetical and carries no meaning --
-// see bandMemberOrder for why a stack under a "3-5" badge would otherwise
+// Order inside a Band is alphabetical and carries no meaning -- see
+// bandMemberOrder for why a stack under a "3-5" badge would otherwise
 // assert a ranking this feature never records or scores.
 describe("bandMemberOrder", () => {
   const clubs = [
@@ -191,8 +187,8 @@ describe("bandMemberOrder", () => {
   });
 });
 
-// PROTOTYPE: already-placed clubs sink to the bottom of the roster, but the
-// re-group is deferred to a Band change -- these tests pin the grouping, and
+// Already-placed clubs sink to the bottom of the roster, but the re-group
+// is deferred to a Band change -- these tests pin the grouping, and
 // PredictTableFlow's handleOpenBand is the only thing that calls it.
 describe("demotePlaced", () => {
   const roster = [
@@ -237,115 +233,6 @@ describe("demotePlaced", () => {
   });
 });
 
-describe("tapWhileFilling", () => {
-  it("places an unplaced team into the open band", () => {
-    const result = tapWhileFilling(empty, "arsenal", "champion");
-    expect(result.assignments).toEqual({ arsenal: "champion" });
-    expect(Object.keys(result.assignments).length).toBe(1);
-    expect(result.previous).toEqual({ arsenal: null });
-    expect(result.movedFrom).toBeNull();
-  });
-
-  it("moves a team from one band directly into the open band, recording where it came from", () => {
-    const state: BoardState = {
-      assignments: { arsenal: "europe" },
-      previous: { arsenal: null },
-    };
-    const result = tapWhileFilling(state, "arsenal", "champion");
-    expect(result.assignments).toEqual({ arsenal: "champion" });
-    expect(Object.keys(result.assignments).length).toBe(1);
-    expect(result.previous).toEqual({ arsenal: "europe" });
-    expect(result.movedFrom).toBe("europe");
-  });
-
-  it("tapping a team already in the open band reverts it to its prior band", () => {
-    const state: BoardState = {
-      assignments: { arsenal: "champion" },
-      previous: { arsenal: "europe" },
-    };
-    const result = tapWhileFilling(state, "arsenal", "champion");
-    expect(result.assignments).toEqual({ arsenal: "europe" });
-    expect(Object.keys(result.assignments).length).toBe(1);
-    expect(result.movedFrom).toBeNull();
-  });
-
-  it("tapping a team already in the open band with no prior band reverts it to unplaced", () => {
-    const state: BoardState = {
-      assignments: { arsenal: "champion" },
-      previous: { arsenal: null },
-    };
-    const result = tapWhileFilling(state, "arsenal", "champion");
-    expect(result.assignments).toEqual({});
-    expect(Object.keys(result.assignments).length).toBe(0);
-    expect(result.movedFrom).toBeNull();
-  });
-});
-
-describe("dropInto", () => {
-  it("moves the lifted team into the target band and records where it came from", () => {
-    const state: BoardState = {
-      assignments: { arsenal: "europe" },
-      previous: { arsenal: null },
-    };
-    const result = dropInto(state, "arsenal", "champion");
-    expect(result.assignments).toEqual({ arsenal: "champion" });
-    expect(Object.keys(result.assignments).length).toBe(1);
-    expect(result.previous).toEqual({ arsenal: "europe" });
-    expect(result.movedFrom).toBe("europe");
-  });
-});
-
-describe("swapBands", () => {
-  it("exchanges two placed teams' bands", () => {
-    const state: BoardState = {
-      assignments: { arsenal: "champion", chelsea: "europe" },
-      previous: { arsenal: null, chelsea: null },
-    };
-    const result = swapBands(state, "arsenal", "chelsea");
-    expect(result.assignments).toEqual({
-      arsenal: "europe",
-      chelsea: "champion",
-    });
-    expect(Object.keys(result.assignments).length).toBe(2);
-    expect(result.swapped[0]).toEqual({
-      teamId: "arsenal",
-      movedFrom: "champion",
-    });
-    expect(result.swapped[1]).toEqual({
-      teamId: "chelsea",
-      movedFrom: "europe",
-    });
-  });
-
-  it("records each team's prior band, for the swap undo affordance", () => {
-    const state: BoardState = {
-      assignments: { arsenal: "champion", chelsea: "europe" },
-      previous: { arsenal: null, chelsea: null },
-    };
-    const result = swapBands(state, "arsenal", "chelsea");
-    expect(result.previous.arsenal).toBe("champion");
-    expect(result.previous.chelsea).toBe("europe");
-  });
-
-  it("swapping the same pair twice restores their original bands", () => {
-    const state: BoardState = {
-      assignments: { arsenal: "champion", chelsea: "europe" },
-      previous: { arsenal: null, chelsea: null },
-    };
-    const first = swapBands(state, "arsenal", "chelsea");
-    const second = swapBands(
-      { assignments: first.assignments, previous: first.previous },
-      "arsenal",
-      "chelsea",
-    );
-    expect(second.assignments).toEqual({
-      arsenal: "champion",
-      chelsea: "europe",
-    });
-    expect(Object.keys(second.assignments).length).toBe(2);
-  });
-});
-
 describe("startAgain", () => {
   it("clears every assignment and history", () => {
     const state: BoardState = {
@@ -375,16 +262,6 @@ describe("fillTone / countRead", () => {
   it("reads over-filled", () => {
     expect(fillTone(5, 4)).toBe("over");
     expect(countRead(5, 4)).toBe("5/4 · 1 over");
-  });
-});
-
-describe("modeFor", () => {
-  it("is filling until every team is placed", () => {
-    expect(modeFor(19, 20)).toBe("filling");
-  });
-
-  it("is review once every team is placed", () => {
-    expect(modeFor(20, 20)).toBe("review");
   });
 });
 

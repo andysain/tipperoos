@@ -13,13 +13,12 @@ import {
   teamScore,
 } from "./predict-table";
 
-// PROTOTYPE (proto/predict-table-rethink) golden values: 8 Bands (Champion
-// 1 / Runners Up 1 / Champions League 3 / Europe 3 / Mid Table 3 / Lower
-// Table 3 / Relegation Battle 3 / Relegated 3); placement 5/2/1/0 by Band
-// distance; Band Bonus 15 for Relegated and 10 for the other seven; Bold
-// Call +3 for a correct placement made by no more than roughly one in ten of
-// the frozen cohort. Re-derived by hand from the 7-Band originals -- the
-// Band-index remap (old index n >= 1 becomes n + 1) shifts several of these.
+// Golden values: 8 Bands (Champion 1 / Runners Up 1 / Champions League 3 /
+// Europe 3 / Mid Table 3 / Lower Table 3 / Relegation Battle 3 / Relegated
+// 3); placement 5/2/1/0 by Band distance; Band Bonus 15 for Relegated and 10
+// for the other seven; Bold Call +3 for a correct placement made by no more
+// than roughly one in ten of the frozen cohort. See
+// docs/adr/0011-predict-the-table-capture-v2.md.
 // made, best 5. Max 100 + 85 + 15 = 200. A prediction is a team -> Band
 // index map whose Bands may be any size
 // (docs/adr/0008-predict-the-table-group-fill-capture.md); only the actual
