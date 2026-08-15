@@ -16,10 +16,14 @@ import { ScoringSummary } from "@/components/scoring/ScoringSummary";
 //  2. Bands cannot over-fill. Tapping into a full Band swaps in for its
 //     marked "Next out" club, which returns to the roster (tapWithEviction).
 //  3. An 8th Band, Runners Up, between Champion and Champions League.
+//  4. The roster is one line per club, and already-placed clubs are demoted
+//     to the bottom -- but only when the open Band changes, never on a tap,
+//     so the list can never shift under a finger mid-flow.
 import {
   bandPosition,
   championWasNamed,
   countsOf,
+  demotePlaced,
   firstIncorrectlyFilledBand,
   nextOutTeam,
   nextUnfilledBand,
@@ -190,6 +194,24 @@ export function PredictTableFlow({
   // roster": last season's finishing position, promoted clubs last. Never
   // re-sorted by placement, so a club stays where the player learned it was.
   const roster = useMemo(() => rosterOrder(teams), [teams]);
+
+  // PROTOTYPE: the roster as currently displayed -- unplaced clubs first,
+  // already-placed ones demoted below a caption. Held in state and refreshed
+  // only by handleOpenBand, never by a tap: while you are filling one Band
+  // the list is frozen, so nothing moves under your finger between taps. It
+  // re-settles at the moment you change Band, which is a moment you are
+  // already changing context.
+  const [demoted, setDemoted] = useState(() =>
+    demotePlaced(rosterOrder(teams), initialAssignments),
+  );
+
+  // The single entry point for changing which Band is open -- re-groups the
+  // roster on the way through, so the "only on a Band change" rule can't be
+  // bypassed by a call site that forgets it.
+  function handleOpenBand(band: BandKey | null) {
+    setDemoted(demotePlaced(roster, assignments));
+    setOpenBand(band);
+  }
 
   const placedCount = Object.keys(assignments).length;
 
@@ -437,6 +459,7 @@ export function PredictTableFlow({
     placementSeq.current = 0;
     setUndo(null);
     setUndoSnapshot(null);
+    setDemoted(demotePlaced(roster, {}));
     setOpenBand("champion");
 
     const results = await Promise.all(
@@ -630,7 +653,7 @@ export function PredictTableFlow({
       ) : null}
 
       <BandsBoard
-        teams={roster}
+        teams={demoted.ordered}
         assignments={assignments}
         openBand={openBand}
         nextBand={nextBand}
@@ -639,9 +662,10 @@ export function PredictTableFlow({
         undo={undo}
         justSwapped={justSwapped}
         celebratingChampion={celebrating}
+        demotedFrom={demoted.demotedFrom}
         boardComplete={boardComplete}
-        onOpenBand={setOpenBand}
-        onCloseBand={() => setOpenBand(null)}
+        onOpenBand={handleOpenBand}
+        onCloseBand={() => handleOpenBand(null)}
         onTapTeam={handleTeamTap}
         onUndo={() => void handleUndo()}
       />

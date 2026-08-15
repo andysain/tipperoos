@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, ChevronUp, X } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, ChevronUp, X } from "lucide-react";
 import {
   CardShell,
   CardShellBody,
@@ -131,8 +131,17 @@ function PlacedTeamCard({
   );
 }
 
-/** The always-visible roster: every club, fixed position, ordered by last
- * season's table. Tapping acts on the club per the current phase. */
+/**
+ * The roster: every club, always present, tappable into the open Band.
+ *
+ * PROTOTYPE: one line, not two. Last season's position now sits in a leading
+ * slot beside the name rather than on its own second line, which nearly
+ * halves the chip and so the roster. A placed club drops its Band label
+ * entirely -- the collapsed Bands directly above already state, in full,
+ * who is in each one, so repeating it 20 times here was the same fact at
+ * 20x the cost. It keeps the muted treatment and a tick, which is all the
+ * chip actually has to say: "this one's done, tap to move it".
+ */
 function RosterChip({
   team,
   band,
@@ -147,45 +156,45 @@ function RosterChip({
   onTap: () => void;
 }) {
   const fill = teamFill(team.shortCode);
+  const position = team.previousSeasonPosition;
   return (
     <button
       type="button"
       onClick={onTap}
       disabled={disabled || busy}
+      title={
+        position ? `${team.name} \u2014 finished ${position}th` : team.name
+      }
       aria-label={
         band
           ? `Move ${team.name} out of ${BAND_LABEL[band]}`
-          : `Place ${team.name}`
+          : `Place ${team.name}${position ? `, finished ${position}th` : ", promoted"}`
       }
-      className={`flex items-stretch gap-2 overflow-hidden rounded-btn-sm border px-2 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-40 ${
+      className={`flex items-center gap-1.5 overflow-hidden rounded-btn-sm border py-1.5 pr-2 pl-1.5 text-left transition disabled:cursor-not-allowed disabled:opacity-40 ${
         band
-          ? "border-paper-line bg-ink/[0.06] opacity-50 hover:opacity-90"
+          ? "border-paper-line bg-ink/[0.06] opacity-55 hover:opacity-100"
           : "border-paper-line bg-white hover:border-accent/50"
       }`}
     >
       <span
         aria-hidden
-        className={`w-1 shrink-0 rounded-full ${band ? "bg-ink/20" : ""}`}
+        className={`h-5 w-1 shrink-0 rounded-full ${band ? "bg-ink/20" : ""}`}
         style={band ? undefined : { background: fill }}
       />
-      <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-1">
-          <span
-            className={`block truncate text-[0.76rem] leading-tight font-extrabold ${band ? "text-ink/60" : "text-ink"}`}
-          >
-            {team.displayName}
-          </span>
-          {band ? (
-            <X aria-hidden className="size-3 shrink-0 text-ink/40" />
-          ) : null}
+      {band ? (
+        <Check aria-hidden className="size-3 shrink-0 text-ink/45" />
+      ) : (
+        <span
+          aria-hidden
+          className="w-4 shrink-0 text-right text-[0.62rem] leading-none font-bold text-ink/40 tabular-nums"
+        >
+          {position ?? "\u2191"}
         </span>
-        <span className="block truncate text-[0.66rem] leading-tight text-ink/50">
-          {band
-            ? BAND_LABEL[band]
-            : team.previousSeasonPosition
-              ? `#${team.previousSeasonPosition}`
-              : "Promoted"}
-        </span>
+      )}
+      <span
+        className={`min-w-0 flex-1 truncate text-[0.76rem] leading-tight font-extrabold ${band ? "text-ink/55" : "text-ink"}`}
+      >
+        {team.displayName}
       </span>
     </button>
   );
@@ -298,6 +307,7 @@ export function BandsBoard({
   openBand,
   nextBand,
   nextOutTeamId,
+  demotedFrom,
   boardComplete,
   busyTeamIds,
   undo,
@@ -323,6 +333,9 @@ export function BandsBoard({
   /** PROTOTYPE: the club in the open Band that eviction would displace, or
    * null while that Band still has room. */
   nextOutTeamId: string | null;
+  /** Index in `teams` where the already-placed group begins. Re-computed
+   * only when the open Band changes, so the roster never reflows mid-tap. */
+  demotedFrom: number;
   /** Every Band exactly filled -- collapses the per-Band counts to ticks. */
   boardComplete: boolean;
   busyTeamIds: string[];
@@ -469,7 +482,7 @@ export function BandsBoard({
 
                 <>
                   <p className="mt-3 mb-2 px-0.5 text-[0.68rem] font-bold tracking-[0.12em] text-ink/40 uppercase">
-                    Last season&apos;s table
+                    Still to place
                   </p>
                   {/* PROTOTYPE: the eviction rule, stated where the tap
                         that triggers it happens. Only shown while the Band
@@ -490,8 +503,8 @@ export function BandsBoard({
                       City" -- two different clubs a tap apart, told apart
                       only by an ellipsis. Costs height, buys not picking
                       the wrong club. */}
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-                    {teams.map((team) => (
+                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4">
+                    {teams.slice(0, demotedFrom).map((team) => (
                       <RosterChip
                         key={team.id}
                         team={team}
@@ -501,6 +514,28 @@ export function BandsBoard({
                       />
                     ))}
                   </div>
+
+                  {/* The demotion is captioned, not silent. A player who
+                      notices Arsenal has moved needs to read it as the list
+                      tidying itself, not as the list losing their place. */}
+                  {demotedFrom < teams.length ? (
+                    <>
+                      <p className="mt-3 mb-1.5 px-0.5 text-[0.62rem] font-bold tracking-[0.1em] text-ink/35 uppercase">
+                        Already placed &middot; {teams.length - demotedFrom}
+                      </p>
+                      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4">
+                        {teams.slice(demotedFrom).map((team) => (
+                          <RosterChip
+                            key={team.id}
+                            team={team}
+                            band={assignments[team.id] ?? null}
+                            busy={busyTeamIds.includes(team.id)}
+                            onTap={() => onTapTeam(team.id)}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  ) : null}
                 </>
               </CardShellBody>
             </CardShell>

@@ -370,3 +370,37 @@ export function rosterOrder<T extends RosterTeam>(teams: readonly T[]): T[] {
       (b.previousSeasonPosition ?? Number.MAX_SAFE_INTEGER),
   );
 }
+
+export interface DemotedRoster<T> {
+  /** Unplaced clubs first, then placed ones -- each group keeping last
+   * season's order internally, so the list is re-grouped, never re-sorted. */
+  ordered: T[];
+  /** Index the placed group starts at, so the boundary can be captioned.
+   * Captured here rather than re-derived from assignments at render time:
+   * a club placed *since* the last re-group is deliberately still sitting
+   * in the top group, and deriving would yank it down immediately. */
+  demotedFrom: number;
+}
+
+/**
+ * PROTOTYPE: pushes already-placed clubs to the bottom of the roster.
+ *
+ * Called only when the open Band changes, never on a tap. That is the whole
+ * point: while you are filling one Band the list is frozen, so nothing
+ * shifts under your finger between taps -- the failure mode that made ADR
+ * 0008 specify fixed roster positions in the first place. The list re-settles
+ * only at a moment the player is already changing context.
+ *
+ * Softer than hiding placed clubs: they stay present and tappable, so
+ * pulling a club out of one Band into another still works with no extra
+ * disclosure control, and ADR 0008's "have I done Wolves yet?" is still
+ * answerable from the roster alone.
+ */
+export function demotePlaced<T extends { id: string }>(
+  roster: readonly T[],
+  assignments: Assignments,
+): DemotedRoster<T> {
+  const unplaced = roster.filter((team) => !assignments[team.id]);
+  const placed = roster.filter((team) => assignments[team.id]);
+  return { ordered: [...unplaced, ...placed], demotedFrom: unplaced.length };
+}

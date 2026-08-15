@@ -7,6 +7,7 @@ import {
   championWasNamed,
   countRead,
   countsOf,
+  demotePlaced,
   dropInto,
   fillTone,
   firstIncorrectlyFilledBand,
@@ -150,6 +151,52 @@ describe("tapWithEviction", () => {
     expect(result.assignments).toEqual({ arsenal: "europe" });
     expect(result.evicted).toBeNull();
     expect(result.movedFrom).toBe("champion");
+  });
+});
+
+// PROTOTYPE: already-placed clubs sink to the bottom of the roster, but the
+// re-group is deferred to a Band change -- these tests pin the grouping, and
+// PredictTableFlow's handleOpenBand is the only thing that calls it.
+describe("demotePlaced", () => {
+  const roster = [
+    { id: "a" },
+    { id: "b" },
+    { id: "c" },
+    { id: "d" },
+    { id: "e" },
+  ];
+
+  it("keeps the roster untouched when nothing is placed", () => {
+    const result = demotePlaced(roster, {});
+    expect(result.ordered.map((t) => t.id)).toEqual(["a", "b", "c", "d", "e"]);
+    expect(result.demotedFrom).toBe(5);
+  });
+
+  it("sinks placed clubs below the unplaced ones", () => {
+    const result = demotePlaced(roster, {
+      b: "champion",
+      d: "europe",
+    } as Record<string, BandKey>);
+    expect(result.ordered.map((t) => t.id)).toEqual(["a", "c", "e", "b", "d"]);
+    expect(result.demotedFrom).toBe(3);
+  });
+
+  it("preserves last season's order inside each group -- regrouped, never re-sorted", () => {
+    const result = demotePlaced(roster, {
+      a: "champion",
+      b: "europe",
+    } as Record<string, BandKey>);
+    // c,d,e keep their relative order, and so do a,b.
+    expect(result.ordered.map((t) => t.id)).toEqual(["c", "d", "e", "a", "b"]);
+  });
+
+  it("demotes everything once all 20 are placed, leaving no unplaced group", () => {
+    const all = Object.fromEntries(
+      roster.map((t) => [t.id, "champion"]),
+    ) as Record<string, BandKey>;
+    const result = demotePlaced(roster, all);
+    expect(result.demotedFrom).toBe(0);
+    expect(result.ordered.map((t) => t.id)).toEqual(["a", "b", "c", "d", "e"]);
   });
 });
 
