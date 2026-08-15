@@ -3,8 +3,11 @@ import {
   bandPosition,
   type BoardState,
   countRead,
+  countsOf,
   dropInto,
   fillTone,
+  firstIncorrectlyFilledBand,
+  isChampionNamed,
   modeFor,
   nextUnfilledBand,
   rosterOrder,
@@ -189,9 +192,7 @@ describe("nextUnfilledBand", () => {
   });
 
   it("returns null once every Band ahead is exactly filled", () => {
-    expect(
-      nextUnfilledBand("relegation_battle", { relegated: 3 }),
-    ).toBeNull();
+    expect(nextUnfilledBand("relegation_battle", { relegated: 3 })).toBeNull();
   });
 
   it("returns null from the last Band -- nothing ahead to search", () => {
@@ -204,6 +205,79 @@ describe("bandPosition", () => {
     expect(bandPosition("champion")).toBe(1);
     expect(bandPosition("europe")).toBe(3);
     expect(bandPosition("relegated")).toBe(7);
+  });
+});
+
+describe("countsOf", () => {
+  it("counts teams per band, from assignments", () => {
+    expect(
+      countsOf({
+        arsenal: "champion",
+        chelsea: "champions_league",
+        liverpool: "champions_league",
+      }),
+    ).toEqual({ champion: 1, champions_league: 2 });
+  });
+
+  it("is empty for an empty board", () => {
+    expect(countsOf({})).toEqual({});
+  });
+});
+
+describe("firstIncorrectlyFilledBand", () => {
+  it("lands an empty board on Champion", () => {
+    expect(firstIncorrectlyFilledBand({})).toBe("champion");
+  });
+
+  it("lands on the first Band under target", () => {
+    expect(
+      firstIncorrectlyFilledBand({ champion: 1, champions_league: 3 }),
+    ).toBe("champions_league");
+  });
+
+  it("skips Bands that are exactly filled", () => {
+    expect(
+      firstIncorrectlyFilledBand({ champion: 1, champions_league: 4 }),
+    ).toBe("europe");
+  });
+
+  it("lands on an over-filled Band -- that is work in filling mode", () => {
+    expect(firstIncorrectlyFilledBand({ champion: 2 })).toBe("champion");
+  });
+
+  it("returns null when every Band is exactly filled", () => {
+    expect(
+      firstIncorrectlyFilledBand({
+        champion: 1,
+        champions_league: 4,
+        europe: 3,
+        mid_table: 3,
+        lower_table: 3,
+        relegation_battle: 3,
+        relegated: 3,
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("isChampionNamed", () => {
+  it("is true only when the champion count moves from 0 to 1", () => {
+    expect(isChampionNamed({}, { champion: 1 })).toBe(true);
+    expect(isChampionNamed({ champion: 0 }, { champion: 1 })).toBe(true);
+  });
+
+  it("is false when the champion was already named", () => {
+    expect(isChampionNamed({ champion: 1 }, { champion: 1 })).toBe(false);
+    expect(isChampionNamed({ champion: 1 }, { champion: 2 })).toBe(false);
+  });
+
+  it("is false when no champion was named", () => {
+    expect(isChampionNamed({}, { champion: 0 })).toBe(false);
+    expect(isChampionNamed({ champion: 1 }, { champion: 0 })).toBe(false);
+  });
+
+  it("is false when a different Band got a team", () => {
+    expect(isChampionNamed({}, { europe: 1 })).toBe(false);
   });
 });
 

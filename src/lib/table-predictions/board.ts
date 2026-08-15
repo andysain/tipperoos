@@ -116,6 +116,47 @@ export function startAgain(): BoardState {
   return { assignments: {}, previous: {} };
 }
 
+/** Band fill counts from an assignments map -- the shape every fill-state
+ * helper (countRead, validateBandCounts, the landing, the ceremony) reads. */
+export function countsOf(
+  assignments: Assignments,
+): Partial<Record<BandKey, number>> {
+  const result: Partial<Record<BandKey, number>> = {};
+  for (const band of Object.values(assignments)) {
+    result[band] = (result[band] ?? 0) + 1;
+  }
+  return result;
+}
+
+/** The #118 return-visit landing: the first Band in canonical table order
+ * whose fill count is incorrect (actual !== target, over-filled included --
+ * that is still work in filling mode). Champion for an empty board, so a
+ * first visit is unchanged; null when every Band is exactly filled (which
+ * in practice means the board is in review mode, where the landing does not
+ * apply). Distinct from nextUnfilledBand, which is the in-session advance
+ * prompt: forward-from-current only and strictly under target. */
+export function firstIncorrectlyFilledBand(
+  counts: Partial<Record<BandKey, number>>,
+): BandKey | null {
+  for (const band of TABLE_BANDS) {
+    if ((counts[band.key] ?? 0) !== band.target) return band.key;
+  }
+  return null;
+}
+
+/** The #118 champion ceremony trigger: the champion band's count moved from
+ * 0 to 1 -- the champion was *named*, as opposed to any assignment into the
+ * band (a second team over-fills it), a review-mode drop or swap (the count
+ * never returns to 0), or an undo (which moves counts the other way). */
+export function isChampionNamed(
+  previousCounts: Partial<Record<BandKey, number>>,
+  nextCounts: Partial<Record<BandKey, number>>,
+): boolean {
+  return (
+    (previousCounts.champion ?? 0) === 0 && (nextCounts.champion ?? 0) === 1
+  );
+}
+
 export type FillTone = "under" | "ok" | "over";
 
 export function fillTone(filled: number, target: number): FillTone {

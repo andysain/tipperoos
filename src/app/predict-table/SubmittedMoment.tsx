@@ -1,39 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Trophy } from "lucide-react";
-import { tv } from "tailwind-variants";
 import { Button } from "@/components/ui/Button";
 import { type BandKey } from "@/lib/table-predictions/rules";
-import { TeamIdentity, type Team } from "./shared";
-
-type BandTone = "success" | "info" | "warning" | "danger" | "neutral";
-
-// A handful of falling confetti pieces, reusing the existing semantic
-// tones (never a new color -- DESIGN_SYSTEM.md's "no other colors" rule).
-// Purely decorative: aria-hidden, and skipped outright under
-// prefers-reduced-motion rather than just not animating.
-const CONFETTI: { left: number; delay: number; tone: BandTone }[] = [
-  { left: 8, delay: 0, tone: "success" },
-  { left: 20, delay: 0.08, tone: "warning" },
-  { left: 33, delay: 0.02, tone: "info" },
-  { left: 46, delay: 0.14, tone: "danger" },
-  { left: 58, delay: 0.05, tone: "success" },
-  { left: 70, delay: 0.11, tone: "info" },
-  { left: 82, delay: 0.03, tone: "warning" },
-  { left: 92, delay: 0.09, tone: "danger" },
-];
-
-const confettiPiece = tv({
-  base: "absolute top-0 h-2 w-2 rounded-sm motion-safe:animate-confetti-fall",
-  variants: {
-    tone: {
-      success: "bg-success",
-      info: "bg-info",
-      warning: "bg-warning",
-      danger: "bg-danger",
-      neutral: "bg-ink/30",
-    },
-  },
-});
+import { CONFETTI, confettiPiece, TeamIdentity, type Team } from "./shared";
 
 // Stays on screen until the player explicitly dismisses it -- no
 // auto-timeout. This is a "you're locked in" confirmation, not a passive

@@ -124,12 +124,15 @@ An untidy table still scores. Per-team band distance computes normally on any as
 only the Band Bonus needs exact membership, and over-filling hedges nothing since a club sits
 in exactly one Band regardless.
 
-## Specified, not prototyped
+## Implemented (was "Specified, not prototyped")
 
-Decided in ADR 0008 but absent from the prototype — implement from here, not from the code:
+All four of the behaviours decided in ADR 0008 but absent from the prototype are now
+shipped — the last two in #118 (2026-08). The bullets below are the spec as implemented;
+the code (`src/app/predict-table/`, `src/lib/table-predictions/`) is authoritative.
 
 - **Return visits** open the first Band that isn't correctly filled. Champion on a first
-  visit; wherever the work actually is on a later one.
+  visit; wherever the work actually is on a later one. Over-filled Bands count as work, and
+  the landing is client-side only (`firstIncorrectlyFilledBand` in `src/lib/table-predictions/board.ts`).
 - **After the fixed Table Prediction deadline**: the expanded review board, read-only. Lifting disabled,
   drop targets absent, tints dropped — once locked, "one too many" is history, not a task.
 - **Ceremony** on the Champion pick: a non-blocking visual beat (the card landing with

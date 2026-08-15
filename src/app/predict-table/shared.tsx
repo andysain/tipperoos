@@ -7,6 +7,7 @@ import {
   TriangleAlert,
   Trophy,
 } from "lucide-react";
+import { tv } from "tailwind-variants";
 import { ClubCodeBadge } from "@/components/ui/ClubCodeBadge";
 import { type BandKey, TABLE_BANDS } from "@/lib/table-predictions/rules";
 import { applyContrastFloor, kitColors } from "@/lib/teams/kit-colors";
@@ -140,3 +141,35 @@ export function TeamIdentity({
     </span>
   );
 }
+
+export type BandTone = "success" | "info" | "warning" | "danger" | "neutral";
+
+// A handful of falling confetti pieces, reusing the existing semantic
+// tones (never a new color -- DESIGN_SYSTEM.md's "no other colors" rule).
+// Purely decorative: always rendered aria-hidden inside a
+// pointer-events-none wrapper, and skipped outright under
+// prefers-reduced-motion rather than just not animating. Shared by the
+// submit moment and the champion ceremony (issue #118).
+export const CONFETTI: { left: number; delay: number; tone: BandTone }[] = [
+  { left: 8, delay: 0, tone: "success" },
+  { left: 20, delay: 0.08, tone: "warning" },
+  { left: 33, delay: 0.02, tone: "info" },
+  { left: 46, delay: 0.14, tone: "danger" },
+  { left: 58, delay: 0.05, tone: "success" },
+  { left: 70, delay: 0.11, tone: "info" },
+  { left: 82, delay: 0.03, tone: "warning" },
+  { left: 92, delay: 0.09, tone: "danger" },
+];
+
+export const confettiPiece = tv({
+  base: "absolute top-0 h-2 w-2 rounded-sm motion-safe:animate-confetti-fall",
+  variants: {
+    tone: {
+      success: "bg-success",
+      info: "bg-info",
+      warning: "bg-warning",
+      danger: "bg-danger",
+      neutral: "bg-ink/30",
+    },
+  },
+});
