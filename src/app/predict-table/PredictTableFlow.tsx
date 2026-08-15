@@ -314,7 +314,7 @@ export function PredictTableFlow({
     void persistTap(
       teamId,
       result,
-      championWasNamed(counts, result.assignments) &&
+      championWasNamed(counts, countsOf(result.assignments)) &&
         !championCelebrated.current,
     );
   }
