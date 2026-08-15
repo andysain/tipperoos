@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { TriangleAlert } from "lucide-react";
 import { ClubCodeBadge } from "@/components/ui/ClubCodeBadge";
 import { kitColors, stripeStyle } from "@/lib/teams/kit-colors";
 import type { TablePredictionStripState } from "@/lib/table-predictions/strip-state";
@@ -92,9 +93,16 @@ export function TablePredictionStrip({
         </Link>
       </div>
       {state.bandsUntidy ? (
-        <p className="text-xs font-semibold text-warning">
-          Some of your Bands aren&apos;t quite right yet -- check your table.
-        </p>
+        <div className="flex items-center gap-2 rounded-btn-sm bg-warning/10 px-3 py-2">
+          <TriangleAlert
+            className="size-4 shrink-0 text-warning"
+            aria-hidden
+          />
+          <p className="text-xs font-semibold text-ink/70">
+            Some of your Bands aren&apos;t quite right yet -- check your
+            table.
+          </p>
+        </div>
       ) : null}
     </div>
   );
