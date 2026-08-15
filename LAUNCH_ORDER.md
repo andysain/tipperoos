@@ -127,7 +127,7 @@ Sizes are rough t-shirt estimates (XS ≈ &lt;1hr, S ≈ half day, M ≈ 1–2 d
     - [x] **#127 — Make emoji selection mandatory + add random-pick button** — **S** (`cut-if-behind`: the full emoji-library tier)
   - [ ] Pick Board
     - [x] **#128 — Pick Board: show calendar date alongside kickoff time** — **S**
-    - [ ] Show the viewing player's own Champion pick (from Predict the Table) on the pick board, as a personal reference chip. i see this sectino existing in five states 1. no table submited. 2. table submitted incorrectly (no winner). 3. table submitted incorrectly (has winner). 4. table submitted not passed deadline. 5. table submitted correctly, deadline has passed. and the actions for each state is 1. show current nudge cell with CTA. 2. show warning table submitted incorrectly with CTA. 3. show winner and warning with CTA. 4. show winner and edit CTA. 5. show winner only
+    - [ ] **#156 — Table Prediction Strip** — **S/M**. Replaces the onboarding-only prompt with a permanent mini-card carrying the player's own Champion pick and that club's current league position, so Predict the Table doesn't vanish from home once the deadline passes. Champion gates on `submitted_at`, not on the deadline (a Late Joiner never locks). Renders nothing for a skipped table, or one whose Champion Band doesn't hold exactly one team. Shape settled by prototype — branch `prototype/table-prediction-strip`, verdict on the issue.
   - [x] Predict the Table
     - [x] new predict the table input approach
     - [x] **#129 — Fix "locked in" confirmation to a fixed modal** — **S**
@@ -146,6 +146,7 @@ Sizes are rough t-shirt estimates (XS ≈ &lt;1hr, S ≈ half day, M ≈ 1–2 d
     - [ ] Reorder Match 1 / Match 2 by kickoff time (chronological), Top Pick as tiebreak only — supersedes the current fixed Match-1-first ordering in `docs/adr/0007` — **S**
     - [ ] Decide on redesigning the score input (buttons vs. free text) — must resolve the "single digit on 5+" case too: multi-digit entry above the valid range currently fails with a vague error instead of being prevented or clearly explained — open design question, not committed — **M**
   - [ ] Predict the Table
+    - [ ] **#157 — Live Table Prediction Score on the Strip** — **M**. Surfaces the continuously-computed score (`CLAUDE.md` → Predict the Table) in #156's card as points plus a meter. Precomputed on the standings sync, not per request — Bold Call rarity needs the whole cohort, so it can't be scored per player on `/`. Depends on #156.
     - [ ] _Future direction, not committed:_ after lock, mirror the weekly pick visibility rule — other players' full Table predictions become visible, plus a comparison against actual current standings
   - [ ] Leaderboard
     - [ ] Build it  - **Due by end of Gameweek 1**
