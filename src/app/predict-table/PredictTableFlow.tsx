@@ -360,9 +360,6 @@ export function PredictTableFlow({
     setUndo(null);
     setLifted(null);
     setOpenBand("champion");
-    // The rebuilt board's first champion deserves the ceremony too -- a
-    // Start again is a deliberate reset, not the same session's churn.
-    championCelebrated.current = false;
 
     const results = await Promise.all(
       teamIds.map((teamId) =>
@@ -376,6 +373,12 @@ export function PredictTableFlow({
       setSaveError(
         "Couldn't start again -- check your connection and try again.",
       );
+    } else {
+      // The rebuilt board's first champion deserves the ceremony too -- a
+      // Start again is a deliberate reset, not the same session's churn.
+      // Reset only on success: a rolled-back board still has its champion
+      // named, and spending the once-per-session beat there loses it.
+      championCelebrated.current = false;
     }
     setStartingAgain(false);
   }

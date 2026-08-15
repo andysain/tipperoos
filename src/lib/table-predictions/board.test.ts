@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
+import { type BandKey } from "./rules";
 import {
   bandPosition,
+  type BandCounts,
   type BoardState,
+  championWasNamed,
   countRead,
   countsOf,
   dropInto,
   fillTone,
   firstIncorrectlyFilledBand,
-  championWasNamed,
   modeFor,
   nextUnfilledBand,
   rosterOrder,
@@ -17,6 +19,12 @@ import {
 } from "./board";
 
 const empty: BoardState = { assignments: {}, previous: {} };
+
+// Test-side constructor for the branded BandCounts shape -- countsOf is the
+// only production constructor, but tests want to write literals.
+function bandCounts(counts: Partial<Record<BandKey, number>>): BandCounts {
+  return counts as BandCounts;
+}
 
 describe("tapWhileFilling", () => {
   it("places an unplaced team into the open band", () => {
@@ -226,58 +234,92 @@ describe("countsOf", () => {
 
 describe("firstIncorrectlyFilledBand", () => {
   it("lands an empty board on Champion", () => {
-    expect(firstIncorrectlyFilledBand({})).toBe("champion");
+    expect(firstIncorrectlyFilledBand(bandCounts({}))).toBe("champion");
   });
 
   it("lands on the first Band under target", () => {
     expect(
-      firstIncorrectlyFilledBand({ champion: 1, champions_league: 3 }),
+      firstIncorrectlyFilledBand(
+        bandCounts({ champion: 1, champions_league: 3 }),
+      ),
     ).toBe("champions_league");
   });
 
   it("skips Bands that are exactly filled", () => {
     expect(
-      firstIncorrectlyFilledBand({ champion: 1, champions_league: 4 }),
+      firstIncorrectlyFilledBand(
+        bandCounts({ champion: 1, champions_league: 4 }),
+      ),
     ).toBe("europe");
   });
 
   it("lands on an over-filled Band -- that is work in filling mode", () => {
-    expect(firstIncorrectlyFilledBand({ champion: 2 })).toBe("champion");
+    expect(firstIncorrectlyFilledBand(bandCounts({ champion: 2 }))).toBe(
+      "champion",
+    );
   });
 
   it("returns null when every Band is exactly filled", () => {
     expect(
-      firstIncorrectlyFilledBand({
-        champion: 1,
-        champions_league: 4,
-        europe: 3,
-        mid_table: 3,
-        lower_table: 3,
-        relegation_battle: 3,
-        relegated: 3,
-      }),
+      firstIncorrectlyFilledBand(
+        bandCounts({
+          champion: 1,
+          champions_league: 4,
+          europe: 3,
+          mid_table: 3,
+          lower_table: 3,
+          relegation_battle: 3,
+          relegated: 3,
+        }),
+      ),
     ).toBeNull();
   });
 });
 
 describe("championWasNamed", () => {
   it("is true only when the champion count moves from 0 to 1", () => {
-    expect(championWasNamed({}, { champion: 1 })).toBe(true);
-    expect(championWasNamed({ champion: 0 }, { champion: 1 })).toBe(true);
+    expect(championWasNamed(bandCounts({}), bandCounts({ champion: 1 }))).toBe(
+      true,
+    );
+    expect(
+      championWasNamed(
+        bandCounts({ champion: 0 }),
+        bandCounts({ champion: 1 }),
+      ),
+    ).toBe(true);
   });
 
   it("is false when the champion was already named", () => {
-    expect(championWasNamed({ champion: 1 }, { champion: 1 })).toBe(false);
-    expect(championWasNamed({ champion: 1 }, { champion: 2 })).toBe(false);
+    expect(
+      championWasNamed(
+        bandCounts({ champion: 1 }),
+        bandCounts({ champion: 1 }),
+      ),
+    ).toBe(false);
+    expect(
+      championWasNamed(
+        bandCounts({ champion: 1 }),
+        bandCounts({ champion: 2 }),
+      ),
+    ).toBe(false);
   });
 
   it("is false when no champion was named", () => {
-    expect(championWasNamed({}, { champion: 0 })).toBe(false);
-    expect(championWasNamed({ champion: 1 }, { champion: 0 })).toBe(false);
+    expect(championWasNamed(bandCounts({}), bandCounts({ champion: 0 }))).toBe(
+      false,
+    );
+    expect(
+      championWasNamed(
+        bandCounts({ champion: 1 }),
+        bandCounts({ champion: 0 }),
+      ),
+    ).toBe(false);
   });
 
   it("is false when a different Band got a team", () => {
-    expect(championWasNamed({}, { europe: 1 })).toBe(false);
+    expect(championWasNamed(bandCounts({}), bandCounts({ europe: 1 }))).toBe(
+      false,
+    );
   });
 });
 

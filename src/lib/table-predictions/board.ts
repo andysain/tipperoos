@@ -116,16 +116,25 @@ export function startAgain(): BoardState {
   return { assignments: {}, previous: {} };
 }
 
+/** Band fill counts, branded so an Assignments map can never be passed
+ * where counts are expected -- the two shapes collide structurally and did
+ * once, silently disabling #118's ceremony (the weak-type rule let
+ * `Record<string, BandKey>` through where `Partial<Record<BandKey,
+ * number>>` was expected). Only countsOf constructs one. */
+export type BandCounts = Partial<Record<BandKey, number>> & {
+  readonly [countsBrand]: true;
+};
+
+declare const countsBrand: unique symbol;
+
 /** Band fill counts from an assignments map -- the shape the landing, the
  * ceremony trigger, and validateBandCounts read. */
-export function countsOf(
-  assignments: Assignments,
-): Partial<Record<BandKey, number>> {
+export function countsOf(assignments: Assignments): BandCounts {
   const result: Partial<Record<BandKey, number>> = {};
   for (const band of Object.values(assignments)) {
     result[band] = (result[band] ?? 0) + 1;
   }
-  return result;
+  return result as BandCounts;
 }
 
 /** The #118 return-visit landing: the first Band in canonical table order
@@ -135,9 +144,7 @@ export function countsOf(
  * in practice means the board is in review mode, where the landing does not
  * apply). Distinct from nextUnfilledBand, which is the in-session advance
  * prompt: forward-from-current only and strictly under target. */
-export function firstIncorrectlyFilledBand(
-  counts: Partial<Record<BandKey, number>>,
-): BandKey | null {
+export function firstIncorrectlyFilledBand(counts: BandCounts): BandKey | null {
   for (const band of TABLE_BANDS) {
     if ((counts[band.key] ?? 0) !== band.target) return band.key;
   }
@@ -151,8 +158,8 @@ export function firstIncorrectlyFilledBand(
  * count 0 -> 1 too, but the ceremony belongs to the filling tap that names
  * the champion -- the flow only checks this on the tap path. */
 export function championWasNamed(
-  previousCounts: Partial<Record<BandKey, number>>,
-  nextCounts: Partial<Record<BandKey, number>>,
+  previousCounts: BandCounts,
+  nextCounts: BandCounts,
 ): boolean {
   return (
     (previousCounts.champion ?? 0) === 0 && (nextCounts.champion ?? 0) === 1

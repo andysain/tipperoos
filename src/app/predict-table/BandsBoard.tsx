@@ -89,7 +89,7 @@ function PlacedTeamCard({
       disabled={disabled}
       className={`group flex min-h-12 items-stretch gap-3 overflow-hidden rounded-btn border py-3 pr-3 pl-2.5 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
         emphasis ? "border-accent bg-accent/10 ring-1 ring-accent/40" : ""
-      } ${liftedHere ? "border-accent bg-accent/10 ring-2 ring-accent/50" : overfilled ? "border-danger/50 bg-danger/10 hover:border-danger" : !emphasis ? "border-paper-line bg-white hover:border-accent/50" : ""}       ${justSwapped || celebrate ? "motion-safe:animate-swap-pulse" : ""}`}
+      } ${liftedHere ? "border-accent bg-accent/10 ring-2 ring-accent/50" : overfilled ? "border-danger/50 bg-danger/10 hover:border-danger" : !emphasis ? "border-paper-line bg-white hover:border-accent/50" : ""} ${justSwapped || celebrate ? "motion-safe:animate-swap-pulse" : ""}`}
     >
       <span
         aria-hidden
