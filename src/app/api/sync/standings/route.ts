@@ -64,12 +64,31 @@ export async function POST(request: Request) {
       teamsResult.data.map((team) => [team.provider_team_id, team.id]),
     );
 
-    const { rows, unmatchedProviderTeamIds } = mapStandingsToRows(
+    const { rows, unmatchedProviderTeamIds, degenerate } = mapStandingsToRows(
       standingsResponse,
       teamIdByProviderId,
       seasonResult.data.id,
       new Date(),
     );
+
+    if (degenerate) {
+      // Pre-season placeholder (football-data.org emits every team at
+      // position 1 / 0 played before real results exist). Overwriting the
+      // stored rows would replace real positions with garbage, so skip the
+      // upsert and note it in sync_log instead.
+      await supabase.from("sync_log").insert({
+        provider_name: PROVIDER_NAME,
+        sync_type: "standings",
+        status: "success",
+        error_message:
+          "skipped degenerate standings snapshot (every team at the same position) -- kept existing rows",
+      });
+      return NextResponse.json({
+        updated: 0,
+        skipped: unmatchedProviderTeamIds,
+        degenerate: true,
+      });
+    }
 
     const { error: upsertError } = await supabase
       .from("team_standings")
