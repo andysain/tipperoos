@@ -7,22 +7,29 @@ import {
 } from "@/app/_lib/gameweek-access";
 import {
   getDatabaseTime,
+  getGameweekOneKickoff,
+  getPlayerForTablePrediction,
   getTablePredictionRecord,
+  getTablePredictionStripData,
 } from "@/app/_lib/table-prediction-access";
 import {
   loadLastWeekSummary,
   loadPickBoardGameweek,
   loadSeasonStats,
 } from "@/app/_lib/pick-board-access";
-import { isMatchLocked, resolveCompetitionId } from "@/lib/competitions/scope";
-import { TABLE_PREDICTION_DEADLINE } from "@/lib/table-predictions/rules";
+import { isMatchLocked } from "@/lib/competitions/scope";
+import {
+  getTablePredictionEditability,
+  validateBandCounts,
+} from "@/lib/table-predictions/rules";
+import { deriveTablePredictionStripState } from "@/lib/table-predictions/strip-state";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { GameweekHeader } from "@/components/pick-board/GameweekHeader";
 import { LastWeekStrip } from "@/components/pick-board/LastWeekStrip";
 import { PickBoardSlotCard } from "@/components/pick-board/PickBoardSlotCard";
 import { SeasonStatsBlock } from "@/components/pick-board/SeasonStatsBlock";
 import { StatsStrip } from "@/components/pick-board/StatsStrip";
-import { TablePredictionPrompt } from "@/components/pick-board/TablePredictionPrompt";
+import { TablePredictionStrip } from "@/components/pick-board/TablePredictionStrip";
 import { ScoringSummary } from "@/components/scoring/ScoringSummary";
 import {
   DEFAULT_TIME_ZONE,
@@ -47,10 +54,11 @@ export default async function PickBoardPage() {
   }
 
   const supabase = createServerSupabaseClient();
-  const competitionId = await resolveCompetitionId(supabase, playerId);
-  if (!competitionId) {
+  const player = await getPlayerForTablePrediction(supabase, playerId);
+  if (!player) {
     redirect("/login");
   }
+  const { competitionId, joinedAt } = player;
 
   const now = new Date();
   const cookieStore = await cookies();
@@ -64,7 +72,18 @@ export default async function PickBoardPage() {
   // depended on either now runs in the single Promise.all beneath it,
   // including the last-week summary, which previously ran serially after
   // the whole block above resolved.
-  const seasonId = await getCurrentSeasonId(supabase);
+  //
+  // `tablePrediction` runs alongside `seasonId` here rather than inside the
+  // wave below (issue #156's decision log): it depends on neither `seasonId`
+  // nor `competitionId`, and the Table Prediction Strip's Champion/Band/
+  // standings loader needs `tablePrediction.id` as an *input* to a promise
+  // in that wave -- which a same-wave peer can't supply. Resolving it one
+  // hop earlier keeps the total round-trip count unchanged (still 3 hops)
+  // while making that id available in time.
+  const [seasonId, tablePrediction] = await Promise.all([
+    getCurrentSeasonId(supabase),
+    getTablePredictionRecord(supabase, playerId),
+  ]);
   const gameweekNumber = seasonId
     ? await resolveCurrentGameweekForCompetition(
         supabase,
@@ -76,43 +95,64 @@ export default async function PickBoardPage() {
   const previousGameweekNumber =
     gameweekNumber !== null ? gameweekNumber - 1 : null;
 
-  const [gameweek, seasonStats, lastWeek, tablePrediction, databaseTime] =
-    await Promise.all([
-      seasonId && gameweekNumber !== null
-        ? loadPickBoardGameweek(
-            supabase,
-            competitionId,
-            playerId,
-            now,
-            seasonId,
-            gameweekNumber,
-          )
-        : Promise.resolve(null),
-      seasonId
-        ? loadSeasonStats(supabase, competitionId, playerId, seasonId)
-        : Promise.resolve(null),
-      seasonId && previousGameweekNumber !== null
-        ? loadLastWeekSummary(
-            supabase,
-            competitionId,
-            playerId,
-            seasonId,
-            previousGameweekNumber,
-          )
-        : Promise.resolve(null),
-      getTablePredictionRecord(supabase, playerId),
-      getDatabaseTime(supabase),
-    ]);
+  const [
+    gameweek,
+    seasonStats,
+    lastWeek,
+    databaseTime,
+    gameweekOneKickoff,
+    tablePredictionStripData,
+  ] = await Promise.all([
+    seasonId && gameweekNumber !== null
+      ? loadPickBoardGameweek(
+          supabase,
+          competitionId,
+          playerId,
+          now,
+          seasonId,
+          gameweekNumber,
+        )
+      : Promise.resolve(null),
+    seasonId
+      ? loadSeasonStats(supabase, competitionId, playerId, seasonId)
+      : Promise.resolve(null),
+    seasonId && previousGameweekNumber !== null
+      ? loadLastWeekSummary(
+          supabase,
+          competitionId,
+          playerId,
+          seasonId,
+          previousGameweekNumber,
+        )
+      : Promise.resolve(null),
+    getDatabaseTime(supabase),
+    getGameweekOneKickoff(supabase),
+    seasonId && tablePrediction
+      ? getTablePredictionStripData(supabase, tablePrediction.id, seasonId)
+      : Promise.resolve({
+          championTeam: null,
+          bandCounts: {},
+          leaguePosition: null,
+        }),
+  ]);
 
-  // ADR-0007's first-run decision: prompt until submitted/skipped or the
-  // fixed Table Prediction deadline. Late joiners can still submit any time
-  // after that via the Predict the Table tab -- this banner just stops nagging
-  // once the literal deadline in the ADR's own wording has passed.
-  const showTablePredictionPrompt =
-    tablePrediction?.submittedAt == null &&
-    !tablePrediction?.skipped &&
-    databaseTime !== null &&
-    databaseTime < TABLE_PREDICTION_DEADLINE;
+  // Fails closed (hidden) if the DB clock couldn't be read -- same "don't
+  // show a stale/unconfirmed state" posture the old prompt took by
+  // requiring `databaseTime !== null` before ever rendering.
+  const tablePredictionStripState = databaseTime
+    ? deriveTablePredictionStripState({
+        prediction: tablePrediction,
+        editability: getTablePredictionEditability({
+          joinedAt,
+          now: databaseTime,
+          gameweekOneKickoff,
+        }),
+        championTeam: tablePredictionStripData.championTeam,
+        bandCountsOk: validateBandCounts(tablePredictionStripData.bandCounts)
+          .ok,
+        leaguePosition: tablePredictionStripData.leaguePosition,
+      })
+    : ({ kind: "hidden" } as const);
 
   return (
     // SwitchPlayerButton (fixed top-3 right-3, size-10) floats above content
@@ -126,7 +166,7 @@ export default async function PickBoardPage() {
       <h1 className="text-[1.9rem] font-extrabold text-ink">Pick Board</h1>
       <StatsStrip stats={seasonStats} />
       <LastWeekStrip summary={lastWeek} />
-      {showTablePredictionPrompt ? <TablePredictionPrompt /> : null}
+      <TablePredictionStrip state={tablePredictionStripState} />
 
       {gameweek ? (
         <>

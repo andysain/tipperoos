@@ -1,9 +1,12 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  type BandKey,
   getTablePredictionEditability,
+  isBandKey,
   type TablePredictionEditability,
 } from "@/lib/table-predictions/rules";
+import type { TablePredictionStripTeam } from "@/lib/table-predictions/strip-state";
 
 export async function getDatabaseTime(
   supabase: SupabaseClient,
@@ -59,6 +62,7 @@ export async function getTablePredictionEditabilityForPlayer(
 
 export interface TablePredictionPlayer {
   id: string;
+  competitionId: string;
   joinedAt: Date;
 }
 
@@ -99,18 +103,109 @@ export async function getTablePredictionRecord(
   };
 }
 
+export interface TablePredictionStripData {
+  championTeam: TablePredictionStripTeam | null;
+  bandCounts: Partial<Record<BandKey, number>>;
+  leaguePosition: number | null;
+}
+
+/**
+ * Pick Board Table Prediction Strip data (issue #156): the Champion Band's
+ * single team (null if it doesn't hold exactly one -- never assigned, or a
+ * capture-invariant violation), each Band's current member count, and the
+ * Champion's current league position. Deliberately returns the raw counts
+ * rather than calling `validateBandCounts()` itself -- that's a rules.ts
+ * concern (this file is DB-fetching glue only, per its own doc comment
+ * above), so the caller runs the counts through `validateBandCounts()`
+ * before handing "Band-count validity" to `deriveTablePredictionStripState()`.
+ *
+ * `tablePredictionId` is caller-resolved (from `getTablePredictionRecord()`,
+ * same rationale as `loadPickBoardGameweek`'s caller-resolved `seasonId`/
+ * `gameweekNumber`) so this can join the Pick Board route's existing
+ * parallel wave instead of forcing a second one -- see issue #156's
+ * decision log.
+ *
+ * Two sequential round trips internally (ranks, then team+standings) once
+ * the Champion is known -- same shape as `loadPickBoardGameweek`'s own
+ * internal sequencing; this whole function is still just one peer in the
+ * caller's outer `Promise.all`.
+ */
+export async function getTablePredictionStripData(
+  supabase: SupabaseClient,
+  tablePredictionId: string,
+  seasonId: string,
+): Promise<TablePredictionStripData> {
+  const { data: ranks, error } = await supabase
+    .from("table_prediction_ranks")
+    .select("team_id, band")
+    .eq("table_prediction_id", tablePredictionId);
+  if (error) throw error;
+
+  const rows: { team_id: string; band: string }[] = ranks ?? [];
+  const bandCounts: Partial<Record<BandKey, number>> = {};
+  for (const row of rows) {
+    if (!isBandKey(row.band)) continue;
+    bandCounts[row.band] = (bandCounts[row.band] ?? 0) + 1;
+  }
+
+  const championRows = rows.filter((row) => row.band === "champion");
+  if (championRows.length !== 1) {
+    return { championTeam: null, bandCounts, leaguePosition: null };
+  }
+  const championTeamId = championRows[0].team_id;
+
+  const [teamResult, standingsResult] = await Promise.all([
+    supabase
+      .from("teams")
+      .select("id, name, short_code")
+      .eq("id", championTeamId)
+      .order("id")
+      .maybeSingle(),
+    supabase
+      .from("team_standings")
+      .select("position")
+      .eq("season_id", seasonId)
+      .eq("team_id", championTeamId)
+      .order("team_id")
+      .maybeSingle(),
+  ]);
+  if (teamResult.error) throw teamResult.error;
+  if (standingsResult.error) throw standingsResult.error;
+
+  const team = teamResult.data;
+  if (!team) return { championTeam: null, bandCounts, leaguePosition: null };
+
+  return {
+    championTeam: { id: team.id, name: team.name, shortCode: team.short_code },
+    bandCounts,
+    leaguePosition: standingsResult.data?.position ?? null,
+  };
+}
+
 // Shared by all three table-predictions routes (assign/submit/skip), each of
 // which needs the same "look up the session's player" step before applying
-// any lock/late-joiner rule.
+// any lock/late-joiner rule. Also the Pick Board route's (issue #156) sole
+// `players` lookup -- it needs both `competitionId` (for every other
+// loader's scoping) and `joinedAt` (for Late-Joiner-aware editability) from
+// the same session player, so a second `resolveCompetitionId` round trip
+// for the same row would be pure duplication
+// (docs/standards/PERFORMANCE_TESTING_STANDARD.md's "resolve shared loader
+// inputs once" principle). `resolveCompetitionId` in
+// src/lib/competitions/scope.ts is left alone for callers that only ever
+// needed the one column.
 export async function getPlayerForTablePrediction(
   supabase: SupabaseClient,
   playerId: string,
 ): Promise<TablePredictionPlayer | null> {
   const { data: player, error } = await supabase
     .from("players")
-    .select("id, joined_at")
+    .select("id, competition_id, joined_at")
     .eq("id", playerId)
     .maybeSingle();
   if (error || !player) return null;
-  return { id: player.id, joinedAt: new Date(player.joined_at) };
+  return {
+    id: player.id,
+    competitionId: player.competition_id,
+    joinedAt: new Date(player.joined_at),
+  };
 }
