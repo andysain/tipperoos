@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, ChevronUp, X } from "lucide-react";
+import { ChevronRight, X } from "lucide-react";
 import {
   CardShell,
   CardShellBody,
@@ -56,15 +56,14 @@ function UndoRow({ undo, onUndo }: { undo: UndoState; onUndo: () => void }) {
   );
 }
 
-/** A placed team's card inside an open or expanded Band. Tapping it acts on
- * the team; which action depends on the phase (see PredictTableFlow). */
+/** A placed team's card inside the open Band. Tapping it toggle-reverts the
+ * club to where it came from (see PredictTableFlow's handleTeamTap). */
 function PlacedTeamCard({
   team,
   emphasis,
   overfilled,
   onTap,
   disabled,
-  inert,
   nextOut,
   justSwapped,
   celebrate,
@@ -74,10 +73,6 @@ function PlacedTeamCard({
   overfilled?: boolean;
   onTap: () => void;
   disabled?: boolean;
-  /** PROTOTYPE: true on the resting board (no Band open), where clubs are
-   * read-only. Rendered as plain, un-hoverable, non-interactive -- the way
-   * back in is a Band header, not a club. */
-  inert?: boolean;
   /** PROTOTYPE: true for the club that will be displaced if another arrives
    * while this Band is full. Marked *before* it happens, so eviction is
    * never a surprise -- which is the whole justification for automating a
@@ -97,14 +92,13 @@ function PlacedTeamCard({
       ? "border-danger/50 bg-danger/10 hover:border-danger"
       : emphasis
         ? ""
-        : `border-paper-line bg-white ${inert ? "" : "hover:border-accent/50"}`;
+        : "border-paper-line bg-white hover:border-accent/50";
   return (
     <button
       type="button"
       onClick={onTap}
-      disabled={disabled || inert}
-      aria-disabled={inert || undefined}
-      className={`group flex min-h-12 items-stretch gap-3 overflow-hidden rounded-btn border py-3 pr-3 pl-2.5 text-left transition ${inert ? "disabled:cursor-default" : "disabled:cursor-not-allowed disabled:opacity-50"} ${
+      disabled={disabled}
+      className={`group flex min-h-12 items-stretch gap-3 overflow-hidden rounded-btn border py-3 pr-3 pl-2.5 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
         emphasis ? "border-accent bg-accent/10 ring-1 ring-accent/40" : ""
       } ${ground} ${justSwapped || celebrate ? "motion-safe:animate-swap-pulse" : ""}`}
     >
@@ -126,7 +120,7 @@ function PlacedTeamCard({
         <span className="shrink-0 self-center rounded-badge bg-warning/25 px-2 py-1 text-[0.6rem] font-extrabold tracking-[0.08em] text-ink/70 uppercase">
           Next out
         </span>
-      ) : inert ? null : (
+      ) : (
         <X aria-hidden className="size-4 shrink-0 self-center text-ink/30" />
       )}
     </button>
@@ -201,6 +195,15 @@ function RosterChip({
 // redundant anyway -- the always-visible roster already reconsiders any
 // placed team, labelled with its current Band -- so it's gone; this row
 // only ever opens.
+//
+// PROTOTYPE: this row is now doing two jobs, not one. With no separate
+// review board, the seven collapsed rows *are* the player's table, so this
+// has to be readable as a finished answer and not just as a waypoint. Hence
+// the changes over the muted one-line version: the position range is shown
+// (so the stack reads as an actual league table, 1 through 20), and members
+// are club-coloured rails plus names at real weight rather than a grey
+// run-on list, so a Band's membership can be checked at a glance instead of
+// read word by word.
 function CollapsedBandRow({
   band,
   teams,
@@ -217,9 +220,12 @@ function CollapsedBandRow({
     <button
       type="button"
       onClick={onOpen}
-      className={`flex w-full flex-col gap-1 rounded-card border px-3 py-2.5 text-left transition hover:border-accent/50 ${FILL_GROUND[tone]}`}
+      className={`flex w-full flex-col gap-1.5 rounded-card border px-3 py-2.5 text-left transition hover:border-accent/50 ${FILL_GROUND[tone]}`}
     >
       <span className="flex w-full items-center gap-2">
+        <span className="inline-flex min-w-8 shrink-0 items-center justify-center rounded-badge bg-ink/[0.07] px-1.5 py-0.5 text-[0.65rem] font-extrabold text-ink/55 tabular-nums">
+          {meta.positions}
+        </span>
         <meta.Icon className="size-4 shrink-0 text-ink/60" aria-hidden />
         <span className="min-w-0 flex-1 truncate text-[0.8rem] font-extrabold text-ink">
           {band.label}
@@ -230,9 +236,26 @@ function CollapsedBandRow({
           {countRead(filled, band.target)}
         </span>
       </span>
-      <span className="w-full pl-6 text-[0.72rem] leading-snug font-semibold whitespace-normal text-ink/50">
-        {teams.length ? teams.map((t) => t.displayName).join(" · ") : "—"}
-      </span>
+      {teams.length ? (
+        <span className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 pl-10">
+          {teams.map((team) => (
+            <span key={team.id} className="flex items-center gap-1.5">
+              <span
+                aria-hidden
+                className="h-3.5 w-1 shrink-0 rounded-full"
+                style={{ background: teamFill(team.shortCode) }}
+              />
+              <span className="text-[0.78rem] leading-snug font-bold text-ink/75">
+                {team.displayName}
+              </span>
+            </span>
+          ))}
+        </span>
+      ) : (
+        <span className="w-full pl-10 text-[0.78rem] leading-snug font-semibold text-ink/35">
+          Nobody yet
+        </span>
+      )}
     </button>
   );
 }
@@ -248,17 +271,16 @@ export function BandsBoard({
   justSwapped,
   celebratingChampion,
   onOpenBand,
-  onCloseBand,
   onTapTeam,
   onUndo,
 }: {
   teams: Team[];
   assignments: Record<string, BandKey>;
-  /** PROTOTYPE: zero or one Band is open. `null` is the resting board --
-   * every Band expanded and read-only, which is what used to be a separate
-   * "review mode" with its own tap grammar. Now it is just the same board
-   * with nothing open, reached and left through Band headers alone. */
-  openBand: BandKey | null;
+  /** PROTOTYPE: exactly one Band is open, always. There is no resting state
+   * and no review board -- the seven collapsed rows carry full membership,
+   * so the stack itself is the review surface and the open Band is where
+   * every edit happens. One shape on screen, in every state, all season. */
+  openBand: BandKey;
   /** The Band the "Next: [Band] →" prompt advances to, once the open Band
    * is exactly filled -- null while there's nothing under-filled ahead
    * (issue #130). */
@@ -275,13 +297,11 @@ export function BandsBoard({
    * lands with weight (issue #118). */
   celebratingChampion: boolean;
   onOpenBand: (band: BandKey) => void;
-  onCloseBand: () => void;
   onTapTeam: (teamId: string) => void;
   onUndo: () => void;
 }) {
   const teamsInBand = (band: BandKey) =>
     teams.filter((t) => assignments[t.id] === band);
-  const resting = openBand === null;
   // The undo affordance shows inside whichever Band(s) the move landed in.
   // A team evicted back to the roster has no Band, so its undo falls back to
   // the Band it was evicted from -- which is the open one, and therefore
@@ -305,9 +325,8 @@ export function BandsBoard({
         const headerBackground = HEADER_BACKGROUND[tone];
 
         const isOpen = band.key === openBand;
-        const expanded = resting || isOpen;
 
-        if (!expanded) {
+        if (!isOpen) {
           return (
             <div key={band.key}>
               {band.key === "relegated" ? <DropDivider /> : null}
@@ -323,13 +342,7 @@ export function BandsBoard({
         return (
           <div key={band.key}>
             {band.key === "relegated" ? <DropDivider /> : null}
-            <CardShell
-              className={
-                isOpen
-                  ? "ring-2 ring-accent ring-offset-2 ring-offset-paper"
-                  : ""
-              }
-            >
+            <CardShell className="ring-2 ring-accent ring-offset-2 ring-offset-paper">
               <CardShellHeader
                 style={
                   headerBackground
@@ -337,18 +350,12 @@ export function BandsBoard({
                     : undefined
                 }
               >
-                {/* PROTOTYPE: the header is the only navigation, in every
-                    state. Open closes to the resting board; resting opens
-                    that Band for filling. One control, one meaning, so
-                    there is no mode to be in the wrong one of. */}
-                <button
-                  type="button"
-                  onClick={() =>
-                    isOpen ? onCloseBand() : onOpenBand(band.key)
-                  }
-                  aria-expanded={isOpen}
-                  className="-my-1 flex w-full items-center justify-between gap-2 py-1 text-left"
-                >
+                {/* PROTOTYPE: with exactly one Band open at all times, the
+                    open Band's header has nowhere to navigate to -- you
+                    leave it by opening a different one. So it is a plain
+                    heading here, and only the collapsed rows are tappable.
+                    Nothing on screen is a control that does nothing. */}
+                <div className="-my-1 flex w-full items-center justify-between gap-2 py-1">
                   <span className="flex min-w-0 items-center gap-2">
                     <span className="inline-flex shrink-0 items-center justify-center rounded-badge bg-paper/15 px-2 py-1 text-[0.7rem] font-extrabold text-paper tabular-nums">
                       {meta.positions}
@@ -358,20 +365,10 @@ export function BandsBoard({
                       {band.label}
                     </h2>
                   </span>
-                  <span className="flex shrink-0 items-center gap-1.5">
-                    <span className="text-xs font-bold tabular-nums text-paper/85">
-                      {countRead(inBand.length, band.target)}
-                    </span>
-                    {isOpen ? (
-                      <ChevronUp className="size-4 text-paper/70" aria-hidden />
-                    ) : (
-                      <ChevronDown
-                        className="size-4 text-paper/70"
-                        aria-hidden
-                      />
-                    )}
+                  <span className="shrink-0 text-xs font-bold tabular-nums text-paper/85">
+                    {countRead(inBand.length, band.target)}
                   </span>
-                </button>
+                </div>
               </CardShellHeader>
               <CardShellBody>
                 {undo && undoBands.includes(band.key) ? (
@@ -386,8 +383,7 @@ export function BandsBoard({
                       emphasis={isChampionSingle}
                       overfilled={inBand.length > band.target}
                       disabled={busyTeamIds.includes(team.id)}
-                      inert={resting}
-                      nextOut={isOpen && nextOutTeamId === team.id}
+                      nextOut={nextOutTeamId === team.id}
                       justSwapped={
                         justSwapped != null &&
                         (justSwapped[0] === team.id ||
@@ -412,64 +408,47 @@ export function BandsBoard({
                     : null}
                 </div>
 
-                {isOpen && tone === "ok" ? (
-                  nextBand ? (
-                    <button
-                      type="button"
-                      onClick={() => onOpenBand(nextBand)}
-                      className="mt-3 flex w-full items-center justify-center gap-1 rounded-btn border-2 border-accent bg-accent/10 px-3 py-2.5 text-sm font-extrabold text-ink transition hover:bg-accent/20"
-                    >
-                      Next: {BAND_LABEL[nextBand]}
-                      <ChevronRight className="size-4" aria-hidden />
-                    </button>
-                  ) : (
-                    // PROTOTYPE: nothing under-filled ahead, so the advance
-                    // prompt becomes the way out to the resting board -- the
-                    // old "review mode", now just every Band closed.
-                    <button
-                      type="button"
-                      onClick={onCloseBand}
-                      className="mt-3 flex w-full items-center justify-center gap-1 rounded-btn border-2 border-accent bg-accent/10 px-3 py-2.5 text-sm font-extrabold text-ink transition hover:bg-accent/20"
-                    >
-                      See my whole table
-                      <ChevronUp className="size-4" aria-hidden />
-                    </button>
-                  )
+                {tone === "ok" && nextBand ? (
+                  <button
+                    type="button"
+                    onClick={() => onOpenBand(nextBand)}
+                    className="mt-3 flex w-full items-center justify-center gap-1 rounded-btn border-2 border-accent bg-accent/10 px-3 py-2.5 text-sm font-extrabold text-ink transition hover:bg-accent/20"
+                  >
+                    Next: {BAND_LABEL[nextBand]}
+                    <ChevronRight className="size-4" aria-hidden />
+                  </button>
                 ) : null}
 
-                {isOpen ? (
-                  <>
-                    <p className="mt-3 mb-2 px-0.5 text-[0.68rem] font-bold tracking-[0.12em] text-ink/40 uppercase">
-                      Last season&apos;s table
-                    </p>
-                    {/* PROTOTYPE: the eviction rule, stated where the tap
+                <>
+                  <p className="mt-3 mb-2 px-0.5 text-[0.68rem] font-bold tracking-[0.12em] text-ink/40 uppercase">
+                    Last season&apos;s table
+                  </p>
+                  {/* PROTOTYPE: the eviction rule, stated where the tap
                         that triggers it happens. Only shown while the Band
                         is genuinely full, so it reads as a live consequence
                         rather than a standing instruction. */}
-                    {nextOutTeamId ? (
-                      <p className="-mt-1 mb-2 px-0.5 text-[0.72rem] font-semibold text-ink/55">
-                        {band.label} is full — the next club you tap swaps in
-                        for{" "}
-                        <span className="font-extrabold text-ink/75">
-                          {teams.find((t) => t.id === nextOutTeamId)?.name ??
-                            "the club marked Next out"}
-                        </span>
-                        .
-                      </p>
-                    ) : null}
-                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
-                      {teams.map((team) => (
-                        <RosterChip
-                          key={team.id}
-                          team={team}
-                          band={assignments[team.id] ?? null}
-                          busy={busyTeamIds.includes(team.id)}
-                          onTap={() => onTapTeam(team.id)}
-                        />
-                      ))}
-                    </div>
-                  </>
-                ) : null}
+                  {nextOutTeamId ? (
+                    <p className="-mt-1 mb-2 px-0.5 text-[0.72rem] font-semibold text-ink/55">
+                      {band.label} is full — the next club you tap swaps in for{" "}
+                      <span className="font-extrabold text-ink/75">
+                        {teams.find((t) => t.id === nextOutTeamId)?.name ??
+                          "the club marked Next out"}
+                      </span>
+                      .
+                    </p>
+                  ) : null}
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+                    {teams.map((team) => (
+                      <RosterChip
+                        key={team.id}
+                        team={team}
+                        band={assignments[team.id] ?? null}
+                        busy={busyTeamIds.includes(team.id)}
+                        onTap={() => onTapTeam(team.id)}
+                      />
+                    ))}
+                  </div>
+                </>
               </CardShellBody>
             </CardShell>
           </div>
