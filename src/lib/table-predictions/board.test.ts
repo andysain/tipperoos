@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { type BandKey } from "./rules";
 import {
+  bandMemberOrder,
   bandPosition,
   type BandCounts,
   type BoardState,
@@ -151,6 +152,42 @@ describe("tapWithEviction", () => {
     expect(result.assignments).toEqual({ arsenal: "europe" });
     expect(result.evicted).toBeNull();
     expect(result.movedFrom).toBe("champion");
+  });
+});
+
+// PROTOTYPE: order inside a Band is alphabetical and carries no meaning --
+// see bandMemberOrder for why a stack under a "3-5" badge would otherwise
+// assert a ranking this feature never records or scores.
+describe("bandMemberOrder", () => {
+  const clubs = [
+    { displayName: "Man United" },
+    { displayName: "Aston Villa" },
+    { displayName: "Liverpool" },
+  ];
+
+  it("lists a Band's members alphabetically, not in the order they were placed", () => {
+    expect(bandMemberOrder(clubs).map((c) => c.displayName)).toEqual([
+      "Aston Villa",
+      "Liverpool",
+      "Man United",
+    ]);
+  });
+
+  it("does not mutate the input", () => {
+    const input = [...clubs];
+    bandMemberOrder(input);
+    expect(input.map((c) => c.displayName)).toEqual([
+      "Man United",
+      "Aston Villa",
+      "Liverpool",
+    ]);
+  });
+
+  it("is stable for a single member and an empty Band", () => {
+    expect(bandMemberOrder([{ displayName: "Arsenal" }])).toEqual([
+      { displayName: "Arsenal" },
+    ]);
+    expect(bandMemberOrder([])).toEqual([]);
   });
 });
 

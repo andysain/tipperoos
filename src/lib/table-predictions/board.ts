@@ -371,6 +371,29 @@ export function rosterOrder<T extends RosterTeam>(teams: readonly T[]): T[] {
   );
 }
 
+/**
+ * PROTOTYPE: the order clubs are listed in *within* a Band -- alphabetical,
+ * deliberately.
+ *
+ * Only Band membership scores; order inside a Band carries no weight at all
+ * (CLAUDE.md, and ADR 0010's placement table reads Bands, never positions).
+ * But once members are stacked vertically under a "3-5" badge, the layout
+ * asserts the opposite: first is 3rd, second is 4th, third is 5th. ADR 0008
+ * rejected a full 1-20 list partly to avoid making "9th or 10th?" a visible
+ * decision that doesn't score, and a vertical stack quietly reintroduces it.
+ *
+ * Alphabetical is the fix, and it's a behavioural one rather than a caption:
+ * a player who puts Liverpool in first and sees it render third learns
+ * immediately that this order isn't theirs and isn't being recorded. Any
+ * order derived from the player's own actions (insertion) or from a
+ * meaningful metric (last season's finish) would read as a ranking instead.
+ */
+export function bandMemberOrder<T extends { displayName: string }>(
+  teams: readonly T[],
+): T[] {
+  return [...teams].sort((a, b) => a.displayName.localeCompare(b.displayName));
+}
+
 export interface DemotedRoster<T> {
   /** Unplaced clubs first, then placed ones -- each group keeping last
    * season's order internally, so the list is re-grouped, never re-sorted. */

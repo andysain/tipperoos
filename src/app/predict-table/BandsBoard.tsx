@@ -6,7 +6,11 @@ import {
 } from "@/components/ui/CardShell";
 import { ClubCodeBadge } from "@/components/ui/ClubCodeBadge";
 import { type BandKey, TABLE_BANDS } from "@/lib/table-predictions/rules";
-import { countRead, fillTone } from "@/lib/table-predictions/board";
+import {
+  bandMemberOrder,
+  countRead,
+  fillTone,
+} from "@/lib/table-predictions/board";
 import {
   BAND_LABEL,
   BAND_META,
@@ -362,8 +366,11 @@ export function BandsBoard({
   onTapTeam: (teamId: string) => void;
   onUndo: () => void;
 }) {
+  // Alphabetical inside a Band, never insertion or last-season order --
+  // see bandMemberOrder: a stack under a "3-5" badge otherwise reads as a
+  // ranking that this feature deliberately doesn't record or score.
   const teamsInBand = (band: BandKey) =>
-    teams.filter((t) => assignments[t.id] === band);
+    bandMemberOrder(teams.filter((t) => assignments[t.id] === band));
   // The undo affordance shows inside whichever Band(s) the move landed in.
   // A team evicted back to the roster has no Band, so its undo falls back to
   // the Band it was evicted from -- which is the open one, and therefore
@@ -445,6 +452,16 @@ export function BandsBoard({
               <CardShellBody>
                 {undo && undoBands.includes(band.key) ? (
                   <UndoRow undo={undo} onUndo={onUndo} />
+                ) : null}
+
+                {/* Said once, in the Band actually being filled, which is
+                    when the misconception would form. Repeating it on all
+                    eight collapsed rows would be noise; burying it in the
+                    scoring accordion (where it also lives) is too late. */}
+                {band.target > 1 ? (
+                  <p className="mb-2 px-0.5 text-[0.72rem] font-semibold text-ink/45">
+                    Any order &mdash; only who&apos;s in the Band counts.
+                  </p>
                 ) : null}
 
                 <div className={`grid ${PLACED_TEAM_GRID_COLS} gap-2`}>
@@ -533,6 +550,9 @@ export function BandsBoard({
                     <>
                       <p className="mt-3 mb-1.5 px-0.5 text-[0.62rem] font-bold tracking-[0.1em] text-ink/35 uppercase">
                         Already placed &middot; {teams.length - demotedFrom}
+                        <span className="ml-1.5 font-semibold tracking-normal normal-case">
+                          &mdash; tap one to move it here
+                        </span>
                       </p>
                       <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4">
                         {teams.slice(demotedFrom).map((team) => (
