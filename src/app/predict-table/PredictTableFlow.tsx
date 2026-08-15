@@ -7,10 +7,10 @@ import { ScoringSummary } from "@/components/scoring/ScoringSummary";
 // PROTOTYPE (proto/predict-table-rethink). Three changes to try together:
 //
 //  1. One grammar, one shape. There is no review mode and no review board:
-//     exactly one Band is open at all times, and the collapsed rows already
-//     carry full membership, so the stack itself is what you review. Editing
-//     a finished table is the same two taps as filling an empty one -- open
-//     the Band, tap the club.
+//     Band headers toggle, the collapsed rows carry full membership, and so
+//     "everything closed" *is* the review of the table -- reached with the
+//     same gesture used to fill it. Editing a finished table is the same two
+//     taps as filling an empty one: open the Band, tap the club.
 //     -> modeFor, swapBands, dropInto-as-drop-target and `lifted` are all
 //        unused here now, and kept in board.ts rather than deleted.
 //  2. Bands cannot over-fill. Tapping into a full Band swaps in for its
@@ -128,13 +128,13 @@ export function PredictTableFlow({
   // #118's return-visit landing: which Band opens on a visit is where the
   // work actually is, not always Champion -- Champion on a first (empty)
   // visit, the first incorrectly filled Band on a return (ADR 0008).
-  // PROTOTYPE: back to non-nullable. Exactly one Band is open at all times
-  // -- there is no resting state, because the collapsed rows already carry
-  // full membership and so already are the review surface. A finished board
-  // falls back to Champion, which is simply the top of the table.
-  const [openBand, setOpenBand] = useState<BandKey>(
-    () =>
-      firstIncorrectlyFilledBand(countsOf(initialAssignments)) ?? "champion",
+  // PROTOTYPE: nullable, and null is a first-class state rather than a
+  // separate mode -- Band headers toggle, so closing the open one leaves
+  // every Band collapsed, which is the whole table on one screen. A visit
+  // lands on wherever the work is; a finished board lands all-collapsed,
+  // showing the answer rather than dropping the player into an edit.
+  const [openBand, setOpenBand] = useState<BandKey | null>(() =>
+    firstIncorrectlyFilledBand(countsOf(initialAssignments)),
   );
   const [undo, setUndo] = useState<UndoState | null>(null);
   // PROTOTYPE: undo restores a snapshot rather than replaying an inverse
@@ -196,14 +196,15 @@ export function PredictTableFlow({
   const counts = useMemo(() => countsOf(assignments), [assignments]);
   const validation = useMemo(() => validateBandCounts(counts), [counts]);
 
-  const nextBand = nextUnfilledBand(openBand, counts);
+  const nextBand = openBand ? nextUnfilledBand(openBand, counts) : null;
 
   // PROTOTYPE: the club eviction would displace, or null while the open Band
   // still has room. Drives the "Next out" marker and the roster hint.
-  const openBandTarget =
-    TABLE_BANDS.find((b) => b.key === openBand)?.target ?? 0;
+  const openBandTarget = openBand
+    ? (TABLE_BANDS.find((b) => b.key === openBand)?.target ?? 0)
+    : 0;
   const nextOutTeamId =
-    (counts[openBand] ?? 0) >= openBandTarget
+    openBand && (counts[openBand] ?? 0) >= openBandTarget
       ? nextOutTeam(assignments, placedAt, openBand)
       : null;
 
@@ -366,6 +367,7 @@ export function PredictTableFlow({
   // this one (which toggle-reverts it). No club is tappable at rest, so the
   // gesture never quietly changes meaning under the player.
   function handleTeamTap(teamId: string) {
+    if (!openBand) return;
     const result = tapWithEviction(
       { assignments, previous, placedAt },
       teamId,
@@ -536,8 +538,9 @@ export function PredictTableFlow({
         Predict the Table
       </h1>
       <p className="-mt-2 text-ink/70">
-        Where will each Premier League club finish? Tap clubs to add them to the
-        open Band, or tap another Band to open that one instead.
+        {openBand
+          ? "Tap clubs to add them to the open Band. Tap a Band's name to open or close it."
+          : "Where will each Premier League club finish? Tap a Band to open it, then tap clubs to add them."}
       </p>
       <ScoringSummary kind="table" />
 
@@ -546,10 +549,14 @@ export function PredictTableFlow({
           <span>
             {placedCount} of {teams.length} placed
           </span>
-          <span aria-hidden>&middot;</span>
-          <span>
-            Band {bandPosition(openBand)} of {TABLE_BANDS.length}
-          </span>
+          {openBand ? (
+            <>
+              <span aria-hidden>&middot;</span>
+              <span>
+                Band {bandPosition(openBand)} of {TABLE_BANDS.length}
+              </span>
+            </>
+          ) : null}
           {!locked && !isLateJoiner ? (
             <>
               <span aria-hidden>&middot;</span>
@@ -604,7 +611,7 @@ export function PredictTableFlow({
       {submittedAt ? (
         <p className="-mt-2 flex items-center gap-1.5 text-sm text-success">
           <CircleCheck className="size-4 shrink-0" aria-hidden />
-          Submitted -- you can keep editing until 31 August.
+          Submitted &mdash; you can keep editing until 31 August.
         </p>
       ) : null}
 
@@ -625,6 +632,7 @@ export function PredictTableFlow({
         justSwapped={justSwapped}
         celebratingChampion={celebrating}
         onOpenBand={setOpenBand}
+        onCloseBand={() => setOpenBand(null)}
         onTapTeam={handleTeamTap}
         onUndo={() => void handleUndo()}
       />

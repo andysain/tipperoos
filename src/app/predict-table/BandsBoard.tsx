@@ -1,4 +1,4 @@
-import { ChevronRight, X } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, X } from "lucide-react";
 import {
   CardShell,
   CardShellBody,
@@ -197,13 +197,17 @@ function RosterChip({
 // only ever opens.
 //
 // PROTOTYPE: this row is now doing two jobs, not one. With no separate
-// review board, the seven collapsed rows *are* the player's table, so this
-// has to be readable as a finished answer and not just as a waypoint. Hence
-// the changes over the muted one-line version: the position range is shown
-// (so the stack reads as an actual league table, 1 through 20), and members
-// are club-coloured rails plus names at real weight rather than a grey
-// run-on list, so a Band's membership can be checked at a glance instead of
-// read word by word.
+// review board, the collapsed rows *are* the player's table, so this has to
+// read as a finished answer and not just as a waypoint: the position range
+// is shown (so the stack reads as an actual league table, 1 through 20) and
+// members carry their club-code badge plus name at real weight.
+//
+// The badge replaced a bare kit-colour rail, which looked right in the
+// abstract and failed on the actual Premier League: Arsenal, Liverpool, Man
+// United, Sunderland, Forest, Palace, Bournemouth and Brentford all render
+// as the same red, so a wash of identical rails disambiguated nothing while
+// costing a column of width. The 3-letter badge is the app's existing club
+// token and is unambiguous by construction.
 function CollapsedBandRow({
   band,
   teams,
@@ -220,7 +224,8 @@ function CollapsedBandRow({
     <button
       type="button"
       onClick={onOpen}
-      className={`flex w-full flex-col gap-1.5 rounded-card border px-3 py-2.5 text-left transition hover:border-accent/50 ${FILL_GROUND[tone]}`}
+      aria-label={`Open ${band.label}`}
+      className={`group flex w-full flex-col gap-1.5 rounded-card border px-3 py-2.5 text-left transition hover:border-accent hover:bg-accent/[0.04] ${FILL_GROUND[tone]}`}
     >
       <span className="flex w-full items-center gap-2">
         <span className="inline-flex min-w-8 shrink-0 items-center justify-center rounded-badge bg-ink/[0.07] px-1.5 py-0.5 text-[0.65rem] font-extrabold text-ink/55 tabular-nums">
@@ -235,15 +240,22 @@ function CollapsedBandRow({
         >
           {countRead(filled, band.target)}
         </span>
+        {/* The "you can open this" affordance. A chevron on every collapsed
+            row, at full strength rather than a hover-only reveal -- on a
+            phone there is no hover, so an affordance that only appears on
+            one is no affordance at all. */}
+        <ChevronDown
+          className="size-4 shrink-0 text-ink/35 transition group-hover:text-accent"
+          aria-hidden
+        />
       </span>
       {teams.length ? (
-        <span className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 pl-10">
+        <span className="flex w-full flex-wrap items-center gap-x-2 gap-y-1.5 pl-10">
           {teams.map((team) => (
             <span key={team.id} className="flex items-center gap-1.5">
-              <span
-                aria-hidden
-                className="h-3.5 w-1 shrink-0 rounded-full"
-                style={{ background: teamFill(team.shortCode) }}
+              <ClubCodeBadge
+                shortCode={team.shortCode}
+                fill={teamFill(team.shortCode)}
               />
               <span className="text-[0.78rem] leading-snug font-bold text-ink/75">
                 {team.displayName}
@@ -271,16 +283,18 @@ export function BandsBoard({
   justSwapped,
   celebratingChampion,
   onOpenBand,
+  onCloseBand,
   onTapTeam,
   onUndo,
 }: {
   teams: Team[];
   assignments: Record<string, BandKey>;
-  /** PROTOTYPE: exactly one Band is open, always. There is no resting state
-   * and no review board -- the seven collapsed rows carry full membership,
-   * so the stack itself is the review surface and the open Band is where
-   * every edit happens. One shape on screen, in every state, all season. */
-  openBand: BandKey;
+  /** PROTOTYPE: zero or one Band is open. Band headers are the only
+   * navigation and they toggle -- tapping the open one closes it, so
+   * everything collapsed is a reachable state rather than a separate
+   * "review board". The collapsed rows carry full membership, so all-closed
+   * already is the review of the table. */
+  openBand: BandKey | null;
   /** The Band the "Next: [Band] →" prompt advances to, once the open Band
    * is exactly filled -- null while there's nothing under-filled ahead
    * (issue #130). */
@@ -297,6 +311,7 @@ export function BandsBoard({
    * lands with weight (issue #118). */
   celebratingChampion: boolean;
   onOpenBand: (band: BandKey) => void;
+  onCloseBand: () => void;
   onTapTeam: (teamId: string) => void;
   onUndo: () => void;
 }) {
@@ -350,12 +365,18 @@ export function BandsBoard({
                     : undefined
                 }
               >
-                {/* PROTOTYPE: with exactly one Band open at all times, the
-                    open Band's header has nowhere to navigate to -- you
-                    leave it by opening a different one. So it is a plain
-                    heading here, and only the collapsed rows are tappable.
-                    Nothing on screen is a control that does nothing. */}
-                <div className="-my-1 flex w-full items-center justify-between gap-2 py-1">
+                {/* Band headers are the only navigation and they toggle:
+                    tapping the open one closes it. That makes "everything
+                    collapsed" -- the whole table on one screen -- a place
+                    you can get to with the same gesture you already use,
+                    rather than a separate mode with its own control. */}
+                <button
+                  type="button"
+                  onClick={onCloseBand}
+                  aria-expanded
+                  aria-label={`Close ${band.label}`}
+                  className="-my-1 flex w-full items-center justify-between gap-2 py-1 text-left"
+                >
                   <span className="flex min-w-0 items-center gap-2">
                     <span className="inline-flex shrink-0 items-center justify-center rounded-badge bg-paper/15 px-2 py-1 text-[0.7rem] font-extrabold text-paper tabular-nums">
                       {meta.positions}
@@ -365,10 +386,13 @@ export function BandsBoard({
                       {band.label}
                     </h2>
                   </span>
-                  <span className="shrink-0 text-xs font-bold tabular-nums text-paper/85">
-                    {countRead(inBand.length, band.target)}
+                  <span className="flex shrink-0 items-center gap-1.5">
+                    <span className="text-xs font-bold tabular-nums text-paper/85">
+                      {countRead(inBand.length, band.target)}
+                    </span>
+                    <ChevronUp className="size-4 text-paper/70" aria-hidden />
                   </span>
-                </div>
+                </button>
               </CardShellHeader>
               <CardShellBody>
                 {undo && undoBands.includes(band.key) ? (
