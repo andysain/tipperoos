@@ -25,6 +25,12 @@
 // Run (repo root, local dev, from .env.local creds):
 //   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
 //     npx vitest run --config scripts/scripted-gameweek-simulation/vitest.config.ts
+//
+// Every run prints a readable per-stage scoring report. Add SIM_KEEP_WORLD=1 to
+// keep the synthetic competition on staging afterwards (it prints the ids and
+// the cleanup SQL) instead of disposing it in the finally block:
+//   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... SIM_KEEP_WORLD=1 \
+//     npx vitest run --config scripts/scripted-gameweek-simulation/vitest.config.ts
 
 import { describe, expect, it } from "vitest";
 import { recomputeMatchScores, type ScoreRow } from "@/lib/scoring/match";
@@ -33,6 +39,7 @@ import {
   createSimulationWorld,
   createStagingClient,
   disposeSimulationWorld,
+  printKeptWorldWarning,
   setMatchStatus,
   setSlotVoided,
   snapshotRowCounts,
@@ -42,6 +49,11 @@ import {
   LibGameweekSimulationDriver,
   type GameweekSimulationDriver,
 } from "./driver";
+import {
+  reportLeaderboard,
+  reportMatch,
+  type Names,
+} from "./report";
 
 type PickTuple = { playerId: string; home: number; away: number };
 
@@ -95,7 +107,7 @@ async function expectLeaderboard(
   competitionId: string,
   seasonId: string,
   expected: { playerId: string; points: number }[],
-): Promise<void> {
+): Promise<Awaited<ReturnType<typeof scoresForCompetition>>> {
   const rows = await scoresForCompetition(supabase, competitionId, seasonId);
   const byPlayer = new Map(rows.map((r) => [r.playerId, r.points]));
   expect(rows.length, `${label}: only this competition's players`).toBe(
@@ -113,6 +125,7 @@ async function expectLeaderboard(
       `${label}: points for ${e.playerId}`,
     ).toBe(e.points);
   }
+  return rows;
 }
 
 describe("scripted gameweek-simulation test (#22)", () => {
@@ -126,6 +139,14 @@ describe("scripted gameweek-simulation test (#22)", () => {
     const driver: GameweekSimulationDriver = new LibGameweekSimulationDriver(
       supabase,
     );
+
+    const names: Names = new Map([
+      [world.playerA1, "A1"],
+      [world.playerA2, "A2"],
+      [world.playerA3, "A3"],
+      [world.playerB1, "B1"],
+      [world.playerB2, "B2"],
+    ]);
 
     const matchOnePicks: PickTuple[] = [
       { playerId: world.playerA1, home: 2, away: 1 }, // exact 2-1 -> 7
@@ -185,6 +206,14 @@ describe("scripted gameweek-simulation test (#22)", () => {
         "exact scoreline 2-1 pays 7 (3+2+1+1)",
       ).toBe(7);
       expect(m1.get(world.playerB2), "wrong result pays 0").toBe(0);
+      reportMatch(
+        "match one scored",
+        matchOnePicks,
+        { home: 2, away: 1 },
+        false,
+        await driver.readScores(world.matchOneId),
+        names,
+      );
 
       // --- result + score, match two at 3-1 ---
       await driver.setResult(world.matchTwoId, 3, 1);
@@ -205,9 +234,17 @@ describe("scripted gameweek-simulation test (#22)", () => {
         m2.get(world.playerA3),
         "wrong-way-round (1-3 vs 3-1) pays exactly 1",
       ).toBe(1);
+      reportMatch(
+        "match two scored",
+        matchTwoPicks,
+        { home: 3, away: 1 },
+        false,
+        await driver.readScores(world.matchTwoId),
+        names,
+      );
 
       // --- leaderboard cross-competition leak check (shared match one) ---
-      await expectLeaderboard(
+      const compAMid = await expectLeaderboard(
         supabase,
         "comp A mid-cycle",
         world.competitionAId,
@@ -218,7 +255,13 @@ describe("scripted gameweek-simulation test (#22)", () => {
           { playerId: world.playerA3, points: 1 },
         ],
       );
-      await expectLeaderboard(
+      reportLeaderboard(
+        "competition A — running totals (after both matches scored)",
+        world.competitionAId,
+        compAMid,
+        names,
+      );
+      const compBMid = await expectLeaderboard(
         supabase,
         "comp B mid-cycle",
         world.competitionBId,
@@ -227,6 +270,12 @@ describe("scripted gameweek-simulation test (#22)", () => {
           { playerId: world.playerB1, points: 7 },
           { playerId: world.playerB2, points: 0 },
         ],
+      );
+      reportLeaderboard(
+        "competition B — running totals (after both matches scored)",
+        world.competitionBId,
+        compBMid,
+        names,
       );
 
       // --- corrected result -> rescore: totals NEVER drift ---
@@ -249,6 +298,14 @@ describe("scripted gameweek-simulation test (#22)", () => {
         corrected.get(world.playerA1),
         "corrected row replaced, not added to",
       ).toBe(5);
+      reportMatch(
+        "match one corrected to 1-0 (replacement, not accumulation)",
+        matchOnePicks,
+        { home: 1, away: 0 },
+        false,
+        await driver.readScores(world.matchOneId),
+        names,
+      );
 
       // Idempotent re-run: identical rows out of an unchanged state.
       const beforeRerun = await driver.readScores(world.matchOneId);
@@ -266,6 +323,14 @@ describe("scripted gameweek-simulation test (#22)", () => {
           `shared-match void zeroed picker ${p.playerId}`,
         ).toBe(0);
       }
+      reportMatch(
+        "match one voided (shared-match contract)",
+        matchOnePicks,
+        { home: 1, away: 0 },
+        true,
+        await driver.readScores(world.matchOneId),
+        names,
+      );
       await setSlotVoided(supabase, world.gameweekAId, "match_1", false);
       await driver.score(world.matchOneId);
       await expectSamePoints(
@@ -331,9 +396,17 @@ describe("scripted gameweek-simulation test (#22)", () => {
         ),
         world.matchTwoId,
       );
+      reportMatch(
+        "match two voided",
+        matchTwoPicks,
+        { home: 3, away: 1 },
+        true,
+        await driver.readScores(world.matchTwoId),
+        names,
+      );
 
       // --- leaderboard after correction + void: still scoped, still right ---
-      await expectLeaderboard(
+      const compAPostVoid = await expectLeaderboard(
         supabase,
         "comp A post-void",
         world.competitionAId,
@@ -344,7 +417,13 @@ describe("scripted gameweek-simulation test (#22)", () => {
           { playerId: world.playerA3, points: 0 },
         ],
       );
-      await expectLeaderboard(
+      reportLeaderboard(
+        "competition A — totals (post-void)",
+        world.competitionAId,
+        compAPostVoid,
+        names,
+      );
+      const compBPostVoid = await expectLeaderboard(
         supabase,
         "comp B post-void",
         world.competitionBId,
@@ -354,16 +433,27 @@ describe("scripted gameweek-simulation test (#22)", () => {
           { playerId: world.playerB2, points: 0 },
         ],
       );
+      reportLeaderboard(
+        "competition B — totals (post-void)",
+        world.competitionBId,
+        compBPostVoid,
+        names,
+      );
     } finally {
-      // D7: dispose must run, and the count baseline must be proven restored
-      // even if dispose itself throws (that error still surfaces on top).
       let disposeError: unknown;
-      try {
-        await disposeSimulationWorld(supabase, world);
-      } catch (error) {
-        disposeError = error;
+      if (process.env.SIM_KEEP_WORLD === "1") {
+        // Inspection mode: leave the synthetic world (and its scores rows) on
+        // staging so Andy can query/see the data; prints ids + cleanup SQL.
+        printKeptWorldWarning(world);
+        expect(await snapshotRowCounts(supabase)).toEqual(baseline);
+      } else {
+        try {
+          await disposeSimulationWorld(supabase, world);
+        } catch (error) {
+          disposeError = error;
+        }
+        expect(await snapshotRowCounts(supabase)).toEqual(baseline);
       }
-      expect(await snapshotRowCounts(supabase)).toEqual(baseline);
       if (disposeError) throw disposeError;
     }
   }, 120_000);

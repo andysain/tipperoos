@@ -14,7 +14,8 @@ export function requireStagingEnv(): { url: string; key: string } {
     throw new Error(
       "Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY. Run from local dev:\n" +
         "  SUPABASE_URL=<staging URL> SUPABASE_SERVICE_ROLE_KEY=<staging key> \\\n" +
-        "  npx vitest run --config scripts/scripted-gameweek-simulation/vitest.config.ts",
+        "  npx vitest run --config scripts/scripted-gameweek-simulation/vitest.config.ts\n" +
+        "  (add SIM_KEEP_WORLD=1 to keep the synthetic competition on staging for inspection)",
     );
   }
   return { url, key };
@@ -293,4 +294,39 @@ export async function snapshotRowCounts(
   const result = {} as RowCounts;
   for (const { name, count } of entries) result[name] = count;
   return result;
+}
+
+/** Cleanup SQL for a kept world, safe to re-run (matches on sim provider markers). */
+const KEPT_WORLD_CLEANUP_SQL = `delete from scores where match_id in (select id from matches where provider_name = 'sim');
+delete from picks where match_id in (select id from matches where provider_name = 'sim');
+delete from gameweeks where competition_id in (select id from competitions where name like 'Sim Comp %');
+delete from players where competition_id in (select id from competitions where name like 'Sim Comp %');
+delete from matches where provider_name = 'sim';
+delete from competitions where name like 'Sim Comp %';
+delete from teams where provider_name = 'sim';
+delete from seasons where label like 'sim-%';`;
+
+/**
+ * Printed by the scenario when SIM_KEEP_WORLD=1: the synthetic competition is
+ * left on staging for inspection (Supabase dashboard, or later drives of the
+ * real Pick Board/leaderboard UI), and this warning carries the ids plus the
+ * recipe to remove it afterwards.
+ */
+export function printKeptWorldWarning(world: SimulationWorld): void {
+  console.log("");
+  console.log(
+    "SIM_KEEP_WORLD=1 — synthetic world LEFT on staging (cleanup skipped).",
+  );
+  console.log(`Competition A: ${world.competitionAId}`);
+  console.log(`Competition B: ${world.competitionBId}`);
+  console.log(
+    `Season: ${world.seasonId}  Gameweeks: ${world.gameweekAId}, ${world.gameweekBId}`,
+  );
+  console.log(`Matches: ${world.matchOneId}, ${world.matchTwoId}`);
+  console.log(`Teams: ${world.teamAId}, ${world.teamBId}`);
+  console.log(
+    `Players: ${world.playerA1}, ${world.playerA2}, ${world.playerA3}, ${world.playerB1}, ${world.playerB2}`,
+  );
+  console.log("Remove it later from the Supabase SQL editor (safe to re-run):");
+  console.log(KEPT_WORLD_CLEANUP_SQL);
 }
