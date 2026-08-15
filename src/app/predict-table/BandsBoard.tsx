@@ -74,9 +74,8 @@ function PlacedTeamCard({
   onTap: () => void;
   disabled?: boolean;
   /** PROTOTYPE: true for the club that will be displaced if another arrives
-   * while this Band is full. Marked *before* it happens, so eviction is
-   * never a surprise -- which is the whole justification for automating a
-   * choice ADR 0008 insisted belongs to the player. */
+   * while this Band is full. Renders as a warm tint and nothing else -- the
+   * sentence above the roster is what explains it. */
   nextOut?: boolean;
   /** True for the two rows of a swap that just landed -- a brief pulse in
    * place of a confirm dialog (issue #131, ADR 0008). */
@@ -120,13 +119,14 @@ function PlacedTeamCard({
           {team.displayName}
         </span>
       </span>
-      {nextOut ? (
-        <span className="shrink-0 self-center rounded-badge bg-warning/25 px-2 py-1 text-[0.6rem] font-extrabold tracking-[0.08em] text-ink/70 uppercase">
-          Next out
-        </span>
-      ) : (
-        <X aria-hidden className="size-4 shrink-0 self-center text-ink/30" />
-      )}
+      {/* The "NEXT OUT" chip is gone: it named a mechanism rather than
+          describing anything, and two words can't carry a rule this
+          conditional. What it was protecting -- eviction being stated
+          before it happens, which is the whole reason automatic eviction is
+          defensible at all -- now lives entirely in the plain-English line
+          above the roster, which names the club. This card keeps only the
+          warm tint, so that sentence has something to point at. */}
+      <X aria-hidden className="size-4 shrink-0 self-center text-ink/30" />
     </button>
   );
 }
@@ -276,16 +276,27 @@ function CollapsedBandRow({
           aria-hidden
         />
       </span>
+      {/* One club per line, left-aligned on a single edge.
+          Members used to wrap inline, which meant three clubs broke 2 + 1,
+          nothing lined up with anything, and every Band ended up a different
+          shape -- the "messy" read. Stacking them makes the whole board one
+          aligned column, and removes truncation as a possibility at any
+          width, which an inline or multi-column layout can't promise.
+          The club-code badge goes with it: badge *and* name is the same club
+          said twice, and three saturated badges a row was most of the visual
+          noise. A thin kit rail keeps the identity cue without competing
+          with the name, which is the thing actually being read here. */}
       {teams.length ? (
-        <span className="flex w-full flex-wrap items-center gap-x-2 gap-y-1.5 pl-10">
+        <span className="flex w-full flex-col gap-1 pl-10">
           {teams.map((team) => (
-            <span key={team.id} className="flex items-center gap-1.5">
-              <ClubCodeBadge
-                shortCode={team.shortCode}
-                fill={teamFill(team.shortCode)}
+            <span key={team.id} className="flex items-center gap-2">
+              <span
+                aria-hidden
+                className="h-3.5 w-[3px] shrink-0 rounded-full"
+                style={{ background: teamFill(team.shortCode) }}
               />
               <span
-                className={`leading-snug font-bold text-ink/75 ${isChampion ? "text-[0.95rem]" : "text-[0.78rem]"}`}
+                className={`truncate leading-snug font-bold text-ink/75 ${isChampion ? "text-[0.95rem]" : "text-[0.82rem]"}`}
               >
                 {team.displayName}
               </span>
@@ -293,7 +304,7 @@ function CollapsedBandRow({
           ))}
         </span>
       ) : (
-        <span className="w-full pl-10 text-[0.78rem] leading-snug font-semibold text-ink/35">
+        <span className="w-full pl-10 text-[0.82rem] leading-snug font-semibold text-ink/35">
           Nobody yet
         </span>
       )}
@@ -489,11 +500,11 @@ export function BandsBoard({
                         is genuinely full, so it reads as a live consequence
                         rather than a standing instruction. */}
                   {nextOutTeamId ? (
-                    <p className="-mt-1 mb-2 px-0.5 text-[0.72rem] font-semibold text-ink/55">
-                      {band.label} is full — the next club you tap swaps in for{" "}
-                      <span className="font-extrabold text-ink/75">
-                        {teams.find((t) => t.id === nextOutTeamId)?.name ??
-                          "the club marked Next out"}
+                    <p className="-mt-1 mb-2 px-0.5 text-[0.75rem] font-semibold text-ink/60">
+                      {band.label} is full. Tapping another club swaps it in for{" "}
+                      <span className="font-extrabold text-ink/80">
+                        {teams.find((t) => t.id === nextOutTeamId)
+                          ?.displayName ?? "the highlighted club"}
                       </span>
                       .
                     </p>
