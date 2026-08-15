@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { recomputeMatchScores, scoreMatch, writeScores } from "./match";
+import { recomputeMatchScores, scoreMatch } from "./match";
 
 describe("scoreMatch — golden values (derived from CLAUDE.md 'Scoring — additive')", () => {
   it("scores 7 for an exact home-win scoreline (result + GD + both team scores)", () => {
@@ -181,57 +180,5 @@ describe("recomputeMatchScores — idempotent recompute from a match's current s
       { playerId: "player-b", matchId: "match-1", points: 7 },
       { playerId: "player-c", matchId: "match-1", points: 0 },
     ]);
-  });
-});
-
-describe("writeScores — idempotent upsert target", () => {
-  function fakeSupabase() {
-    const calls: {
-      rows: { player_id: string; match_id: string; points: number }[];
-      onConflict: string;
-    }[] = [];
-    const client = {
-      from: (_table: string) => ({
-        upsert: async (rows: unknown[], options: { onConflict: string }) => {
-          calls.push({ rows: rows as never, onConflict: options.onConflict });
-          return { error: null };
-        },
-      }),
-    } as unknown as SupabaseClient;
-    return { client, calls };
-  }
-
-  it("upserts the mapped rows keyed on (player_id, match_id)", async () => {
-    const { client, calls } = fakeSupabase();
-
-    await writeScores(client, [
-      { playerId: "player-a", matchId: "match-1", points: 7 },
-      { playerId: "player-b", matchId: "match-1", points: 0 },
-    ]);
-
-    expect(calls).toHaveLength(1);
-    expect(calls[0].onConflict).toBe("player_id,match_id");
-    expect(calls[0].rows).toEqual([
-      {
-        player_id: "player-a",
-        match_id: "match-1",
-        points: 7,
-        computed_at: expect.any(String),
-      },
-      {
-        player_id: "player-b",
-        match_id: "match-1",
-        points: 0,
-        computed_at: expect.any(String),
-      },
-    ]);
-  });
-
-  it("no-ops without calling the database when there are no rows", async () => {
-    const { client, calls } = fakeSupabase();
-
-    await writeScores(client, []);
-
-    expect(calls).toHaveLength(0);
   });
 });

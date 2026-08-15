@@ -8,9 +8,11 @@
  * score (both only on a correct result), and Wrong Way Round for the exact
  * scoreline with the sides swapped. There is deliberately no exact-scoreline
  * bonus — see docs/adr/0009, which records what the formula does not reward.
+ *
+ * Pure and client-safe by design (imported by client components for the
+ * breakdown display): the `scores` write-path lives separately in
+ * ./write-scores.ts, which is server-only.
  */
-
-import type { SupabaseClient } from "@supabase/supabase-js";
 
 /** The four stackable term values; every number in this module traces back here. */
 export const RESULT_POINTS = 3;
@@ -170,30 +172,4 @@ export function recomputeMatchScores(
     points: scoreMatch(pick.pickHome, pick.pickAway, result.home, result.away)
       .points,
   }));
-}
-
-/**
- * Writes the authoritative row set for a match into the `scores` ledger,
- * upserting on the `unique (player_id, match_id)` constraint — the idempotency
- * backbone of the whole engine: recompute the rows with `recomputeMatchScores`
- * and this overwrites, never adds. `computed_at` is refreshed so a recompute
- * is traceable. No rows is a no-op (a match not yet scored/voided).
- */
-export async function writeScores(
-  supabase: SupabaseClient,
-  rows: ScoreRow[],
-): Promise<void> {
-  if (rows.length === 0) return;
-
-  const { error } = await supabase.from("scores").upsert(
-    rows.map((row) => ({
-      player_id: row.playerId,
-      match_id: row.matchId,
-      points: row.points,
-      computed_at: new Date().toISOString(),
-    })),
-    { onConflict: "player_id,match_id" },
-  );
-
-  if (error) throw error;
 }
