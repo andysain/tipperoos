@@ -27,6 +27,7 @@ This file is a router, not a rulebook — the linked docs own their rules; don't
 | GitHub issue backlog / what's done vs. open                                                    | `gh issue list -R andysain/tipperoos --state all --limit 100` |
 | Frontend/design/UI work                                                                        | `docs/FRONTEND_BRIEFING.md`                                   |
 | Server-side data loading / round-trip counts / perf regressions                                | `docs/standards/PERFORMANCE_TESTING_STANDARD.md`              |
+| The scripted gameweek-simulation test — how to run it, what it proves, `SIM_KEEP_WORLD`        | `scripts/scripted-gameweek-simulation/README.md`              |
 
 ## Non-negotiables (see CLAUDE.md for full detail)
 
