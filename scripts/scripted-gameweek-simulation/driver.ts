@@ -10,25 +10,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { recomputeMatchScores, type ScoreRow } from "@/lib/scoring/match";
 import { writeScores } from "@/lib/scoring/write-scores";
+import { isMatchVoided } from "@/lib/matches/voided";
 
-export interface MatchSlotVoidSignal {
-  voidedAt: string | null;
-}
-
-/**
- * A match is voided when any gameweek slot referencing it has been voided
- * (`gameweeks.match_1_voided_at`/`match_2_voided_at`) or its own status is
- * `postponed` — the same authoritative combination pick-board-access trusts
- * (D4). No referencing slot + a non-postponed status => not voided.
- */
-export function isMatchVoided(
-  slots: MatchSlotVoidSignal[],
-  matchStatus: string,
-): boolean {
-  return (
-    matchStatus === "postponed" || slots.some((slot) => slot.voidedAt !== null)
-  );
-}
+// isMatchVoided/MatchSlotVoidSignal moved to src/lib/matches/voided.ts
+// (issue #166) once the sync-scoring orchestrator became a second production
+// consumer.
+export { isMatchVoided, type MatchSlotVoidSignal } from "@/lib/matches/voided";
 
 export interface PickInput {
   playerId: string;

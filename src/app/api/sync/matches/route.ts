@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { mapMatchesToUpdates } from "@/lib/matches/map-matches";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { scoreCompletedMatchesAndSnapshots } from "@/lib/gameweeks/sync-scoring";
 
 // Issue #11: fixture/result sync route, callable manually now and by this
 // issue's own GitHub Actions workflow on a schedule. Mirrors #88's standings
@@ -100,9 +101,51 @@ export async function POST(request: Request) {
       error_message: errorMessage,
     });
 
+    // Issue #166 D5: scoring/snapshot failures never touch the "matches"
+    // sync_log row above or this route's response status -- the fixture/
+    // result sync itself genuinely succeeded regardless of whether our own
+    // downstream computation does. Own try/catch, own sync_log entry.
+    //
+    // No "scoring" sync_log row at all when this cycle completed nothing --
+    // most cycles land outside a match's final whistle, and a success row
+    // every ~10-15 minutes with nothing to report would just be noise.
+    const completedMatchIds = updates
+      .filter((u) => u.status === "completed")
+      .map((u) => u.id);
+
+    // scoringFailed is a bare flag, not the caught message -- matches the
+    // outer catch's convention below (generic response, detail in
+    // sync_log only). A raw Postgres/PostgREST error can carry constraint,
+    // column, or row-identifier fragments; no caller of this route needs
+    // more than "check sync_log" to act on a scoring failure.
+    let scoringFailed = false;
+    try {
+      if (completedMatchIds.length > 0) {
+        await scoreCompletedMatchesAndSnapshots(supabase, completedMatchIds);
+        await supabase.from("sync_log").insert({
+          provider_name: PROVIDER_NAME,
+          sync_type: "scoring",
+          status: "success",
+          error_message: null,
+        });
+      }
+    } catch (err) {
+      scoringFailed = true;
+      const message = err instanceof Error ? err.message : String(err);
+      await supabase.from("sync_log").insert({
+        provider_name: PROVIDER_NAME,
+        sync_type: "scoring",
+        status: "failure",
+        error_message: message,
+      });
+    }
+
     return NextResponse.json({
       updated: updates.length,
       skipped: unmatchedProviderMatchIds,
+      ...(scoringFailed
+        ? { scoringError: "Scoring failed -- see sync_log." }
+        : {}),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
