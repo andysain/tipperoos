@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { mapMatchesToUpdates } from "@/lib/matches/map-matches";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { scoreCompletedMatchesAndSnapshots } from "@/lib/gameweeks/sync-scoring";
+import { generateBotPicks } from "@/lib/bots/generate";
 
 // Issue #11: fixture/result sync route, callable manually now and by this
 // issue's own GitHub Actions workflow on a schedule. Mirrors #88's standings
@@ -101,6 +102,39 @@ export async function POST(request: Request) {
       error_message: errorMessage,
     });
 
+    // Issue #35 D3: bot pick generation, on the same cadence and with the
+    // same failure isolation as the scoring block below. Deliberately NOT
+    // inside that block's `completedMatchIds.length > 0` gate -- Random and
+    // 1-1 bots must file while their match is still days away, on cycles
+    // where nothing has completed. Runs before scoring so a Median pick
+    // created at lock is scored in the same cycle the match finishes; that
+    // ordering is a nicety, not a correctness requirement, since #166 D1
+    // recomputes from current state every cycle.
+    let botsFailed = false;
+    try {
+      const generated = await generateBotPicks(supabase);
+      // Same "no success row when there was nothing to do" rule as scoring:
+      // most cycles generate nothing, and a row every 30 minutes would bury
+      // the real entries.
+      if (generated > 0) {
+        await supabase.from("sync_log").insert({
+          provider_name: PROVIDER_NAME,
+          sync_type: "bots",
+          status: "success",
+          error_message: `generated ${generated} bot picks`,
+        });
+      }
+    } catch (err) {
+      botsFailed = true;
+      const message = err instanceof Error ? err.message : String(err);
+      await supabase.from("sync_log").insert({
+        provider_name: PROVIDER_NAME,
+        sync_type: "bots",
+        status: "failure",
+        error_message: message,
+      });
+    }
+
     // Issue #166 D5: scoring/snapshot failures never touch the "matches"
     // sync_log row above or this route's response status -- the fixture/
     // result sync itself genuinely succeeded regardless of whether our own
@@ -143,6 +177,9 @@ export async function POST(request: Request) {
     return NextResponse.json({
       updated: updates.length,
       skipped: unmatchedProviderMatchIds,
+      ...(botsFailed
+        ? { botsError: "Bot pick generation failed -- see sync_log." }
+        : {}),
       ...(scoringFailed
         ? { scoringError: "Scoring failed -- see sync_log." }
         : {}),

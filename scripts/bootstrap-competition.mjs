@@ -18,6 +18,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { hashSecret } from "./lib/scrypt-secret.mjs";
+import { ensureCompetitionBots } from "./lib/bots.mjs";
 import {
   normalizeCompetitionCode,
   findCollidingCompetition,
@@ -149,6 +150,34 @@ async function main() {
   console.log(
     `Created admin "${adminDisplayName}" (id: ${row.admin_id}) -- can log in immediately.`,
   );
+
+  // Issue #35 D13: a competition with no bots is a broken competition -- the
+  // Median Bot benchmark is promised to players on /how-it-works -- so
+  // bootstrap provisions them rather than leaving it to be remembered.
+  //
+  // Deliberately AFTER the RPC rather than inside it: bot PINs are scrypt-
+  // hashed in Node and the function never receives plaintext (see the
+  // migration's own header), so folding bots in would mean three more hash
+  // arguments and a migration to change its signature. Non-atomic is fine
+  // here specifically because the failure is recoverable -- the RPC's
+  // atomicity exists to prevent a competition live with no admin able to fix
+  // anything, whereas missing bots are repaired by re-running seed-bots.mjs.
+  try {
+    const { created } = await ensureCompetitionBots(
+      supabase,
+      row.competition_id,
+    );
+    for (const name of created) {
+      console.log(`Created bot "${name}".`);
+    }
+  } catch (err) {
+    console.error(`\nCompetition and admin were created successfully.`);
+    console.error(`Bot creation failed: ${err.message}`);
+    console.error(
+      `Fix the cause and run: node scripts/seed-bots.mjs (choose "${competitionName}").`,
+    );
+    process.exitCode = 1;
+  }
 }
 
 main().catch((err) => {
