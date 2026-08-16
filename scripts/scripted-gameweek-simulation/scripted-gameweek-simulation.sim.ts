@@ -444,8 +444,10 @@ describe("scripted gameweek-simulation test (#22)", () => {
       if (process.env.SIM_KEEP_WORLD === "1") {
         // Inspection mode: leave the synthetic world (and its scores rows) on
         // staging so Andy can query/see the data; prints ids + cleanup SQL.
+        // Disposal is deliberately skipped here, so the row-count baseline
+        // assertion below (which only holds once the world is gone) does not
+        // apply in this branch.
         printKeptWorldWarning(world);
-        expect(await snapshotRowCounts(supabase)).toEqual(baseline);
       } else {
         try {
           await disposeSimulationWorld(supabase, world);
