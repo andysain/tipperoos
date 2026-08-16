@@ -40,9 +40,21 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 // competition with no players and no gameweeks. Ordered, per AGENTS.md --
 // an unordered numbered list could mean a different competition between two
 // runs with nothing on screen to reveal it.
+//
+// Unlike that script, a single competition is still confirmed rather than
+// auto-selected: a fresh project's only competitions row is the placeholder,
+// so "there's just one, use it" would silently seed exactly the row this
+// script must never touch.
 async function selectCompetition(competitions) {
   if (competitions.length === 1) {
-    return competitions[0];
+    const only = competitions[0];
+    const answer = await prompt(
+      `Seed bots for competition "${only.name}" (${only.id.slice(0, 8)})? [y/N] `,
+    );
+    if (!/^y(es)?$/i.test(answer.trim())) {
+      throw new Error("Aborted -- no competition chosen.");
+    }
+    return only;
   }
 
   console.log("Multiple competitions found:");

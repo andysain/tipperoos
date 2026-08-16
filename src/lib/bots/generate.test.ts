@@ -53,15 +53,22 @@ function fakeSupabase(world: World) {
       upsert: (rows: Row[], options: UpsertCall["options"]) => {
         upserts.push({ rows, options });
         // Mirror ignoreDuplicates: an existing (player_id, match_id) is left
-        // alone rather than overwritten.
+        // alone rather than overwritten, and only rows actually written come
+        // back from .select().
+        const inserted: Row[] = [];
         for (const row of rows) {
           const exists = world.picks.some(
             (p) =>
               p.player_id === row.player_id && p.match_id === row.match_id,
           );
-          if (!exists) world.picks.push(row);
+          if (!exists) {
+            world.picks.push(row);
+            inserted.push(row);
+          }
         }
-        return Promise.resolve({ error: null });
+        return {
+          select: () => Promise.resolve({ data: inserted, error: null }),
+        };
       },
     }),
   } as unknown as SupabaseClient;
@@ -309,6 +316,51 @@ describe("generateBotPicks", () => {
     expect(pickFor(world, "a-median", "shared")?.pred_away_score).toBe(0);
     expect(pickFor(world, "b-median", "shared")?.pred_home_score).toBe(0);
     expect(pickFor(world, "b-median", "shared")?.pred_away_score).toBe(2);
+  });
+
+  // D8's `is_bot = false` narrowing is new work -- `picksForMatch` selects
+  // is_bot but never filters on it, so there was no existing pattern to
+  // copy. This is a live case, not a theoretical one: the Random and 1-1
+  // bots file on this very match BEFORE it locks, so by the time the Median
+  // Bot runs their rows are always sitting there waiting to be counted.
+  it("excludes the other bots' own picks from the median", async () => {
+    const world: World = {
+      gameweeks: [
+        {
+          id: "gw1",
+          competition_id: COMP_A,
+          match_1_id: "m1",
+          match_2_id: null,
+          match_1_voided_at: null,
+          match_2_voided_at: null,
+        },
+      ],
+      matches: [
+        { id: "m1", kickoff_time: LOCKED_KICKOFF, status: "scheduled" },
+      ],
+      players: [
+        ...bots(COMP_A, "a"),
+        { id: "h1", competition_id: COMP_A, is_bot: false, bot_type: null },
+        { id: "h2", competition_id: COMP_A, is_bot: false, bot_type: null },
+        { id: "h3", competition_id: COMP_A, is_bot: false, bot_type: null },
+      ],
+      picks: [
+        // Humans: home [0, 0, 1] -> median 0; away [0, 0, 1] -> median 0.
+        { player_id: "h1", match_id: "m1", pred_home_score: 0, pred_away_score: 0 },
+        { player_id: "h2", match_id: "m1", pred_home_score: 0, pred_away_score: 0 },
+        { player_id: "h3", match_id: "m1", pred_home_score: 1, pred_away_score: 1 },
+        // Pre-lock bot picks on the same match. Counting these would make
+        // it home [0,0,1,3,1] -> median 1, not 0.
+        { player_id: "a-random", match_id: "m1", pred_home_score: 3, pred_away_score: 3 },
+        { player_id: "a-one-one", match_id: "m1", pred_home_score: 1, pred_away_score: 1 },
+      ],
+    };
+    const { client } = fakeSupabase(world);
+
+    await generateBotPicks(client, { now: NOW, rng: ALWAYS_THREE });
+
+    expect(pickFor(world, "a-median", "m1")?.pred_home_score).toBe(0);
+    expect(pickFor(world, "a-median", "m1")?.pred_away_score).toBe(0);
   });
 
   it("keys the loop on (competition, slot) -- one competition's bots never pick another's slot", async () => {

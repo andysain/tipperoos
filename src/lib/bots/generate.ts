@@ -91,11 +91,13 @@ export async function generateBotPicks(
   const competitionIds = dedupe(slots.map((s) => s.competitionId));
   const players = await loadPlayers(supabase, competitionIds);
 
-  const botsByCompetition = groupBy(
-    players.filter((p) => p.is_bot && p.bot_type !== null),
-    (p) => p.competition_id,
-  );
-  const botIds = players.filter((p) => p.is_bot).map((p) => p.id);
+  // A bot row with no bot_type has no logic to run, so it is excluded here
+  // and must stay excluded from `botIds` too -- two filters that disagree
+  // would let a competition of type-less bots pass the guard below and then
+  // do a full round of work that can produce nothing.
+  const usableBots = players.filter((p) => p.is_bot && p.bot_type !== null);
+  const botsByCompetition = groupBy(usableBots, (p) => p.competition_id);
+  const botIds = usableBots.map((p) => p.id);
   if (botIds.length === 0) return 0;
 
   const slotMatchIds = dedupe(slots.map((s) => s.matchId));
@@ -157,14 +159,21 @@ export async function generateBotPicks(
 
   if (rows.length === 0) return 0;
 
-  const { error } = await supabase.from("picks").upsert(rows, {
-    onConflict: "player_id,match_id",
-    // Not an overwrite: an existing bot pick wins over this computation.
-    ignoreDuplicates: true,
-  });
+  // `.select()` so the return value is rows actually WRITTEN, not rows
+  // attempted: with ignoreDuplicates a row lost to a concurrent cycle is
+  // silently dropped, and reporting it as generated would put a success
+  // line in sync_log for work that didn't happen.
+  const { data: inserted, error } = await supabase
+    .from("picks")
+    .upsert(rows, {
+      onConflict: "player_id,match_id",
+      // Not an overwrite: an existing bot pick wins over this computation.
+      ignoreDuplicates: true,
+    })
+    .select("player_id");
   if (error) throw error;
 
-  return rows.length;
+  return (inserted ?? []).length;
 }
 
 async function loadGameweeks(supabase: SupabaseClient): Promise<GameweekRow[]> {

@@ -39,6 +39,54 @@ async function fetchMatches(apiKey: string, dateFrom: string, dateTo: string) {
   return res.json();
 }
 
+/**
+ * Runs one post-sync step in its own failure domain (issue #166 D5, extended
+ * by #35 D3). Three rules, identical for every step, which is why this is a
+ * helper rather than a third copy of the same try/catch:
+ *
+ * - A step's failure never touches the "matches" sync_log row, another
+ *   step's row, or this route's HTTP status. The fixture/result sync
+ *   genuinely succeeded regardless of what our own downstream computation
+ *   does.
+ * - No success row when the step did nothing (`work` returns 0). Most cycles
+ *   land between kickoffs with every bot pick already filed, and a success
+ *   row every 30 minutes would bury the entries that matter.
+ * - The caller gets a bare flag, never the caught message. A raw
+ *   Postgres/PostgREST error can carry constraint, column or row-identifier
+ *   fragments; the detail stays in sync_log, matching the outer catch's own
+ *   "detail in sync_log, generic to caller" convention.
+ *
+ * @param work returns how many units it did; 0 means "nothing to report".
+ * @returns true if the step failed.
+ */
+async function runIsolatedStep(
+  supabase: ReturnType<typeof createServerSupabaseClient>,
+  syncType: "bots" | "scoring",
+  work: () => Promise<number>,
+): Promise<boolean> {
+  try {
+    const done = await work();
+    if (done > 0) {
+      await supabase.from("sync_log").insert({
+        provider_name: PROVIDER_NAME,
+        sync_type: syncType,
+        status: "success",
+        error_message: null,
+      });
+    }
+    return false;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await supabase.from("sync_log").insert({
+      provider_name: PROVIDER_NAME,
+      sync_type: syncType,
+      status: "failure",
+      error_message: message,
+    });
+    return true;
+  }
+}
+
 export async function POST(request: Request) {
   if (!hasValidSyncSecret(request)) {
     return NextResponse.json({ error: "Forbidden." }, { status: 403 });
@@ -110,69 +158,23 @@ export async function POST(request: Request) {
     // created at lock is scored in the same cycle the match finishes; that
     // ordering is a nicety, not a correctness requirement, since #166 D1
     // recomputes from current state every cycle.
-    let botsFailed = false;
-    try {
-      const generated = await generateBotPicks(supabase);
-      // Same "no success row when there was nothing to do" rule as scoring:
-      // most cycles generate nothing, and a row every 30 minutes would bury
-      // the real entries.
-      if (generated > 0) {
-        await supabase.from("sync_log").insert({
-          provider_name: PROVIDER_NAME,
-          sync_type: "bots",
-          status: "success",
-          error_message: `generated ${generated} bot picks`,
-        });
-      }
-    } catch (err) {
-      botsFailed = true;
-      const message = err instanceof Error ? err.message : String(err);
-      await supabase.from("sync_log").insert({
-        provider_name: PROVIDER_NAME,
-        sync_type: "bots",
-        status: "failure",
-        error_message: message,
-      });
-    }
+    const botsFailed = await runIsolatedStep(supabase, "bots", () =>
+      generateBotPicks(supabase),
+    );
 
     // Issue #166 D5: scoring/snapshot failures never touch the "matches"
     // sync_log row above or this route's response status -- the fixture/
     // result sync itself genuinely succeeded regardless of whether our own
     // downstream computation does. Own try/catch, own sync_log entry.
-    //
-    // No "scoring" sync_log row at all when this cycle completed nothing --
-    // most cycles land outside a match's final whistle, and a success row
-    // every ~10-15 minutes with nothing to report would just be noise.
     const completedMatchIds = updates
       .filter((u) => u.status === "completed")
       .map((u) => u.id);
 
-    // scoringFailed is a bare flag, not the caught message -- matches the
-    // outer catch's convention below (generic response, detail in
-    // sync_log only). A raw Postgres/PostgREST error can carry constraint,
-    // column, or row-identifier fragments; no caller of this route needs
-    // more than "check sync_log" to act on a scoring failure.
-    let scoringFailed = false;
-    try {
-      if (completedMatchIds.length > 0) {
-        await scoreCompletedMatchesAndSnapshots(supabase, completedMatchIds);
-        await supabase.from("sync_log").insert({
-          provider_name: PROVIDER_NAME,
-          sync_type: "scoring",
-          status: "success",
-          error_message: null,
-        });
-      }
-    } catch (err) {
-      scoringFailed = true;
-      const message = err instanceof Error ? err.message : String(err);
-      await supabase.from("sync_log").insert({
-        provider_name: PROVIDER_NAME,
-        sync_type: "scoring",
-        status: "failure",
-        error_message: message,
-      });
-    }
+    const scoringFailed = await runIsolatedStep(supabase, "scoring", async () => {
+      if (completedMatchIds.length === 0) return 0;
+      await scoreCompletedMatchesAndSnapshots(supabase, completedMatchIds);
+      return 1;
+    });
 
     return NextResponse.json({
       updated: updates.length,
