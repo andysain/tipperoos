@@ -22,6 +22,17 @@ const syncLogInsertMock = vi.fn();
 const gameweeksInMock = vi.fn().mockResolvedValue({ data: [], error: null });
 const gameweeksSelectMock = vi.fn(() => ({ in: gameweeksInMock }));
 
+// Issue #35: the route also generates bot picks every cycle. Mocked at the
+// module boundary rather than through the fake client above -- the
+// orchestrator's own behaviour is covered by src/lib/bots/generate.test.ts,
+// and what this file is for is the route's isolation contract: whose
+// sync_log row a failure lands in, and whose it must not. Defaults to
+// "nothing to generate", the common case.
+const generateBotPicksMock = vi.fn().mockResolvedValue(0);
+vi.mock("@/lib/bots/generate", () => ({
+  generateBotPicks: (...args: unknown[]) => generateBotPicksMock(...args),
+}));
+
 vi.mock("@/lib/supabase/server", () => ({
   createServerSupabaseClient: () => ({
     from: (table: string) => {
@@ -64,6 +75,7 @@ describe("POST /api/sync/matches", () => {
     matchesUpdateEqMock.mockResolvedValue({ error: null });
     syncLogInsertMock.mockResolvedValue({ error: null });
     gameweeksInMock.mockResolvedValue({ data: [], error: null });
+    generateBotPicksMock.mockResolvedValue(0);
   });
 
   it("logs a sync_log failure and leaves existing matches rows untouched when the provider fetch fails", async () => {
@@ -269,6 +281,163 @@ describe("POST /api/sync/matches", () => {
     const body = await response.json();
     expect(body.scoringError).toBe("Scoring failed -- see sync_log.");
     expect(body.scoringError).not.toContain("gameweeks lookup boom");
+
+    vi.unstubAllGlobals();
+  });
+
+  // Issue #35 D3: the bot block sits OUTSIDE the scoring block's
+  // `completedMatchIds.length > 0` gate. Random and 1-1 bots have to file
+  // while their match is still days away -- gating bot generation on "a
+  // match just finished" would mean bots only ever picked in cycles where
+  // something happened to complete, which for a 2-match gameweek is almost
+  // never before the deadline.
+  it("generates bot picks on a cycle where nothing completed", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          matches: [
+            {
+              id: 999,
+              utcDate: "2026-08-20T15:00:00.000Z",
+              status: "TIMED",
+              homeTeam: { id: 1 },
+              awayTeam: { id: 2 },
+              score: { fullTime: { home: null, away: null } },
+            },
+          ],
+        }),
+      }),
+    );
+    generateBotPicksMock.mockResolvedValue(2);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    expect(generateBotPicksMock).toHaveBeenCalledTimes(1);
+    expect(syncLogInsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ sync_type: "bots", status: "success" }),
+    );
+    // ...while scoring, correctly, stayed out of it.
+    expect(syncLogInsertMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ sync_type: "scoring" }),
+    );
+
+    vi.unstubAllGlobals();
+  });
+
+  // Issue #35 D3: bots must not be gated on the provider fetch succeeding.
+  // They read gameweeks/matches from our own DB and need nothing from
+  // football-data.org. A provider outage across a whole pre-lock window
+  // would otherwise leave Random and 1-1 with no pick for that match
+  // permanently -- once it locks they're skipped, and write-once means
+  // nothing ever backfills them.
+  it("still generates bot picks when the provider fetch fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        text: async () => "provider unavailable",
+      }),
+    );
+    generateBotPicksMock.mockResolvedValue(2);
+
+    const response = await POST(request());
+
+    // The matches sync genuinely failed -- that verdict is unchanged.
+    expect(response.status).toBe(500);
+    expect(syncLogInsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ sync_type: "matches", status: "failure" }),
+    );
+    // ...but the bots still ran, and logged their own success.
+    expect(generateBotPicksMock).toHaveBeenCalledTimes(1);
+    expect(syncLogInsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ sync_type: "bots", status: "success" }),
+    );
+    // Scoring correctly did NOT run: nothing completed, since nothing synced.
+    expect(syncLogInsertMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ sync_type: "scoring" }),
+    );
+
+    vi.unstubAllGlobals();
+  });
+
+  // Same "no success row when there was nothing to do" rule #166 settled for
+  // scoring: most cycles have every bot pick already filed, and a success
+  // row every 30 minutes would bury the entries that matter.
+  it("writes no bots sync_log row when the cycle generated no picks", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ matches: [] }),
+      }),
+    );
+    generateBotPicksMock.mockResolvedValue(0);
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    expect(generateBotPicksMock).toHaveBeenCalledTimes(1);
+    expect(syncLogInsertMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ sync_type: "bots" }),
+    );
+
+    vi.unstubAllGlobals();
+  });
+
+  // Issue #35 D3 / #166 D5: three independent failure domains in one
+  // handler. A bot-generation failure must leave the "matches" row, the
+  // "scoring" row and the HTTP status exactly as a clean run would.
+  it("isolates a bot-generation failure from both the matches sync and scoring", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          matches: [
+            {
+              id: 999,
+              utcDate: "2026-08-20T15:00:00.000Z",
+              status: "FINISHED",
+              homeTeam: { id: 1 },
+              awayTeam: { id: 2 },
+              score: { fullTime: { home: 2, away: 1 } },
+            },
+          ],
+        }),
+      }),
+    );
+    generateBotPicksMock.mockRejectedValue(new Error("bot upsert boom"));
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    expect(matchesUpdateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ team_a_score: 2, team_b_score: 1 }),
+    );
+    expect(syncLogInsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ sync_type: "matches", status: "success" }),
+    );
+    // Scoring still ran, and still succeeded, despite the bot failure
+    // immediately before it.
+    expect(syncLogInsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ sync_type: "scoring", status: "success" }),
+    );
+    expect(syncLogInsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sync_type: "bots",
+        status: "failure",
+        error_message: expect.stringContaining("bot upsert boom"),
+      }),
+    );
+
+    const body = await response.json();
+    expect(body.botsError).toBe("Bot pick generation failed -- see sync_log.");
+    expect(body.botsError).not.toContain("bot upsert boom");
+    expect(body.scoringError).toBeUndefined();
 
     vi.unstubAllGlobals();
   });

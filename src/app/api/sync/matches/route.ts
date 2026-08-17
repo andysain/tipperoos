@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { mapMatchesToUpdates } from "@/lib/matches/map-matches";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { scoreCompletedMatchesAndSnapshots } from "@/lib/gameweeks/sync-scoring";
+import { generateBotPicks } from "@/lib/bots/generate";
 
 // Issue #11: fixture/result sync route, callable manually now and by this
 // issue's own GitHub Actions workflow on a schedule. Mirrors #88's standings
@@ -38,6 +39,54 @@ async function fetchMatches(apiKey: string, dateFrom: string, dateTo: string) {
   return res.json();
 }
 
+/**
+ * Runs one post-sync step in its own failure domain (issue #166 D5, extended
+ * by #35 D3). Three rules, identical for every step, which is why this is a
+ * helper rather than a third copy of the same try/catch:
+ *
+ * - A step's failure never touches the "matches" sync_log row, another
+ *   step's row, or this route's HTTP status. The fixture/result sync
+ *   genuinely succeeded regardless of what our own downstream computation
+ *   does.
+ * - No success row when the step did nothing (`work` returns 0). Most cycles
+ *   land between kickoffs with every bot pick already filed, and a success
+ *   row every 30 minutes would bury the entries that matter.
+ * - The caller gets a bare flag, never the caught message. A raw
+ *   Postgres/PostgREST error can carry constraint, column or row-identifier
+ *   fragments; the detail stays in sync_log, matching the outer catch's own
+ *   "detail in sync_log, generic to caller" convention.
+ *
+ * @param work returns how many units it did; 0 means "nothing to report".
+ * @returns true if the step failed.
+ */
+async function runIsolatedStep(
+  supabase: ReturnType<typeof createServerSupabaseClient>,
+  syncType: "bots" | "scoring",
+  work: () => Promise<number>,
+): Promise<boolean> {
+  try {
+    const done = await work();
+    if (done > 0) {
+      await supabase.from("sync_log").insert({
+        provider_name: PROVIDER_NAME,
+        sync_type: syncType,
+        status: "success",
+        error_message: null,
+      });
+    }
+    return false;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await supabase.from("sync_log").insert({
+      provider_name: PROVIDER_NAME,
+      sync_type: syncType,
+      status: "failure",
+      error_message: message,
+    });
+    return true;
+  }
+}
+
 export async function POST(request: Request) {
   if (!hasValidSyncSecret(request)) {
     return NextResponse.json({ error: "Forbidden." }, { status: 403 });
@@ -55,6 +104,12 @@ export async function POST(request: Request) {
   const now = new Date();
   const { dateFrom, dateTo } = dateRange(now);
 
+  type MapResult = ReturnType<typeof mapMatchesToUpdates>;
+  let updates: MapResult["updates"] = [];
+  let unmatchedProviderMatchIds: MapResult["unmatchedProviderMatchIds"] = [];
+  let matchesFailed = false;
+  let matchesErrorMessage = "";
+
   try {
     const [matchesResponse, knownMatchesResult] = await Promise.all([
       fetchMatches(apiKey, dateFrom, dateTo),
@@ -70,11 +125,11 @@ export async function POST(request: Request) {
       knownMatchesResult.data.map((row) => [row.provider_match_id, row.id]),
     );
 
-    const { updates, unmatchedProviderMatchIds } = mapMatchesToUpdates(
+    ({ updates, unmatchedProviderMatchIds } = mapMatchesToUpdates(
       matchesResponse,
       matchIdByProviderMatchId,
       now,
-    );
+    ));
 
     // Fixtures are always pre-seeded (CLAUDE.md): every id here already
     // exists, so this is always an UPDATE, never an insert -- an upsert
@@ -101,63 +156,72 @@ export async function POST(request: Request) {
       error_message: errorMessage,
     });
 
-    // Issue #166 D5: scoring/snapshot failures never touch the "matches"
-    // sync_log row above or this route's response status -- the fixture/
-    // result sync itself genuinely succeeded regardless of whether our own
-    // downstream computation does. Own try/catch, own sync_log entry.
-    //
-    // No "scoring" sync_log row at all when this cycle completed nothing --
-    // most cycles land outside a match's final whistle, and a success row
-    // every ~10-15 minutes with nothing to report would just be noise.
-    const completedMatchIds = updates
-      .filter((u) => u.status === "completed")
-      .map((u) => u.id);
-
-    // scoringFailed is a bare flag, not the caught message -- matches the
-    // outer catch's convention below (generic response, detail in
-    // sync_log only). A raw Postgres/PostgREST error can carry constraint,
-    // column, or row-identifier fragments; no caller of this route needs
-    // more than "check sync_log" to act on a scoring failure.
-    let scoringFailed = false;
-    try {
-      if (completedMatchIds.length > 0) {
-        await scoreCompletedMatchesAndSnapshots(supabase, completedMatchIds);
-        await supabase.from("sync_log").insert({
-          provider_name: PROVIDER_NAME,
-          sync_type: "scoring",
-          status: "success",
-          error_message: null,
-        });
-      }
-    } catch (err) {
-      scoringFailed = true;
-      const message = err instanceof Error ? err.message : String(err);
-      await supabase.from("sync_log").insert({
-        provider_name: PROVIDER_NAME,
-        sync_type: "scoring",
-        status: "failure",
-        error_message: message,
-      });
-    }
-
-    return NextResponse.json({
-      updated: updates.length,
-      skipped: unmatchedProviderMatchIds,
-      ...(scoringFailed
-        ? { scoringError: "Scoring failed -- see sync_log." }
-        : {}),
-    });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    matchesFailed = true;
+    matchesErrorMessage = err instanceof Error ? err.message : String(err);
     await supabase.from("sync_log").insert({
       provider_name: PROVIDER_NAME,
       sync_type: "matches",
       status: "failure",
-      error_message: message,
+      error_message: matchesErrorMessage,
     });
+  }
+
+  // Issue #35 D3: bot pick generation, on the same cadence and with the same
+  // failure isolation as the scoring step below. Two things it is
+  // deliberately NOT gated on:
+  //
+  // - `completedMatchIds.length > 0`. Random and 1-1 bots must file while
+  //   their match is still days away, on cycles where nothing has completed.
+  // - The provider fetch succeeding. Bots read gameweeks and matches from
+  //   our own DB and need nothing from football-data.org, so running this
+  //   inside the try above would mean an outage across a pre-lock window
+  //   (only ~4 usable cycles before a Saturday morning kickoff, given
+  //   sync.yml's 10-23 UTC schedule) left the Random and 1-1 bots with no
+  //   pick for that match FOREVER -- once it locks they are skipped, and D5
+  //   is write-once so nothing backfills them. The Median Bot self-heals;
+  //   those two do not.
+  //
+  // It still runs after the matches update on a good cycle, so it sees this
+  // cycle's kickoff-time changes rather than last cycle's.
+  const botsFailed = await runIsolatedStep(supabase, "bots", () =>
+    generateBotPicks(supabase),
+  );
+
+  if (matchesFailed) {
     return NextResponse.json(
-      { error: "Matches sync failed -- see sync_log." },
+      {
+        error: "Matches sync failed -- see sync_log.",
+        ...(botsFailed
+          ? { botsError: "Bot pick generation failed -- see sync_log." }
+          : {}),
+      },
       { status: 500 },
     );
   }
+
+  // Issue #166 D5: scoring/snapshot failures never touch the "matches"
+  // sync_log row above or this route's response status -- the fixture/
+  // result sync itself genuinely succeeded regardless of whether our own
+  // downstream computation does. Own try/catch, own sync_log entry.
+  const completedMatchIds = updates
+    .filter((u) => u.status === "completed")
+    .map((u) => u.id);
+
+  const scoringFailed = await runIsolatedStep(supabase, "scoring", async () => {
+    if (completedMatchIds.length === 0) return 0;
+    await scoreCompletedMatchesAndSnapshots(supabase, completedMatchIds);
+    return 1;
+  });
+
+  return NextResponse.json({
+    updated: updates.length,
+    skipped: unmatchedProviderMatchIds,
+    ...(botsFailed
+      ? { botsError: "Bot pick generation failed -- see sync_log." }
+      : {}),
+    ...(scoringFailed
+      ? { scoringError: "Scoring failed -- see sync_log." }
+      : {}),
+  });
 }

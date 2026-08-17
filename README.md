@@ -77,6 +77,30 @@ since at bootstrap the operator and the account holder are the same person at th
 Refuses to create a competition whose code is already used by another competition in the same
 environment.
 
+It then creates the competition's three bot players (see _Seeding bots_ below). If that step
+fails after the competition and admin were created, the script says so and tells you to run
+`scripts/seed-bots.mjs` — the competition itself is fine and does not need recreating.
+
+## Seeding bots
+
+Every competition has its own three bot players — Random Bot, 1-1 Bot and Median Bot — scoped by
+`players.competition_id`. Competitions created by `bootstrap-competition.mjs` get them
+automatically; use this script for a competition that predates the bots, or to repair a failed
+bootstrap bot step:
+
+```bash
+SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node scripts/seed-bots.mjs
+```
+
+If the environment has more than one competition, it lists them and prompts for which one to
+seed — it never seeds all of them, since the placeholder `competitions` row from the `#68`
+migration would otherwise collect three orphan bots. Idempotent: re-running creates only whatever
+is missing and never modifies an existing bot.
+
+Once the bots exist, their picks are generated automatically by the fixture sync cycle — Random
+and 1-1 file while a match is still open, the Median Bot files its crowd-consensus pick once the
+match locks. No manual trigger, and nothing to run per gameweek.
+
 ## Setting a competition's code
 
 Competition codes are stored hashed (`competitions.code_hash`), never in a migration file or
