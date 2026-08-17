@@ -25,7 +25,32 @@ export interface CompetitionScoreRow {
   joinedAt: string;
   points: number;
   matchesScored: number;
+  /** Matches where this player named the exact scoreline. */
+  exactTips: number;
+  /** Matches where this player got the result right (win/draw/loss). */
+  correctResults: number;
 }
+
+/**
+ * Both counts below are read straight off a match's points value rather
+ * than re-deriving them from picks and results, because the additive
+ * formula's reachable score set is exactly {0, 1, 3, 4, 5, 7}
+ * (docs/adr/0009-match-scoring-formula-and-title-eligibility.md, and
+ * CLAUDE.md -> Scoring):
+ *
+ *   7  result 3 + goal difference 2 + both team scores 1+1. Getting all
+ *      four is only possible with the exact scoreline, so 7 <=> exact.
+ *   >=3  every term except Wrong Way Round (+1) requires a correct
+ *      result, and Wrong Way Round is mutually exclusive with all of them
+ *      by construction -- so >=3 <=> correct result, and 1 is the only
+ *      non-zero score that isn't one.
+ *
+ * This is a deliberate coupling to the formula, not a coincidence being
+ * exploited: if the reachable set ever changes, these two predicates must
+ * change with it, which is why scope.test.ts pins the whole set.
+ */
+const EXACT_SCORELINE_POINTS = 7;
+const MIN_CORRECT_RESULT_POINTS = 3;
 
 /**
  * Pure fold: combines a competition's player roster with their score rows
@@ -43,16 +68,26 @@ export function foldCompetitionScores(
   }[],
   scoreRows: { playerId: string; points: number }[],
 ): CompetitionScoreRow[] {
-  const byPlayer = new Map<string, { points: number; count: number }>();
+  interface Agg {
+    points: number;
+    count: number;
+    exact: number;
+    correct: number;
+  }
+  const empty = (): Agg => ({ points: 0, count: 0, exact: 0, correct: 0 });
+
+  const byPlayer = new Map<string, Agg>();
   for (const row of scoreRows) {
-    const existing = byPlayer.get(row.playerId) ?? { points: 0, count: 0 };
+    const existing = byPlayer.get(row.playerId) ?? empty();
     existing.points += row.points;
     existing.count += 1;
+    if (row.points === EXACT_SCORELINE_POINTS) existing.exact += 1;
+    if (row.points >= MIN_CORRECT_RESULT_POINTS) existing.correct += 1;
     byPlayer.set(row.playerId, existing);
   }
 
   return players.map((player) => {
-    const agg = byPlayer.get(player.id) ?? { points: 0, count: 0 };
+    const agg = byPlayer.get(player.id) ?? empty();
     return {
       playerId: player.id,
       displayName: player.displayName,
@@ -61,6 +96,8 @@ export function foldCompetitionScores(
       joinedAt: player.joinedAt,
       points: agg.points,
       matchesScored: agg.count,
+      exactTips: agg.exact,
+      correctResults: agg.correct,
     };
   });
 }

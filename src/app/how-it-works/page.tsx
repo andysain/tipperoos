@@ -111,8 +111,16 @@ export default async function HowItWorksPage() {
           No pick means no points. The app never makes up a scoreline for you.
         </p>
         <p>
-          Missing a week does not mean you are a bad predictor. Your leaderboard
-          points-per-gameweek-played number helps show the difference.
+          Missing a week does not mean you are a bad predictor. On the
+          leaderboard, the small <strong>/wk</strong> number beside your points
+          is how many points you average for each gameweek since you joined — so
+          joining late, or missing a couple of weeks, does not make your record
+          look worse than it is.
+        </p>
+        <p>
+          Bots play along every week for fun, but they cannot win the season, so
+          they do not take a place on the leaderboard — the numbers you see are
+          the players you are actually racing.
         </p>
         <div className="rounded-btn bg-paper p-3 text-sm text-ink">
           <p className="font-bold">Example</p>
