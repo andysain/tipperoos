@@ -140,9 +140,9 @@ export default async function HowItWorksPage() {
       >
         <h2 className="text-[1.3rem] font-bold text-ink">Predict the Table</h2>
         <p>
-          Put all 20 clubs into seven Table Bands. A club in the right Band
-          earns {PLACEMENT_POINTS_BY_DISTANCE[0]} points; one Band away earns{" "}
-          {PLACEMENT_POINTS_BY_DISTANCE[1]}, and two Bands away earns{" "}
+          Put all 20 clubs into {TABLE_BANDS.length} Table Bands. A club in the
+          right Band earns {PLACEMENT_POINTS_BY_DISTANCE[0]} points; one Band
+          away earns {PLACEMENT_POINTS_BY_DISTANCE[1]}, and two Bands away earns{" "}
           {PLACEMENT_POINTS_BY_DISTANCE[2]}.
         </p>
         <p>
@@ -159,7 +159,7 @@ export default async function HowItWorksPage() {
         </h3>
         <TableScoringTable />
         <div className="rounded-btn bg-white p-3 text-sm text-ink/75 shadow-card">
-          <p className="font-bold text-ink">The seven Bands</p>
+          <p className="font-bold text-ink">The {TABLE_BANDS.length} Bands</p>
           <p>{TABLE_BANDS.map((band) => band.name).join(" · ")}</p>
         </div>
         <p>These points stay separate from your weekly points.</p>
