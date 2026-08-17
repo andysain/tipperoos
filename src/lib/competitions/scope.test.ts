@@ -353,10 +353,11 @@ describe("scoresForCompetition competition scoping", () => {
 //
 //   UK BST->GMT 2026-10-25: clocks fall back at 02:00 BST, so the transition
 //     instant is 2026-10-25T02:00:00+01:00 = 2026-10-25T01:00:00Z. The local
-//     hour 01:00 then occurs twice; a naive un-offsetted capture of the
-//     second (GMT) occurrence would be stored an hour early
-//     (2026-10-25T00:00:00Z), so the discriminating value is a kickoff at
-//     the true instant while `now` crosses it.
+//     hour 01:00 then occurs twice; capturing the second (GMT) occurrence
+//     with the stale BST offset attached (+01:00) would store it an hour
+//     early (2026-10-25T00:00:00Z) — the issue's naive-local-time failure
+//     mode — so the discriminating value is a kickoff at the true instant
+//     while `now` crosses it.
 //   Sydney AEST->AEDT 2026-10-04: clocks spring forward at 02:00 AEST, so
 //     the transition instant is 2026-10-04T02:00:00+10:00 = 2026-10-03T16:00:00Z.
 //
