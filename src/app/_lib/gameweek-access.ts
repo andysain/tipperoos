@@ -41,11 +41,19 @@ export async function getCurrentSeasonId(
   // "Never select a row without an explicit .order()... Postgres row order
   // is arbitrary." start_date desc is the meaningful tiebreak if `is_current`
   // were ever momentarily true on more than one row during a season rollover.
+  //
+  // .limit(1) is what makes that tiebreak actually work (issue #174): the
+  // ordering alone still hands every matching row to a single-object
+  // request, which then fails with PGRST116 ("Results contain 2 rows...")
+  // rather than taking the first. That turned a second current season into
+  // a 500 on every authenticated route, observed for real on staging. The
+  // ordering decides *which* row; the limit is what lets there be one.
   const { data: season, error } = await supabase
     .from("seasons")
     .select("id")
     .eq("is_current", true)
     .order("start_date", { ascending: false })
+    .limit(1)
     .maybeSingle();
   if (error) throw error;
   return season?.id ?? null;
