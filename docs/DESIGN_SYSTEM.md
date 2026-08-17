@@ -142,9 +142,23 @@ Emoji stay the personalization layer, separate from functional icons: bot (🤖)
 Never use emoji where a functional icon is needed (rendering is inconsistent across platforms for that use);
 never use a functional icon where personalization is the point.
 
-**Open / deferred**: whether a player's emoji renders inline next to their name or inside a small colored
-circle chip (mini-avatar treatment) is undecided — resolve when the leaderboard/login screens are actually
-built, not before.
+**Resolved 2026-08-16 — the circle chip wins.** A player's emoji renders inside a small circle chip
+(mini-avatar treatment), not inline beside their name. Decided by building both against a realistic 16-row
+leaderboard and comparing directly (`docs/adr/0012-leaderboard-view.md` D11): inline emoji sit at name size and
+disappear into the text line, while a chip gives the player a fixed, findable object at a consistent position
+down the column. **The login list should follow this**, rather than diverging — it's the other screen this
+question was parked for.
+
+Two rules the leaderboard settled alongside it, both worth honouring wherever the chip is reused:
+
+- **The chip's fill is never used to signal state.** An early leaderboard pass tinted the signed-in player's own
+  chip accent and it was rejected: the emoji is the one element a player chose for themselves, and recolouring
+  it puts the palette on top of their identity, making the chip read as a system state rather than as them.
+  Own-row emphasis moved to an accent stripe on the card's left edge instead. The chip's only fill variation is
+  the muted ground used for an ineligible entrant.
+- **Rank movement can't live on an ink ground.** `success`/`danger` don't clear the contrast floor against
+  `ink`, so a movement indicator drawn on a dark surface loses its colour coding entirely and falls back to the
+  ▲/▼ glyph alone. Keep movement on a light ground so it keeps both signals.
 
 ## Copy tone
 
