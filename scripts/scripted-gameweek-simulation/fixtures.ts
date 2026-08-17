@@ -82,10 +82,16 @@ export async function createSimulationWorld(
     return (data as { id: string }).id as T;
   };
 
+  // is_current is set explicitly rather than left to the column default.
+  // The default was `true` until issue #174, which meant this insert alone
+  // gave staging a second current season and 500ed every authenticated
+  // route (SIM_KEEP_WORLD runs left it behind). Stated here so the script
+  // is correct regardless of what the default happens to be.
   const seasonId = await insert<string>("seasons", {
     label: `sim-${stamp}`,
     start_date: "2026-08-01",
     end_date: "2027-05-31",
+    is_current: false,
   });
   created.seasons.push(seasonId);
 
