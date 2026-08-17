@@ -3,6 +3,7 @@ import {
   foldCompetitionPicks,
   foldCompetitionScores,
   isMatchLocked,
+  scoresForCompetition,
 } from "./scope";
 
 // Golden values hand-derived from CLAUDE.md:
@@ -204,5 +205,145 @@ describe("isMatchLocked", () => {
 
   it("stays locked after kickoff", () => {
     expect(isMatchLocked(kickoff, new Date("2026-08-15T15:30:00Z"))).toBe(true);
+  });
+});
+
+// The reason this module exists at all (issue #71, and
+// docs/adr/0004-multi-competition-foundational-scope.md's sharpest
+// finding): `scores` is keyed by match_id, and `matches` is deliberately
+// global, so two competitions can legitimately tip the same real fixture.
+// A read that isn't scoped to one competition silently blends their points.
+//
+// Where the boundary actually lives, established by mutation-testing these
+// assertions (breaking the code on purpose to check the test notices):
+//
+//   `foldCompetitionScores` is ROSTER-driven -- it maps over the players
+//   array and looks each player's score rows up by id. A foreign
+//   competition's score rows therefore can't attach to one of this
+//   competition's players, and can't appear as an extra row. So the single
+//   point of failure is the `players` query's competition_id filter: drop
+//   that and the other competition walks onto the leaderboard. The
+//   `.in("player_id", ...)` filter on `scores` is defence-in-depth and a
+//   smaller query, NOT the thing holding the boundary -- removing it alone
+//   changes no output, which is why the first draft of this test passed
+//   against deliberately broken code and had to be rewritten.
+describe("scoresForCompetition competition scoping", () => {
+  const COMP_A = "comp-a";
+  const SHARED_MATCH = "match-shared";
+
+  /**
+   * Mock that honours `.eq()` and `.in()` rather than returning fixed rows,
+   * so dropping a filter in the implementation actually changes the result.
+   */
+  function createFilteringSupabase() {
+    const seen: { table: string; col: string; val: unknown }[] = [];
+    const rows: Record<string, Record<string, unknown>[]> = {
+      players: [
+        {
+          id: "a1",
+          display_name: "Comp A One",
+          emoji: "\u{1F98A}",
+          is_bot: false,
+          joined_at: "2026-08-01T00:00:00Z",
+          competition_id: COMP_A,
+        },
+        {
+          id: "b1",
+          display_name: "Comp B One",
+          emoji: "\u{1F427}",
+          is_bot: false,
+          joined_at: "2026-08-01T00:00:00Z",
+          competition_id: "comp-b",
+        },
+      ],
+      // Both competitions' players tipped the SAME global match.
+      scores: [
+        {
+          player_id: "a1",
+          points: 7,
+          match_id: SHARED_MATCH,
+          matches: { season_id: "season-1" },
+        },
+        {
+          player_id: "b1",
+          points: 3,
+          match_id: SHARED_MATCH,
+          matches: { season_id: "season-1" },
+        },
+      ],
+    };
+
+    const from = (table: string) => {
+      let data = [...(rows[table] ?? [])];
+      const builder: Record<string, unknown> = {
+        select: () => builder,
+        eq(col: string, val: unknown) {
+          seen.push({ table, col, val });
+          const key = col.includes(".") ? col.split(".").pop()! : col;
+          data = data.filter((row) =>
+            key === "season_id"
+              ? (row.matches as { season_id: string }).season_id === val
+              : row[key] === val,
+          );
+          return builder;
+        },
+        in(col: string, vals: unknown[]) {
+          seen.push({ table, col, val: vals });
+          data = data.filter((row) => vals.includes(row[col]));
+          return builder;
+        },
+        then: (resolve: (v: { data: unknown[]; error: null }) => unknown) =>
+          Promise.resolve({ data, error: null }).then(resolve),
+      };
+      return builder;
+    };
+
+    return { client: { from } as never, seen };
+  }
+
+  it("returns only the asked-for competition's players when both tip the same global match", async () => {
+    const { client } = createFilteringSupabase();
+    const result = await scoresForCompetition(client, COMP_A, "season-1");
+    expect(result.length).toBe(1);
+    expect(result[0].displayName).toBe("Comp A One");
+    expect(result[0].points).toBe(7);
+    expect(result[0].matchesScored).toBe(1);
+    expect(result[0].exactTips).toBe(1);
+  });
+
+  it("scopes the roster read by competition_id -- the filter the boundary rests on", async () => {
+    const { client, seen } = createFilteringSupabase();
+    await scoresForCompetition(client, COMP_A, "season-1");
+    expect(
+      seen.some(
+        (call) =>
+          call.table === "players" &&
+          call.col === "competition_id" &&
+          call.val === COMP_A,
+      ),
+    ).toBe(true);
+  });
+
+  it("narrows the scores read to this competition's player ids, never match_id alone", async () => {
+    const { client, seen } = createFilteringSupabase();
+    await scoresForCompetition(client, COMP_A, "season-1");
+    const playerFilter = seen.find(
+      (call) => call.table === "scores" && call.col === "player_id",
+    );
+    expect(playerFilter).toBeDefined();
+    expect(playerFilter!.val).toEqual(["a1"]);
+  });
+
+  it("scopes the scores read by season too, so two seasons never blend", async () => {
+    const { client, seen } = createFilteringSupabase();
+    await scoresForCompetition(client, COMP_A, "season-1");
+    expect(
+      seen.some(
+        (call) =>
+          call.table === "scores" &&
+          call.col === "matches.season_id" &&
+          call.val === "season-1",
+      ),
+    ).toBe(true);
   });
 });
