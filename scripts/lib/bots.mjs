@@ -60,10 +60,14 @@ export async function ensureCompetitionBots(supabase, competitionId) {
   const existingBotTypes = new Set(
     (players ?? []).filter((p) => p.is_bot).map((p) => p.bot_type),
   );
-  const humanNamesLower = new Set(
-    (players ?? [])
-      .filter((p) => !p.is_bot)
-      .map((p) => p.display_name.toLowerCase()),
+  // Every player's name, not just the humans'. The DB's uniqueness index is
+  // on display_name while this function's idempotency keys on bot_type, and
+  // the schema permits `is_bot = true` with a null bot_type -- so a row
+  // called "Random Bot" with no bot_type is absent from existingBotTypes AND
+  // would be absent from a humans-only name set, leaving nothing to catch it
+  // before the insert failed on a bare 23505.
+  const takenNamesLower = new Set(
+    (players ?? []).map((p) => p.display_name.toLowerCase()),
   );
 
   const missing = BOT_SPECS.filter(
@@ -71,7 +75,7 @@ export async function ensureCompetitionBots(supabase, competitionId) {
   );
 
   for (const spec of missing) {
-    if (humanNamesLower.has(spec.displayName.toLowerCase())) {
+    if (takenNamesLower.has(spec.displayName.toLowerCase())) {
       throw new Error(
         `Cannot create the ${spec.botType} bot: a player in this competition ` +
           `is already called "${spec.displayName}". Rename that player (or the ` +
@@ -95,6 +99,17 @@ export async function ensureCompetitionBots(supabase, competitionId) {
 
   if (rows.length > 0) {
     const { error: insertError } = await supabase.from("players").insert(rows);
+    // The check above is read-then-insert, so two operators running this at
+    // once (or bootstrap racing a manual seed-bots run) can both see the same
+    // bot missing. The loser gets a raw 23505 from the per-competition
+    // display-name index; translate it rather than printing PostgREST's
+    // constraint name at someone.
+    if (insertError?.code === "23505") {
+      throw new Error(
+        "Another process created these bots at the same time. Nothing was " +
+          "duplicated -- re-run scripts/seed-bots.mjs to confirm the final state.",
+      );
+    }
     if (insertError) throw insertError;
   }
 

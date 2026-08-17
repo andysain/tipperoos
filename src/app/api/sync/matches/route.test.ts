@@ -327,6 +327,43 @@ describe("POST /api/sync/matches", () => {
     vi.unstubAllGlobals();
   });
 
+  // Issue #35 D3: bots must not be gated on the provider fetch succeeding.
+  // They read gameweeks/matches from our own DB and need nothing from
+  // football-data.org. A provider outage across a whole pre-lock window
+  // would otherwise leave Random and 1-1 with no pick for that match
+  // permanently -- once it locks they're skipped, and write-once means
+  // nothing ever backfills them.
+  it("still generates bot picks when the provider fetch fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        text: async () => "provider unavailable",
+      }),
+    );
+    generateBotPicksMock.mockResolvedValue(2);
+
+    const response = await POST(request());
+
+    // The matches sync genuinely failed -- that verdict is unchanged.
+    expect(response.status).toBe(500);
+    expect(syncLogInsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ sync_type: "matches", status: "failure" }),
+    );
+    // ...but the bots still ran, and logged their own success.
+    expect(generateBotPicksMock).toHaveBeenCalledTimes(1);
+    expect(syncLogInsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ sync_type: "bots", status: "success" }),
+    );
+    // Scoring correctly did NOT run: nothing completed, since nothing synced.
+    expect(syncLogInsertMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ sync_type: "scoring" }),
+    );
+
+    vi.unstubAllGlobals();
+  });
+
   // Same "no success row when there was nothing to do" rule #166 settled for
   // scoring: most cycles have every bot pick already filed, and a success
   // row every 30 minutes would bury the entries that matter.

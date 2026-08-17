@@ -56,7 +56,15 @@ function clampScore(value: number): number {
 }
 
 function drawFromPool(rng: Rng): number {
-  return SCORE_POOL[Math.floor(rng() * SCORE_POOL.length)];
+  // Clamped, not just floored: `Math.random()` is always < 1, but an
+  // injected rng returning exactly 1 would index past the pool and yield
+  // undefined -> NaN -> a NOT NULL violation on insert. Cheaper to make
+  // that unreachable than to rely on every caller's rng being well-behaved.
+  const index = Math.min(
+    SCORE_POOL.length - 1,
+    Math.max(0, Math.floor(rng() * SCORE_POOL.length)),
+  );
+  return SCORE_POOL[index];
 }
 
 /**

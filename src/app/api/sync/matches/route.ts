@@ -104,6 +104,12 @@ export async function POST(request: Request) {
   const now = new Date();
   const { dateFrom, dateTo } = dateRange(now);
 
+  type MapResult = ReturnType<typeof mapMatchesToUpdates>;
+  let updates: MapResult["updates"] = [];
+  let unmatchedProviderMatchIds: MapResult["unmatchedProviderMatchIds"] = [];
+  let matchesFailed = false;
+  let matchesErrorMessage = "";
+
   try {
     const [matchesResponse, knownMatchesResult] = await Promise.all([
       fetchMatches(apiKey, dateFrom, dateTo),
@@ -119,11 +125,11 @@ export async function POST(request: Request) {
       knownMatchesResult.data.map((row) => [row.provider_match_id, row.id]),
     );
 
-    const { updates, unmatchedProviderMatchIds } = mapMatchesToUpdates(
+    ({ updates, unmatchedProviderMatchIds } = mapMatchesToUpdates(
       matchesResponse,
       matchIdByProviderMatchId,
       now,
-    );
+    ));
 
     // Fixtures are always pre-seeded (CLAUDE.md): every id here already
     // exists, so this is always an UPDATE, never an insert -- an upsert
@@ -150,53 +156,72 @@ export async function POST(request: Request) {
       error_message: errorMessage,
     });
 
-    // Issue #35 D3: bot pick generation, on the same cadence and with the
-    // same failure isolation as the scoring block below. Deliberately NOT
-    // inside that block's `completedMatchIds.length > 0` gate -- Random and
-    // 1-1 bots must file while their match is still days away, on cycles
-    // where nothing has completed. Runs before scoring so a Median pick
-    // created at lock is scored in the same cycle the match finishes; that
-    // ordering is a nicety, not a correctness requirement, since #166 D1
-    // recomputes from current state every cycle.
-    const botsFailed = await runIsolatedStep(supabase, "bots", () =>
-      generateBotPicks(supabase),
-    );
-
-    // Issue #166 D5: scoring/snapshot failures never touch the "matches"
-    // sync_log row above or this route's response status -- the fixture/
-    // result sync itself genuinely succeeded regardless of whether our own
-    // downstream computation does. Own try/catch, own sync_log entry.
-    const completedMatchIds = updates
-      .filter((u) => u.status === "completed")
-      .map((u) => u.id);
-
-    const scoringFailed = await runIsolatedStep(supabase, "scoring", async () => {
-      if (completedMatchIds.length === 0) return 0;
-      await scoreCompletedMatchesAndSnapshots(supabase, completedMatchIds);
-      return 1;
-    });
-
-    return NextResponse.json({
-      updated: updates.length,
-      skipped: unmatchedProviderMatchIds,
-      ...(botsFailed
-        ? { botsError: "Bot pick generation failed -- see sync_log." }
-        : {}),
-      ...(scoringFailed
-        ? { scoringError: "Scoring failed -- see sync_log." }
-        : {}),
-    });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    matchesFailed = true;
+    matchesErrorMessage = err instanceof Error ? err.message : String(err);
     await supabase.from("sync_log").insert({
       provider_name: PROVIDER_NAME,
       sync_type: "matches",
       status: "failure",
-      error_message: message,
+      error_message: matchesErrorMessage,
     });
+  }
+
+  // Issue #35 D3: bot pick generation, on the same cadence and with the same
+  // failure isolation as the scoring step below. Two things it is
+  // deliberately NOT gated on:
+  //
+  // - `completedMatchIds.length > 0`. Random and 1-1 bots must file while
+  //   their match is still days away, on cycles where nothing has completed.
+  // - The provider fetch succeeding. Bots read gameweeks and matches from
+  //   our own DB and need nothing from football-data.org, so running this
+  //   inside the try above would mean an outage across a pre-lock window
+  //   (only ~4 usable cycles before a Saturday morning kickoff, given
+  //   sync.yml's 10-23 UTC schedule) left the Random and 1-1 bots with no
+  //   pick for that match FOREVER -- once it locks they are skipped, and D5
+  //   is write-once so nothing backfills them. The Median Bot self-heals;
+  //   those two do not.
+  //
+  // It still runs after the matches update on a good cycle, so it sees this
+  // cycle's kickoff-time changes rather than last cycle's.
+  const botsFailed = await runIsolatedStep(supabase, "bots", () =>
+    generateBotPicks(supabase),
+  );
+
+  if (matchesFailed) {
     return NextResponse.json(
-      { error: "Matches sync failed -- see sync_log." },
+      {
+        error: "Matches sync failed -- see sync_log.",
+        ...(botsFailed
+          ? { botsError: "Bot pick generation failed -- see sync_log." }
+          : {}),
+      },
       { status: 500 },
     );
   }
+
+  // Issue #166 D5: scoring/snapshot failures never touch the "matches"
+  // sync_log row above or this route's response status -- the fixture/
+  // result sync itself genuinely succeeded regardless of whether our own
+  // downstream computation does. Own try/catch, own sync_log entry.
+  const completedMatchIds = updates
+    .filter((u) => u.status === "completed")
+    .map((u) => u.id);
+
+  const scoringFailed = await runIsolatedStep(supabase, "scoring", async () => {
+    if (completedMatchIds.length === 0) return 0;
+    await scoreCompletedMatchesAndSnapshots(supabase, completedMatchIds);
+    return 1;
+  });
+
+  return NextResponse.json({
+    updated: updates.length,
+    skipped: unmatchedProviderMatchIds,
+    ...(botsFailed
+      ? { botsError: "Bot pick generation failed -- see sync_log." }
+      : {}),
+    ...(scoringFailed
+      ? { scoringError: "Scoring failed -- see sync_log." }
+      : {}),
+  });
 }

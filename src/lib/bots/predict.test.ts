@@ -65,6 +65,16 @@ describe("randomBotPick", () => {
     expect(pick.awayScore).toBe(2);
   });
 
+  it("stays inside the pool when an rng returns exactly 1", () => {
+    // Math.random() is always < 1, so this is only reachable via an injected
+    // rng -- but indexing past the pool yields undefined -> NaN, which would
+    // hit the DB as a NOT NULL violation rather than a bad pick.
+    const pick = randomBotPick(() => 1);
+
+    expect(pick.homeScore).toBe(3);
+    expect(pick.awayScore).toBe(3);
+  });
+
   it("consumes exactly two draws per pick -- one per side, never one shared", () => {
     // A shared draw would make every Random Bot pick a draw. The seeded rng
     // throws once exhausted, so two values being enough proves it takes two.
