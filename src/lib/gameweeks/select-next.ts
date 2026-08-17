@@ -73,6 +73,15 @@ export interface SelectNextGameweekSlotsOptions {
   now?: Date;
   /** Injected for tests; `Math.random` otherwise (see selectMatch2). */
   random?: () => number;
+  /**
+   * Injected for the scripted-gameweek-simulation harness (issue #92's
+   * scope), which runs against shared staging: without this, an unscoped
+   * call would also evaluate and potentially write real gameweek rows for
+   * whatever other competitions already exist on that project. Production
+   * (`sync/matches`) never passes this -- it processes every competition,
+   * per D6.
+   */
+  competitionIds?: string[];
 }
 
 /**
@@ -88,7 +97,8 @@ export async function selectNextGameweekSlots(
 ): Promise<number> {
   const now = options.now ?? new Date();
 
-  const competitionIds = await loadCompetitionIds(supabase);
+  const competitionIds =
+    options.competitionIds ?? (await loadCompetitionIds(supabase));
   if (competitionIds.length === 0) return 0;
 
   const gameweeksByCompetition = await loadGameweeksByCompetition(

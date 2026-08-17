@@ -111,6 +111,39 @@ describe("selectNextGameweekSlots", () => {
     expect(await selectNextGameweekSlots(client)).toBe(0);
   });
 
+  it("only evaluates competitions passed via options.competitionIds, ignoring an eligible one left out", async () => {
+    const otherCompetition = { id: "c2", created_at: "2026-01-02T00:00:00Z" };
+    const { client, tables } = fakeSupabase({
+      competitions: [COMPETITION, otherCompetition],
+      gameweeks: [
+        gameweek({ number: 1, match_1_id: "m1", match_2_id: "m2" }),
+        gameweek({
+          id: "gw-c2-1",
+          competition_id: "c2",
+          number: 1,
+          match_1_id: "m1",
+          match_2_id: "m2",
+        }),
+      ],
+      matches: [
+        match("m1", { status: "completed" }),
+        match("m2", { status: "completed" }),
+        match("m3", { matchday: 2 }),
+        match("m4", { matchday: 2 }),
+      ],
+      teams: TEAMS,
+    });
+
+    const selected = await selectNextGameweekSlots(client, {
+      competitionIds: ["c1"],
+      random: () => 0,
+    });
+
+    expect(selected).toBe(1);
+    expect(tables.gameweeks.some((g) => g.competition_id === "c1" && g.number === 2)).toBe(true);
+    expect(tables.gameweeks.some((g) => g.competition_id === "c2" && g.number === 2)).toBe(false);
+  });
+
   it("no-ops when the competition's latest gameweek isn't scoring-complete yet", async () => {
     const { client, tables } = fakeSupabase({
       competitions: [COMPETITION],

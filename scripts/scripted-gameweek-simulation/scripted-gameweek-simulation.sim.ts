@@ -16,6 +16,11 @@
 //      of competition (the engine's match-level void contract, #21 D4), and
 //      `scoresForCompetition` never leaks one competition's data into another
 //   5. disposeSimulationWorld leaves every synthetic table at its pre-run count
+//   6. (issue #92) once both competitions' gameweek 1s are scoring-complete,
+//      selectNextGameweekSlots writes gameweek 2 for each from a real
+//      matchday-2 fixture pool, scoped to just these two competitions via
+//      `competitionIds` (never touching any other competition on shared
+//      staging), and a repeat invocation selects nothing new (write-once)
 //
 // Absolute points are derived by running the engine against the known picks
 // below; a few literals are pinned against CLAUDE.md's scoring section as
@@ -35,10 +40,12 @@
 import { describe, expect, it } from "vitest";
 import { recomputeMatchScores, type ScoreRow } from "@/lib/scoring/match";
 import { scoresForCompetition } from "@/lib/competitions/scope";
+import { selectNextGameweekSlots } from "@/lib/gameweeks/select-next";
 import {
   createSimulationWorld,
   createStagingClient,
   disposeSimulationWorld,
+  insertNextGameweekFixture,
   printKeptWorldWarning,
   setMatchStatus,
   setSlotVoided,
@@ -439,6 +446,78 @@ describe("scripted gameweek-simulation test (#22)", () => {
         compBPostVoid,
         names,
       );
+
+      // --- selection runner (issue #92): complete-gameweek -> selection ->
+      // repeat-invocation ---
+      //
+      // Both gameweek 1s are already scoring-complete at this point: comp A's
+      // (match one completed, match two completed-and-voided -- voided counts
+      // as scoring-done) and comp B's (match one completed, match two a
+      // Skipped Slot from world setup -- matchId null also counts as done).
+      // `competitionIds` is passed explicitly (issue #92's addition to
+      // `SelectNextGameweekSlotsOptions`) so this call only ever evaluates
+      // this world's two synthetic competitions -- never any other
+      // competition that happens to exist on shared staging.
+      const nextGwKickoff = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000);
+      const selectionNow = new Date(Date.now() + 1 * 24 * 60 * 60 * 1000);
+
+      const nextFixtureOne = await insertNextGameweekFixture(supabase, world, {
+        providerMatchId: `sim-m3-${world.seasonId}`,
+        matchday: 2,
+        kickoffTime: nextGwKickoff.toISOString(),
+      });
+      const nextFixtureTwo = await insertNextGameweekFixture(supabase, world, {
+        providerMatchId: `sim-m4-${world.seasonId}`,
+        matchday: 2,
+        kickoffTime: new Date(
+          nextGwKickoff.getTime() + 60 * 60 * 1000,
+        ).toISOString(),
+      });
+
+      const selected = await selectNextGameweekSlots(supabase, {
+        now: selectionNow,
+        random: () => 0,
+        competitionIds: [world.competitionAId, world.competitionBId],
+      });
+      expect(selected, "selects gameweek 2 for both competitions").toBe(2);
+
+      const { data: gw2Rows, error: gw2Error } = await supabase
+        .from("gameweeks")
+        .select("id, competition_id, match_1_id, match_2_id")
+        .in("competition_id", [world.competitionAId, world.competitionBId])
+        .eq("number", 2);
+      if (gw2Error) throw gw2Error;
+      expect(gw2Rows?.length, "one gameweek 2 row per competition").toBe(2);
+      // Track for disposal -- selectNextGameweekSlots writes these directly,
+      // not through createSimulationWorld's own insert() helper.
+      for (const row of gw2Rows ?? []) {
+        world.created.gameweeks.push((row as { id: string }).id);
+      }
+      for (const row of gw2Rows as { match_1_id: string | null }[]) {
+        expect(
+          [nextFixtureOne, nextFixtureTwo],
+          "match_1_id is one of the next matchday's fixtures",
+        ).toContain(row.match_1_id);
+      }
+
+      // Repeat invocation: write-once, no re-roll, no new rows.
+      const selectedAgain = await selectNextGameweekSlots(supabase, {
+        now: selectionNow,
+        random: () => 0,
+        competitionIds: [world.competitionAId, world.competitionBId],
+      });
+      expect(selectedAgain, "a repeat invocation selects nothing new").toBe(0);
+
+      const { data: gw2RowsAfter, error: gw2AfterError } = await supabase
+        .from("gameweeks")
+        .select("id, match_1_id, match_2_id")
+        .in("competition_id", [world.competitionAId, world.competitionBId])
+        .eq("number", 2);
+      if (gw2AfterError) throw gw2AfterError;
+      expect(
+        gw2RowsAfter,
+        "repeat invocation leaves the selected slots byte-identical",
+      ).toEqual(gw2Rows);
     } finally {
       let disposeError: unknown;
       if (process.env.SIM_KEEP_WORLD === "1") {
