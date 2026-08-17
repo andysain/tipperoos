@@ -3,6 +3,7 @@ import { mapMatchesToUpdates } from "@/lib/matches/map-matches";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { scoreCompletedMatchesAndSnapshots } from "@/lib/gameweeks/sync-scoring";
 import { generateBotPicks } from "@/lib/bots/generate";
+import { selectNextGameweekSlots } from "@/lib/gameweeks/select-next";
 
 // Issue #11: fixture/result sync route, callable manually now and by this
 // issue's own GitHub Actions workflow on a schedule. Mirrors #88's standings
@@ -61,7 +62,7 @@ async function fetchMatches(apiKey: string, dateFrom: string, dateTo: string) {
  */
 async function runIsolatedStep(
   supabase: ReturnType<typeof createServerSupabaseClient>,
-  syncType: "bots" | "scoring",
+  syncType: "bots" | "scoring" | "selection",
   work: () => Promise<number>,
 ): Promise<boolean> {
   try {
@@ -214,6 +215,14 @@ export async function POST(request: Request) {
     return 1;
   });
 
+  // Issue #92 D3: next-gameweek Tipped Match selection, placed after scoring
+  // so it sees this cycle's newly-completed matches feed straight into
+  // isGameweekScoringComplete. Own failure domain, own sync_log entry --
+  // never touches the "matches" or "scoring" rows above.
+  const selectionFailed = await runIsolatedStep(supabase, "selection", () =>
+    selectNextGameweekSlots(supabase),
+  );
+
   return NextResponse.json({
     updated: updates.length,
     skipped: unmatchedProviderMatchIds,
@@ -222,6 +231,9 @@ export async function POST(request: Request) {
       : {}),
     ...(scoringFailed
       ? { scoringError: "Scoring failed -- see sync_log." }
+      : {}),
+    ...(selectionFailed
+      ? { selectionError: "Selection failed -- see sync_log." }
       : {}),
   });
 }

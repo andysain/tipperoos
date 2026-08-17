@@ -207,6 +207,37 @@ export async function createSimulationWorld(
   };
 }
 
+/**
+ * Inserts one extra `matches` row at a given `matchday`, for issue #92's
+ * selection-runner stage -- `createSimulationWorld`'s two matches have no
+ * matchday set (irrelevant to the scoring engine), but `selectNextGameweekSlots`
+ * needs a real next-matchday fixture pool to select from. Pushed onto
+ * `world.created.matches` so `disposeSimulationWorld` cleans it up too.
+ */
+export async function insertNextGameweekFixture(
+  supabase: SupabaseClient,
+  world: SimulationWorld,
+  params: { providerMatchId: string; matchday: number; kickoffTime: string },
+): Promise<string> {
+  const { data, error } = await supabase
+    .from("matches")
+    .insert({
+      season_id: world.seasonId,
+      provider_name: "sim",
+      provider_match_id: params.providerMatchId,
+      team_a_id: world.teamAId,
+      team_b_id: world.teamBId,
+      kickoff_time: params.kickoffTime,
+      matchday: params.matchday,
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+  const id = (data as { id: string }).id;
+  world.created.matches.push(id);
+  return id;
+}
+
 /** Voids/un-voids one gameweek slot (the authoritative voided signal, D4). */
 export async function setSlotVoided(
   supabase: SupabaseClient,

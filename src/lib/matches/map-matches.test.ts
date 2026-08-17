@@ -19,6 +19,7 @@ function payload(
     id: number;
     utcDate: string;
     status: string;
+    matchday?: number;
     homeScore?: number | null;
     awayScore?: number | null;
   }>,
@@ -28,6 +29,7 @@ function payload(
       id: m.id,
       utcDate: m.utcDate,
       status: m.status,
+      matchday: m.matchday ?? 1,
       homeTeam: { id: 1 },
       awayTeam: { id: 2 },
       score: {
@@ -73,11 +75,29 @@ describe("mapMatchesToUpdates", () => {
       id: "match-uuid-100",
       kickoff_time: "2026-08-22T15:30:00Z",
       status: "scheduled",
+      matchday: 1,
       team_a_score: null,
       team_b_score: null,
       result_updated_at: null,
       updated_at: NOW.toISOString(),
     });
+  });
+
+  it("carries the provider's matchday through onto the update row (issue #92)", () => {
+    const result = mapMatchesToUpdates(
+      payload([
+        {
+          id: 100,
+          utcDate: "2026-08-22T15:30:00Z",
+          status: "SCHEDULED",
+          matchday: 7,
+        },
+      ]),
+      MATCH_ID_BY_PROVIDER_ID,
+      NOW,
+    );
+
+    expect(result.updates[0].matchday).toBe(7);
   });
 
   it("writes a different final scoreline correctly (3-0)", () => {

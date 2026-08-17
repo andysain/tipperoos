@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { recomputeMatchScores } from "@/lib/scoring/match";
 import { writeScores } from "@/lib/scoring/write-scores";
 import { isMatchVoided } from "@/lib/matches/voided";
-import { isGameweekScoringComplete, type ScoringSlot } from "./completion";
+import { isGameweekScoringComplete, toScoringSlot } from "./completion";
 import { loadStandingsSnapshotInputs } from "@/lib/standings-snapshot/load-snapshot-inputs";
 import { computeGameweekStandings } from "@/lib/standings-snapshot/compute-snapshot";
 import { writeStandingsSnapshot } from "@/lib/standings-snapshot/write-snapshot";
@@ -115,16 +115,6 @@ async function loadCandidateGameweeks(
     byId.set(row.id, row as GameweekRow);
   }
   return [...byId.values()];
-}
-
-function toScoringSlot(
-  matchId: string | null,
-  voidedAt: string | null,
-  matchById: Map<string, MatchRow>,
-): ScoringSlot {
-  if (matchId === null) return { matchId: null, status: null, voidedAt: null };
-  const status = matchById.get(matchId)?.status ?? null;
-  return { matchId, status: status as ScoringSlot["status"], voidedAt };
 }
 
 /**

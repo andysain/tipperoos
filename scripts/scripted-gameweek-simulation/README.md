@@ -67,8 +67,15 @@ scoring report:
    even for matches with a voided slot signal toggled, and the authoritative
    slot signal wins in the final state.
 9. **post-void leaderboards** — still scoped, still right.
-10. **dispose + baseline proof** — deletes every synthetic row in dependency
-    order and re-checks global row counts match the pre-run snapshot.
+10. **selection runner** (issue #92) — both competitions' gameweek 1s are by
+    now scoring-complete; adds a real matchday-2 fixture pool and calls
+    `selectNextGameweekSlots`, scoped via `competitionIds` to just this
+    world's two competitions so it never touches any other competition on
+    shared staging. Asserts gameweek 2 is written for both from that pool,
+    and that a repeat invocation selects nothing new (write-once).
+11. **dispose + baseline proof** — deletes every synthetic row (including the
+    selection runner's new matches and gameweek rows) in dependency order and
+    re-checks global row counts match the pre-run snapshot.
 
 Any drift between the expected points (computed by the very same
 `recomputeMatchScores` the engine writes) and what's read back from the `scores`

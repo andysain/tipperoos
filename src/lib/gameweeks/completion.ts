@@ -39,3 +39,20 @@ export function isGameweekScoringComplete(
 ): boolean {
   return isSlotScoringDone(match1) && isSlotScoringDone(match2);
 }
+
+/**
+ * Builds a `ScoringSlot` from a `gameweeks` slot pair (matchId, voidedAt)
+ * plus a status lookup -- shared by `sync-scoring.ts` (#166) and
+ * `select-next.ts` (#92), both of which resolve slots into scoring/
+ * completion predicates from their own differently-shaped `matches` row
+ * fetch, but only ever need `status` out of it here.
+ */
+export function toScoringSlot(
+  matchId: string | null,
+  voidedAt: string | null,
+  matchById: ReadonlyMap<string, { status: string }>,
+): ScoringSlot {
+  if (matchId === null) return { matchId: null, status: null, voidedAt: null };
+  const status = matchById.get(matchId)?.status ?? null;
+  return { matchId, status: status as ScoringSlot["status"], voidedAt };
+}
