@@ -510,7 +510,7 @@ describe("scripted gameweek-simulation test (#22)", () => {
 
       const { data: gw2RowsAfter, error: gw2AfterError } = await supabase
         .from("gameweeks")
-        .select("id, match_1_id, match_2_id")
+        .select("id, competition_id, match_1_id, match_2_id")
         .in("competition_id", [world.competitionAId, world.competitionBId])
         .eq("number", 2);
       if (gw2AfterError) throw gw2AfterError;
