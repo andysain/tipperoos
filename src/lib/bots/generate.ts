@@ -1,4 +1,5 @@
 import "server-only";
+import { randomInt } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isMatchLocked } from "@/lib/competitions/scope";
 import { isMatchVoided } from "@/lib/matches/voided";
@@ -64,8 +65,29 @@ interface CandidateSlot {
 export interface GenerateBotPicksOptions {
   /** Injected for tests; server time otherwise, same as `picksForMatch`. */
   now?: Date;
-  /** Injected for tests; `Math.random` otherwise. */
+  /** Injected for tests; a CSPRNG otherwise (see `secureRng`). */
   rng?: Rng;
+}
+
+/**
+ * 2^32 is an exact multiple of SCORE_POOL's length, so scaling to [0, 1) and
+ * flooring is uniform over the pool -- no modulo bias.
+ */
+const RNG_RANGE = 2 ** 32;
+
+/**
+ * The Random Bot draws from a CSPRNG rather than `Math.random`. Nobody can
+ * currently gain points from predicting it -- per-match scoring is a pure
+ * function of one player's own pick, and bots can't win the season title --
+ * but a predictable bot is the kind of thing that quietly becomes a problem
+ * if a future feature ever pays out for beating one, and `randomInt` costs
+ * nothing here (two draws per bot pick, a handful of times a week).
+ *
+ * Lives in this server-only module on purpose: ./predict stays pure and free
+ * of node builtins so it remains safe to import anywhere.
+ */
+function secureRng(): number {
+  return randomInt(0, RNG_RANGE) / RNG_RANGE;
 }
 
 export async function generateBotPicks(
@@ -145,7 +167,7 @@ export async function generateBotPicks(
           humanPicksByCompetitionAndMatch.get(
             competitionMatchKey(slot.competitionId, slot.matchId),
           ) ?? [],
-        rng: options.rng,
+        rng: options.rng ?? secureRng,
       });
 
       rows.push({

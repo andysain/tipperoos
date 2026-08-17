@@ -405,6 +405,39 @@ describe("generateBotPicks", () => {
     expect(pickFor(world, "b-random", "a-only")).toBeUndefined();
   });
 
+  // Exercises the real CSPRNG default (node:crypto randomInt scaled to
+  // [0, 1)) rather than an injected stub -- a scaling bug there would put
+  // undefined/NaN into a NOT NULL column, which no seeded-rng test can catch.
+  it("produces an in-range pick with its own CSPRNG when no rng is injected", async () => {
+    const world: World = {
+      gameweeks: [
+        {
+          id: "gw1",
+          competition_id: COMP_A,
+          match_1_id: "m1",
+          match_2_id: null,
+          match_1_voided_at: null,
+          match_2_voided_at: null,
+        },
+      ],
+      matches: [
+        { id: "m1", kickoff_time: UNLOCKED_KICKOFF, status: "scheduled" },
+      ],
+      players: bots(COMP_A, "a"),
+      picks: [],
+    };
+    const { client } = fakeSupabase(world);
+
+    const created = await generateBotPicks(client, { now: NOW });
+
+    expect(created).toBe(2);
+    const random = pickFor(world, "a-random", "m1");
+    expect(Number.isInteger(random?.pred_home_score)).toBe(true);
+    expect(random?.pred_home_score as number).toBeGreaterThanOrEqual(0);
+    expect(random?.pred_home_score as number).toBeLessThanOrEqual(3);
+    expect(random?.pred_away_score as number).toBeLessThanOrEqual(3);
+  });
+
   it("is a no-op, with no upsert at all, when there is nothing to generate", async () => {
     const world: World = {
       gameweeks: [],

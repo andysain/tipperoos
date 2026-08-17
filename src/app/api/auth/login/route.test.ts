@@ -111,4 +111,31 @@ describe("POST /api/auth/login", () => {
     expect(lookupChain.eq).toHaveBeenCalledWith("competition_id", "comp-1");
     expect(body.displayName).toBe("Andy");
   });
+
+  // Issue #35 made bots real `players` rows with a pin_hash. They are not
+  // login surfaces: /api/auth/players already hid them from the roster, and
+  // this makes it structural rather than resting on their throwaway secret
+  // being unguessable.
+  it("excludes bots from the player lookup", async () => {
+    competitionsSelectMock.mockResolvedValue({
+      data: [{ id: "comp-1", code_hash: await hashSecret("real-code") }],
+    });
+    lookupChain.maybeSingle.mockResolvedValue({ data: null, error: null });
+
+    const response = await POST(
+      request({
+        competitionCode: "real-code",
+        displayName: "Median Bot",
+        pin: "1234",
+      }),
+    );
+    const body = await response.json();
+
+    expect(lookupChain.eq).toHaveBeenCalledWith("is_bot", false);
+    // Indistinguishable from any other unknown name -- no oracle telling an
+    // attacker that "Median Bot" exists but is filtered.
+    expect(response.status).toBe(401);
+    expect(body.error).toBe("Incorrect display name or PIN.");
+    expect(updateMock).not.toHaveBeenCalled();
+  });
 });

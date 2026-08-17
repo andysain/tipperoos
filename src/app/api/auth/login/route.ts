@@ -69,6 +69,14 @@ export async function POST(request: Request) {
       "id, display_name, emoji, pin_hash, failed_pin_attempts, locked_until, pin_reset_required",
     )
     .eq("competition_id", competitionId)
+    // Bots are not login surfaces. This agrees with /api/auth/players, which
+    // has always filtered them out of the roster -- but that only hid them,
+    // and until issue #35 no bot rows existed at all, so the two filters
+    // disagreeing was moot. Now that bots are real players with a pin_hash,
+    // make it structural rather than relying on their 256-bit throwaway
+    // secret (scripts/lib/bots.mjs) being unguessable. Also stops a guesser
+    // driving a bot's lockout counter, which nothing would ever reset.
+    .eq("is_bot", false)
     .ilike("display_name", displayName.replace(/[%_]/g, "\\$&"))
     .maybeSingle();
 
