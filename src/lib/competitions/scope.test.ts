@@ -347,3 +347,71 @@ describe("scoresForCompetition competition scoping", () => {
     ).toBe(true);
   });
 });
+
+// DST-transition golden values, hand-derived for issue #37 using the same
+// IANA tzdata shifts already pinned in src/lib/dates/kickoff-format.test.ts:
+//
+//   UK BST->GMT 2026-10-25: clocks fall back at 02:00 BST, so the transition
+//     instant is 2026-10-25T02:00:00+01:00 = 2026-10-25T01:00:00Z. The local
+//     hour 01:00 then occurs twice; a naive un-offsetted capture of the
+//     second (GMT) occurrence would be stored an hour early
+//     (2026-10-25T00:00:00Z), so the discriminating value is a kickoff at
+//     the true instant while `now` crosses it.
+//   Sydney AEST->AEDT 2026-10-04: clocks spring forward at 02:00 AEST, so
+//     the transition instant is 2026-10-04T02:00:00+10:00 = 2026-10-03T16:00:00Z.
+//
+// Locking is pure epoch-millisecond math on the stored UTC instant, so the
+// 5-minute window must land identically whether `now` falls on the pre- or
+// post-transition side of either change.
+describe("isMatchLocked across DST transitions", () => {
+  const ukTransitionKickoff = new Date("2026-10-25T01:00:00Z");
+  const sydneyTransitionKickoff = new Date("2026-10-03T16:00:00Z");
+
+  it("UK: not locked at T-6min on the pre-transition side", () => {
+    expect(
+      isMatchLocked(ukTransitionKickoff, new Date("2026-10-25T00:54:00Z")),
+    ).toBe(false);
+  });
+
+  it("UK: locks exactly at T-5min on the pre-transition side", () => {
+    expect(
+      isMatchLocked(ukTransitionKickoff, new Date("2026-10-25T00:55:00Z")),
+    ).toBe(true);
+  });
+
+  it("UK: locked at kickoff, which is the transition instant itself", () => {
+    expect(
+      isMatchLocked(ukTransitionKickoff, new Date("2026-10-25T01:00:00Z")),
+    ).toBe(true);
+  });
+
+  it("UK: stays locked post-kickoff on the post-transition side", () => {
+    expect(
+      isMatchLocked(ukTransitionKickoff, new Date("2026-10-25T01:30:00Z")),
+    ).toBe(true);
+  });
+
+  it("Sydney: not locked at T-6min on the pre-transition side", () => {
+    expect(
+      isMatchLocked(sydneyTransitionKickoff, new Date("2026-10-03T15:54:00Z")),
+    ).toBe(false);
+  });
+
+  it("Sydney: locks exactly at T-5min on the pre-transition side", () => {
+    expect(
+      isMatchLocked(sydneyTransitionKickoff, new Date("2026-10-03T15:55:00Z")),
+    ).toBe(true);
+  });
+
+  it("Sydney: locked at kickoff, which is the transition instant itself", () => {
+    expect(
+      isMatchLocked(sydneyTransitionKickoff, new Date("2026-10-03T16:00:00Z")),
+    ).toBe(true);
+  });
+
+  it("Sydney: stays locked post-kickoff on the post-transition side", () => {
+    expect(
+      isMatchLocked(sydneyTransitionKickoff, new Date("2026-10-03T16:30:00Z")),
+    ).toBe(true);
+  });
+});
