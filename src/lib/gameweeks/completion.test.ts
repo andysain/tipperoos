@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   isGameweekScoringComplete,
   isSlotScoringDone,
+  toScoringSlot,
   type ScoringSlot,
 } from "./completion";
 
@@ -142,5 +143,57 @@ describe("isSlotScoringDone across a mixed set", () => {
       isGameweekScoringComplete(m1, m2),
     ).length;
     expect(completeCount).toBe(2);
+  });
+});
+
+// Golden values for issue #92's shared helper: hoisted out of
+// sync-scoring.ts and select-next.ts, both of which resolve a `gameweeks`
+// slot pair (matchId, voidedAt) plus a status lookup into a ScoringSlot.
+describe("toScoringSlot", () => {
+  it("is a Skipped Slot when matchId is null, regardless of the status map", () => {
+    expect(toScoringSlot(null, null, new Map([["m1", { status: "completed" }]]))).toEqual({
+      matchId: null,
+      status: null,
+      voidedAt: null,
+    });
+  });
+
+  it("resolves status from the lookup map for a non-null matchId", () => {
+    expect(
+      toScoringSlot("m1", null, new Map([["m1", { status: "completed" }]])),
+    ).toEqual({ matchId: "m1", status: "completed", voidedAt: null });
+  });
+
+  it("carries voidedAt through unchanged", () => {
+    expect(
+      toScoringSlot("m1", "2026-08-15T00:00:00Z", new Map([["m1", { status: "scheduled" }]])),
+    ).toEqual({
+      matchId: "m1",
+      status: "scheduled",
+      voidedAt: "2026-08-15T00:00:00Z",
+    });
+  });
+
+  it("resolves status to null when the matchId isn't in the lookup map", () => {
+    expect(toScoringSlot("missing", null, new Map())).toEqual({
+      matchId: "missing",
+      status: null,
+      voidedAt: null,
+    });
+  });
+
+  it("round-trips into isSlotScoringDone the same way a raw ScoringSlot does", () => {
+    const doneSlot = toScoringSlot(
+      "m1",
+      null,
+      new Map([["m1", { status: "completed" }]]),
+    );
+    const pendingSlot = toScoringSlot(
+      "m1",
+      null,
+      new Map([["m1", { status: "scheduled" }]]),
+    );
+    expect(isSlotScoringDone(doneSlot)).toBe(true);
+    expect(isSlotScoringDone(pendingSlot)).toBe(false);
   });
 });

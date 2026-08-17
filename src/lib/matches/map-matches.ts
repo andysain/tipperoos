@@ -21,6 +21,7 @@ export interface FootballDataMatch {
   readonly id: number;
   readonly utcDate: string;
   readonly status: string;
+  readonly matchday: number;
   readonly homeTeam: { readonly id: number };
   readonly awayTeam: { readonly id: number };
   readonly score: {
@@ -39,6 +40,7 @@ export interface MatchUpdate {
   readonly id: string;
   readonly kickoff_time: string;
   readonly status: MatchStatus;
+  readonly matchday: number;
   readonly team_a_score: number | null;
   readonly team_b_score: number | null;
   readonly result_updated_at: string | null;
@@ -80,6 +82,7 @@ export function mapMatchesToUpdates(
       id,
       kickoff_time: match.utcDate,
       status,
+      matchday: match.matchday,
       team_a_score: isCompleted ? match.score.fullTime.home : null,
       team_b_score: isCompleted ? match.score.fullTime.away : null,
       result_updated_at: isCompleted ? nowIso : null,

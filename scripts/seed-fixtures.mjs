@@ -81,6 +81,7 @@ async function main() {
     team_b_id: teamIdByProviderId.get(String(m.awayTeam.id)),
     kickoff_time: m.utcDate,
     status: statusMap[m.status] ?? "scheduled",
+    matchday: m.matchday,
     team_a_score: m.score?.fullTime?.home ?? null,
     team_b_score: m.score?.fullTime?.away ?? null,
   }));

@@ -9,6 +9,12 @@ import { scoreCompletedMatchesAndSnapshots } from "./sync-scoring";
 // (picks -> recomputeMatchScores -> scores upsert -> standings snapshot),
 // not just asserting call shapes, using an in-memory fake that persists
 // upserts so a later read in the same run sees them (real Postgres would).
+//
+// Issue #92: sync-scoring.ts's local toScoringSlot was hoisted into
+// completion.ts (shared with select-next.ts, see completion.test.ts's own
+// toScoringSlot suite) -- a pure internal refactor, so these assertions and
+// their fake-Supabase behavior are unchanged; this comment is the paired
+// test-file touch the internal refactor otherwise wouldn't need.
 
 interface Row {
   [key: string]: unknown;

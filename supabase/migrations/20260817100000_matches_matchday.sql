@@ -1,0 +1,12 @@
+-- Issue #92: persists football-data.org's `matchday` field, which every
+-- /competitions/PL/matches response already carries but this codebase
+-- discarded until now (seed-fixtures.mjs fetched it and dropped it;
+-- mapMatchesToUpdates never read it). The per-gameweek selection runner
+-- needs "which fixtures belong to gameweek N" on every invocation, so this
+-- makes that a persisted column instead of #89's one-off
+-- `?matchday=N` API call repeated forever.
+--
+-- Nullable, no backfill migration: seed-fixtures.mjs's upsert (issue #92)
+-- populates it for already-seeded rows on next run per environment, and
+-- sync/matches's regular batched update populates it going forward.
+alter table matches add column matchday integer;
