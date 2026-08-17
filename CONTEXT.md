@@ -51,7 +51,7 @@ The Median Bot's Season Total, treated as a bar to clear rather than a rival to 
 A Player's cumulative points across all Gameweeks played so far. Shown alongside **points-per-Gameweek-played**, so a Late Joiner or a Player who missed Gameweeks isn't visually buried by a total covering weeks they weren't in.
 
 **Season Standing**:
-A Player's rank among all Players by Season Total, as of a given Gameweek. Worst standing = highest rank number (closest to the bottom of the table), not lowest — this was the Picker tiebreak's second signal, and remains the leaderboard's ordering.
+A Player's rank by Season Total, as of a given Gameweek. Worst standing = highest rank number (closest to the bottom of the table), not lowest — this was the Picker tiebreak's second signal, and remains the leaderboard's ordering. **Two bases exist deliberately**: `standings_snapshots.season_standing` ranks _all_ Players including Bots (it's a full-roster historical record), while every Player-facing surface — the leaderboard and the Pick Board's stats strip — ranks **humans only**, since a Bot can't win and a rank counting them answers a question nobody asks (`docs/adr/0012-leaderboard-view.md` D12). Rank movement is computed by re-ranking the stored `season_total` values on the humans-only basis, never by reading the stored standing.
 _Avoid_: Position (ambiguous — reads as "best" as easily as "worst")
 
 **Standings Snapshot**:

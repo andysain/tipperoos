@@ -340,11 +340,19 @@ export interface SeasonStats {
  * This player's season total and rank -- from `scoresForCompetition`
  * (src/lib/competitions/scope.ts, already competition+season scoped) fed
  * through the pure `rankScores` (issue #90, decision 3). Deliberately not
- * `standings_snapshots`: that table's schema exists but nothing populates
- * it yet (its own doc comment scopes it to the deferred Match-2 picker
- * mechanic). Null when this competition has never had a scored match --
- * the day-one variant (ADR: "no rank, no season points... stats strip
- * drops rank and points entirely").
+ * `standings_snapshots.season_standing`, for two independent reasons: that
+ * column is bot-inclusive by design (#23 D3) where this rank is not (see
+ * below), and it only updates when a gameweek completes, where this is as
+ * fresh as the scores themselves. Null when this competition has never had
+ * a scored match -- the day-one variant (ADR: "no rank, no season
+ * points... stats strip drops rank and points entirely").
+ *
+ * **Bots are excluded from the ranking** (docs/adr/0012-leaderboard-view.md
+ * D12): they can't win the season title, so a rank that counts them answers
+ * a question nobody asks, and the leaderboard route ranks the same way. The
+ * two surfaces showing one player two different ranks on the same day is
+ * the trust bug ADR 0012 D2 exists to prevent, so if either basis changes,
+ * both must change together.
  */
 export async function loadSeasonStats(
   supabase: SupabaseClient,
@@ -357,8 +365,12 @@ export async function loadSeasonStats(
   if (!hasAnyScoredMatch) return null;
 
   const ranked = rankScores(
-    scores.map((row) => ({ playerId: row.playerId, points: row.points })),
+    scores
+      .filter((row) => !row.isBot)
+      .map((row) => ({ playerId: row.playerId, points: row.points })),
   );
+  // A bot viewing its own Pick Board isn't a real case (bots don't log in),
+  // but it would land here with no rank -- null is the honest answer.
   const own = ranked.find((row) => row.playerId === playerId);
   if (!own) return null;
 

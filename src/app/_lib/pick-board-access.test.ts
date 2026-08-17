@@ -38,7 +38,8 @@ function createSupabaseMock(tableData: Record<string, TableData>) {
   return { from, calls };
 }
 
-const { loadPickBoardGameweek } = await import("./pick-board-access");
+const { loadPickBoardGameweek, loadSeasonStats } =
+  await import("./pick-board-access");
 
 const SESSION_PLAYER = "player-me";
 const OTHER_PLAYER = "player-other";
@@ -348,5 +349,86 @@ describe("loadPickBoardGameweek", () => {
       GAMEWEEK_NUMBER,
     );
     expect(result?.slots[0]).toMatchObject({ kind: "match", voided: true });
+  });
+});
+
+// ADR 0012 D12: the Pick Board's rank must use the same humans-only basis
+// as the leaderboard route, or the two surfaces show one player two
+// different ranks on the same day.
+describe("loadSeasonStats", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function mockWithRoster() {
+    return createSupabaseMock({
+      players: {
+        list: [
+          {
+            id: SESSION_PLAYER,
+            display_name: "Me",
+            emoji: "⚡",
+            is_bot: false,
+            joined_at: "2026-08-01T00:00:00Z",
+          },
+          {
+            id: "bot-1",
+            display_name: "Median Bot",
+            emoji: "🤖",
+            is_bot: true,
+            joined_at: "2026-08-01T00:00:00Z",
+          },
+          {
+            id: OTHER_PLAYER,
+            display_name: "Rival",
+            emoji: "🦊",
+            is_bot: false,
+            joined_at: "2026-08-01T00:00:00Z",
+          },
+        ],
+      },
+      scores: {
+        list: [
+          { player_id: OTHER_PLAYER, points: 20 },
+          { player_id: "bot-1", points: 15 },
+          { player_id: SESSION_PLAYER, points: 10 },
+        ],
+      },
+    });
+  }
+
+  it("ranks past a bot sitting between two humans, so the player below it is 2nd not 3rd", async () => {
+    const { from } = mockWithRoster();
+    const stats = await loadSeasonStats(
+      { from } as never,
+      COMPETITION_ID,
+      SESSION_PLAYER,
+      SEASON_ID,
+    );
+    expect(stats).toEqual({ points: 10, rank: 2 });
+  });
+
+  it("returns null before the competition has any scored match (day-one variant)", async () => {
+    const { from } = createSupabaseMock({
+      players: {
+        list: [
+          {
+            id: SESSION_PLAYER,
+            display_name: "Me",
+            emoji: "⚡",
+            is_bot: false,
+            joined_at: "2026-08-01T00:00:00Z",
+          },
+        ],
+      },
+      scores: { list: [] },
+    });
+    const stats = await loadSeasonStats(
+      { from } as never,
+      COMPETITION_ID,
+      SESSION_PLAYER,
+      SEASON_ID,
+    );
+    expect(stats).toBeNull();
   });
 });

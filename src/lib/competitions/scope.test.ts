@@ -78,6 +78,81 @@ describe("foldCompetitionScores", () => {
   });
 });
 
+// Golden values hand-derived from CLAUDE.md -> Scoring and
+// docs/adr/0009-match-scoring-formula-and-title-eligibility.md:
+//
+//   result 3 | goal difference 2 | each team score 1, only on a correct
+//   result | Wrong Way Round 1, mutually exclusive with all of the above.
+//
+// Reachable per-match scores are therefore exactly {0, 1, 3, 4, 5, 7}, and
+// each one is here with the outcome that produces it:
+//
+//   0  nothing right
+//   1  Wrong Way Round (called 2-1, finished 1-2) -- result wrong
+//   3  result only              (called 3-0, finished 1-0)
+//   4  result + one team score  (called 2-0, finished 2-1)
+//   5  result + goal difference (called 2-1, finished 3-2)
+//   7  exact scoreline          (called 2-1, finished 2-1)
+//
+// so `exactTips` counts 7s and `correctResults` counts >= 3.
+describe("foldCompetitionScores derived counts", () => {
+  const solo = [
+    {
+      id: "p1",
+      displayName: "Alice",
+      emoji: "🦊",
+      isBot: false,
+      joinedAt: "2026-08-01T00:00:00Z",
+    },
+  ];
+
+  const everyReachableScore = [0, 1, 3, 4, 5, 7].map((points) => ({
+    playerId: "p1",
+    points,
+  }));
+
+  it("counts one exact tip and four correct results across the whole reachable set", () => {
+    const alice = foldCompetitionScores(solo, everyReachableScore)[0];
+    expect(alice.matchesScored).toBe(6);
+    expect(alice.points).toBe(20);
+    expect(alice.exactTips).toBe(1);
+    expect(alice.correctResults).toBe(4);
+  });
+
+  it("treats Wrong Way Round as neither exact nor a correct result", () => {
+    const alice = foldCompetitionScores(solo, [
+      { playerId: "p1", points: 1 },
+    ])[0];
+    expect(alice.exactTips).toBe(0);
+    expect(alice.correctResults).toBe(0);
+  });
+
+  it("counts an exact scoreline as a correct result too, not instead of one", () => {
+    const alice = foldCompetitionScores(solo, [
+      { playerId: "p1", points: 7 },
+      { playerId: "p1", points: 7 },
+    ])[0];
+    expect(alice.exactTips).toBe(2);
+    expect(alice.correctResults).toBe(2);
+  });
+
+  it("counts a voided match (0) as neither", () => {
+    const alice = foldCompetitionScores(solo, [
+      { playerId: "p1", points: 0 },
+      { playerId: "p1", points: 5 },
+    ])[0];
+    expect(alice.matchesScored).toBe(2);
+    expect(alice.exactTips).toBe(0);
+    expect(alice.correctResults).toBe(1);
+  });
+
+  it("gives a player with no score rows zero of both rather than omitting them", () => {
+    const alice = foldCompetitionScores(solo, [])[0];
+    expect(alice.exactTips).toBe(0);
+    expect(alice.correctResults).toBe(0);
+  });
+});
+
 describe("foldCompetitionPicks", () => {
   const players = [
     { id: "p1", displayName: "Alice", emoji: "🦊", isBot: false },
