@@ -5,13 +5,41 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // matches rows. See #12's decision log for why this route (not
 // standings) is the target.
 
-const matchesSelectChain = {
-  eq: vi.fn().mockReturnThis(),
+// Issue #182: the matches lookup is now season-scoped and ordered
+// (getCurrentSeasonId + .eq("season_id",...) + .order()), so the chain
+// needs to stay chainable through an extra call and resolve however many
+// links deep the route calls it -- a thenable object every method returns,
+// rather than a fixed-depth mock.
+let matchesQueryResult: { data: unknown[]; error: unknown } = {
+  data: [],
+  error: null,
+};
+const matchesSelectChain: Record<string, unknown> = {
+  eq: vi.fn(() => matchesSelectChain),
+  order: vi.fn(() => matchesSelectChain),
+  then: (resolve: (v: unknown) => unknown) =>
+    Promise.resolve(matchesQueryResult).then(resolve),
 };
 const matchesSelectMock = vi.fn(() => matchesSelectChain);
 const matchesUpdateEqMock = vi.fn();
 const matchesUpdateMock = vi.fn(() => ({ eq: matchesUpdateEqMock }));
 const syncLogInsertMock = vi.fn();
+
+// getCurrentSeasonId (src/app/_lib/gameweek-access.ts) reads "seasons" --
+// defaults to a resolved current season so the season-scope filter above
+// actually applies in every existing test unless a test says otherwise.
+const CURRENT_SEASON_ID = "22222222-2222-2222-2222-222222222222";
+let seasonsQueryResult: { data: unknown; error: unknown } = {
+  data: { id: CURRENT_SEASON_ID },
+  error: null,
+};
+const seasonsSelectChain: Record<string, unknown> = {
+  eq: vi.fn(() => seasonsSelectChain),
+  order: vi.fn(() => seasonsSelectChain),
+  limit: vi.fn(() => seasonsSelectChain),
+  maybeSingle: () => Promise.resolve(seasonsQueryResult),
+};
+const seasonsSelectMock = vi.fn(() => seasonsSelectChain);
 
 // Issue #166: the route now also calls scoreCompletedMatchesAndSnapshots,
 // which queries "gameweeks" via `select(...).in(...)` twice per cycle (once
@@ -45,6 +73,9 @@ vi.mock("@/lib/supabase/server", () => ({
       if (table === "gameweeks") {
         return { select: gameweeksSelectMock };
       }
+      if (table === "seasons") {
+        return { select: seasonsSelectMock };
+      }
       throw new Error(`Unexpected table: ${table}`);
     },
   }),
@@ -67,11 +98,11 @@ describe("POST /api/sync/matches", () => {
     vi.clearAllMocks();
     process.env.SYNC_TRIGGER_SECRET = SECRET;
     process.env.FOOTBALL_DATA_API_KEY = "test-api-key";
-    matchesSelectChain.eq.mockReturnThis();
-    matchesSelectChain.eq.mockResolvedValue({
+    matchesQueryResult = {
       data: [{ id: MATCH_1, provider_match_id: "999" }],
       error: null,
-    });
+    };
+    seasonsQueryResult = { data: { id: CURRENT_SEASON_ID }, error: null };
     matchesUpdateEqMock.mockResolvedValue({ error: null });
     syncLogInsertMock.mockResolvedValue({ error: null });
     gameweeksInMock.mockResolvedValue({ data: [], error: null });
@@ -142,6 +173,63 @@ describe("POST /api/sync/matches", () => {
     // sync_log row follows it.
     expect(matchesUpdateEqMock).toHaveBeenCalledTimes(1);
     expect(syncLogInsertMock).toHaveBeenCalledTimes(1);
+
+    vi.unstubAllGlobals();
+  });
+
+  // Issue #182: an all-seasons matches lookup grows unbounded and crosses
+  // Supabase's row cap by season 2-3. Scoping to the current season keeps
+  // the response bounded regardless of how many past seasons accumulate.
+  it("scopes the known-matches lookup to the current season", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ matches: [] }) }),
+    );
+
+    await POST(request());
+
+    expect(seasonsSelectMock).toHaveBeenCalled();
+    expect(matchesSelectChain.eq).toHaveBeenCalledWith(
+      "season_id",
+      CURRENT_SEASON_ID,
+    );
+
+    vi.unstubAllGlobals();
+  });
+
+  // Falls back to the unscoped lookup rather than failing the whole sync --
+  // a sync outage from a missing current-season flag would be worse than a
+  // temporarily wide query.
+  it("falls back to an unscoped matches lookup when no season is flagged current", async () => {
+    seasonsQueryResult = { data: null, error: null };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          matches: [
+            {
+              id: 999,
+              utcDate: "2026-08-20T15:00:00.000Z",
+              status: "FINISHED",
+              homeTeam: { id: 1 },
+              awayTeam: { id: 2 },
+              score: { fullTime: { home: 2, away: 1 } },
+            },
+          ],
+        }),
+      }),
+    );
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    expect(
+      matchesSelectChain.eq as unknown as ReturnType<typeof vi.fn>,
+    ).not.toHaveBeenCalledWith("season_id", expect.anything());
+    expect(syncLogInsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ sync_type: "matches", status: "success" }),
+    );
 
     vi.unstubAllGlobals();
   });

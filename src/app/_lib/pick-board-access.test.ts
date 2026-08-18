@@ -35,7 +35,48 @@ function createSupabaseMock(tableData: Record<string, TableData>) {
     return builder;
   });
 
-  return { from, calls };
+  // Mirrors competition_score_totals (issue #182): scoresForCompetition now
+  // fetches pre-aggregated per-player totals via RPC instead of raw `scores`
+  // rows. Fixtures still describe `scores` as one row per scored match (the
+  // fixture's intent stays readable); this groups them by player_id the
+  // same way the SQL aggregate does, restricted to the asked-for player ids.
+  const rpc = vi.fn((fn: string, args: { p_player_ids: string[] }) => {
+    if (fn !== "competition_score_totals") {
+      return Promise.resolve({
+        data: null,
+        error: new Error(`unexpected rpc: ${fn}`),
+      });
+    }
+    const rows = (tableData.scores?.list ?? []) as {
+      player_id: string;
+      points: number;
+    }[];
+    const byPlayer = new Map<
+      string,
+      { points: number; matches_scored: number; exact_tips: number; correct_results: number }
+    >();
+    for (const row of rows) {
+      if (!args.p_player_ids.includes(row.player_id)) continue;
+      const agg = byPlayer.get(row.player_id) ?? {
+        points: 0,
+        matches_scored: 0,
+        exact_tips: 0,
+        correct_results: 0,
+      };
+      agg.points += row.points;
+      agg.matches_scored += 1;
+      if (row.points === 7) agg.exact_tips += 1;
+      if (row.points >= 3) agg.correct_results += 1;
+      byPlayer.set(row.player_id, agg);
+    }
+    const data = [...byPlayer.entries()].map(([player_id, agg]) => ({
+      player_id,
+      ...agg,
+    }));
+    return Promise.resolve({ data, error: null });
+  });
+
+  return { from, rpc, calls };
 }
 
 const { loadPickBoardGameweek, loadSeasonStats } =
@@ -398,9 +439,9 @@ describe("loadSeasonStats", () => {
   }
 
   it("ranks past a bot sitting between two humans, so the player below it is 2nd not 3rd", async () => {
-    const { from } = mockWithRoster();
+    const { from, rpc } = mockWithRoster();
     const stats = await loadSeasonStats(
-      { from } as never,
+      { from, rpc } as never,
       COMPETITION_ID,
       SESSION_PLAYER,
       SEASON_ID,
@@ -409,7 +450,7 @@ describe("loadSeasonStats", () => {
   });
 
   it("returns null before the competition has any scored match (day-one variant)", async () => {
-    const { from } = createSupabaseMock({
+    const { from, rpc } = createSupabaseMock({
       players: {
         list: [
           {
@@ -424,7 +465,7 @@ describe("loadSeasonStats", () => {
       scores: { list: [] },
     });
     const stats = await loadSeasonStats(
-      { from } as never,
+      { from, rpc } as never,
       COMPETITION_ID,
       SESSION_PLAYER,
       SEASON_ID,

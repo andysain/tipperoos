@@ -19,6 +19,11 @@ function slotMatchIds(gameweek: GameweekMatchRow): string[] {
   );
 }
 
+/**
+ * This gameweek's own two Tipped Matches only -- at most 2 matches x roster
+ * rows, always safe, so it stays a raw per-match select (no aggregation
+ * needed, and it isn't the query issue #182 was about).
+ */
 async function fetchScoreRows(
   supabase: SupabaseClient,
   playerIds: string[],
@@ -37,6 +42,35 @@ async function fetchScoreRows(
     playerId: row.player_id,
     points: row.points,
   }));
+}
+
+/**
+ * Every gameweek 1..N's matches, cumulative -- grows across the whole
+ * season, the same unbounded shape `scoresForCompetition` had (issue #182).
+ * Aggregated in SQL (`score_totals_for_matches`,
+ * supabase/migrations/20260818020000_score_totals_aggregate.sql) so the
+ * response is one row per player regardless of season length, instead of
+ * one row per scored match per player.
+ */
+async function fetchSeasonScoreRows(
+  supabase: SupabaseClient,
+  playerIds: string[],
+  matchIds: string[],
+): Promise<{ playerId: string; points: number }[]> {
+  if (matchIds.length === 0) return [];
+
+  const { data, error } = await supabase.rpc("score_totals_for_matches", {
+    p_player_ids: playerIds,
+    p_match_ids: matchIds,
+  });
+  if (error) throw error;
+
+  return ((data ?? []) as { player_id: string; points: number }[]).map(
+    (row) => ({
+      playerId: row.player_id,
+      points: row.points,
+    }),
+  );
 }
 
 /**
@@ -86,7 +120,7 @@ export async function loadStandingsSnapshotInputs(
 
   const [gameweekScoreRows, seasonScoreRows] = await Promise.all([
     fetchScoreRows(supabase, playerIds, gameweekMatchIds),
-    fetchScoreRows(supabase, playerIds, seasonMatchIds),
+    fetchSeasonScoreRows(supabase, playerIds, seasonMatchIds),
   ]);
 
   return {

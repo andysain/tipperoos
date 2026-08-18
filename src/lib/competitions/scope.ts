@@ -32,33 +32,37 @@ export interface CompetitionScoreRow {
 }
 
 /**
- * Both counts below are read straight off a match's points value rather
- * than re-deriving them from picks and results, because the additive
- * formula's reachable score set is exactly {0, 1, 3, 4, 5, 7}
+ * One player's aggregated totals for a set of scored matches -- the shape
+ * `competition_score_totals`/`score_totals_for_matches`
+ * (supabase/migrations/20260818020000_score_totals_aggregate.sql) compute in
+ * SQL. `exactTips`/`correctResults` are derived there straight off each
+ * match's points value, because the additive formula's reachable score set
+ * is exactly {0, 1, 3, 4, 5, 7}
  * (docs/adr/0009-match-scoring-formula-and-title-eligibility.md, and
- * CLAUDE.md -> Scoring):
- *
- *   7  result 3 + goal difference 2 + both team scores 1+1. Getting all
- *      four is only possible with the exact scoreline, so 7 <=> exact.
- *   >=3  every term except Wrong Way Round (+1) requires a correct
- *      result, and Wrong Way Round is mutually exclusive with all of them
- *      by construction -- so >=3 <=> correct result, and 1 is the only
- *      non-zero score that isn't one.
- *
- * This is a deliberate coupling to the formula, not a coincidence being
- * exploited: if the reachable set ever changes, these two predicates must
- * change with it, which is why scope.test.ts pins the whole set.
+ * CLAUDE.md -> Scoring): points = 7 <=> exact scoreline (7 needs all four
+ * terms, only possible on the exact scoreline), and points >= 3 <=> correct
+ * result (every term but Wrong Way Round requires one, and Wrong Way Round
+ * is mutually exclusive with all of them by construction). A deliberate
+ * coupling to the formula, not a coincidence -- if the reachable set ever
+ * changes, the SQL migration's predicate must change with it.
  */
-const EXACT_SCORELINE_POINTS = 7;
-const MIN_CORRECT_RESULT_POINTS = 3;
+export interface CompetitionScoreTotal {
+  playerId: string;
+  points: number;
+  matchesScored: number;
+  exactTips: number;
+  correctResults: number;
+}
 
 /**
- * Pure fold: combines a competition's player roster with their score rows
- * (already filtered to the right season) into one row per player, players
- * with no score rows yet included at 0 -- required so a Late Joiner or a
- * brand-new player still appears on the leaderboard instead of vanishing.
+ * Pure fold: combines a competition's player roster with their pre-aggregated
+ * score totals (issue #182 -- computed in SQL, not folded from raw rows here,
+ * to stay well under Supabase's 1,000-row cap regardless of season length)
+ * into one row per player, players with no totals yet included at 0 --
+ * required so a Late Joiner or a brand-new player still appears on the
+ * leaderboard instead of vanishing.
  */
-export function foldCompetitionScores(
+export function mergeCompetitionScoreTotals(
   players: {
     id: string;
     displayName: string;
@@ -66,28 +70,18 @@ export function foldCompetitionScores(
     isBot: boolean;
     joinedAt: string;
   }[],
-  scoreRows: { playerId: string; points: number }[],
+  totals: CompetitionScoreTotal[],
 ): CompetitionScoreRow[] {
-  interface Agg {
-    points: number;
-    count: number;
-    exact: number;
-    correct: number;
-  }
-  const empty = (): Agg => ({ points: 0, count: 0, exact: 0, correct: 0 });
-
-  const byPlayer = new Map<string, Agg>();
-  for (const row of scoreRows) {
-    const existing = byPlayer.get(row.playerId) ?? empty();
-    existing.points += row.points;
-    existing.count += 1;
-    if (row.points === EXACT_SCORELINE_POINTS) existing.exact += 1;
-    if (row.points >= MIN_CORRECT_RESULT_POINTS) existing.correct += 1;
-    byPlayer.set(row.playerId, existing);
-  }
+  const empty: Omit<CompetitionScoreTotal, "playerId"> = {
+    points: 0,
+    matchesScored: 0,
+    exactTips: 0,
+    correctResults: 0,
+  };
+  const byPlayer = new Map(totals.map((t) => [t.playerId, t]));
 
   return players.map((player) => {
-    const agg = byPlayer.get(player.id) ?? empty();
+    const agg = byPlayer.get(player.id) ?? empty;
     return {
       playerId: player.id,
       displayName: player.displayName,
@@ -95,9 +89,9 @@ export function foldCompetitionScores(
       isBot: player.isBot,
       joinedAt: player.joinedAt,
       points: agg.points,
-      matchesScored: agg.count,
-      exactTips: agg.exact,
-      correctResults: agg.correct,
+      matchesScored: agg.matchesScored,
+      exactTips: agg.exactTips,
+      correctResults: agg.correctResults,
     };
   });
 }
@@ -112,6 +106,14 @@ export function foldCompetitionScores(
  * single authority on their points (zeroed on void), so a voided match's
  * score row already reads 0 by the time this runs. This stays a pure
  * scoped read.
+ *
+ * Score totals come from the `competition_score_totals` SQL aggregate
+ * (issue #182), not a raw per-match `scores` select folded in JS: this
+ * repo's season is ~76 scored matches, so a raw select returns up to
+ * (matches x roster) rows and crosses Supabase's configured 1,000-row cap
+ * (supabase/config.toml) at 14 players -- a silent, arbitrary-row
+ * truncation with no `.order()` to make it deterministic. The aggregate
+ * returns one row per player regardless of season length.
  */
 export async function scoresForCompetition(
   supabase: SupabaseClient,
@@ -127,14 +129,13 @@ export async function scoresForCompetition(
   const playerIds = (players ?? []).map((p) => p.id);
   if (playerIds.length === 0) return [];
 
-  const { data: scoreRows, error: scoresError } = await supabase
-    .from("scores")
-    .select("player_id, points, matches!inner(season_id)")
-    .in("player_id", playerIds)
-    .eq("matches.season_id", seasonId);
-  if (scoresError) throw scoresError;
+  const { data: totalRows, error: totalsError } = await supabase.rpc(
+    "competition_score_totals",
+    { p_player_ids: playerIds, p_season_id: seasonId },
+  );
+  if (totalsError) throw totalsError;
 
-  return foldCompetitionScores(
+  return mergeCompetitionScoreTotals(
     (players ?? []).map((p) => ({
       id: p.id,
       displayName: p.display_name,
@@ -142,9 +143,20 @@ export async function scoresForCompetition(
       isBot: p.is_bot,
       joinedAt: p.joined_at,
     })),
-    (scoreRows ?? []).map((r) => ({
+    (
+      (totalRows ?? []) as {
+        player_id: string;
+        points: number;
+        matches_scored: number;
+        exact_tips: number;
+        correct_results: number;
+      }[]
+    ).map((r) => ({
       playerId: r.player_id,
       points: r.points,
+      matchesScored: r.matches_scored,
+      exactTips: r.exact_tips,
+      correctResults: r.correct_results,
     })),
   );
 }

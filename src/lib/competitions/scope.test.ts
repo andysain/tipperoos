@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
+import type { CompetitionScoreTotal } from "./scope";
 import {
   foldCompetitionPicks,
-  foldCompetitionScores,
   isMatchLocked,
+  mergeCompetitionScoreTotals,
   scoresForCompetition,
 } from "./scope";
 
@@ -14,7 +15,7 @@ import {
 //   special-case logic needed beyond 'no picks exist for those matches'"
 //   ("Identity and auth" -> Late joiners).
 
-describe("foldCompetitionScores", () => {
+describe("mergeCompetitionScoreTotals", () => {
   const players = [
     {
       id: "p1",
@@ -39,28 +40,27 @@ describe("foldCompetitionScores", () => {
     },
   ];
 
-  it("sums a player's points across multiple scored matches", () => {
-    const rows = foldCompetitionScores(players, [
-      { playerId: "p1", points: 9 },
-      { playerId: "p1", points: 3 },
+  it("attaches a player's pre-aggregated total (summed in SQL, not folded here)", () => {
+    const rows = mergeCompetitionScoreTotals(players, [
+      { playerId: "p1", points: 12, matchesScored: 2, exactTips: 0, correctResults: 1 },
     ]);
     const alice = rows.find((r) => r.playerId === "p1")!;
     expect(alice.points).toBe(12);
     expect(alice.matchesScored).toBe(2);
   });
 
-  it("includes a bot's points using the same fold as a human player", () => {
-    const rows = foldCompetitionScores(players, [
-      { playerId: "p2", points: 5 },
+  it("includes a bot's total using the same merge as a human player", () => {
+    const rows = mergeCompetitionScoreTotals(players, [
+      { playerId: "p2", points: 5, matchesScored: 1, exactTips: 0, correctResults: 1 },
     ]);
     const bob = rows.find((r) => r.playerId === "p2")!;
     expect(bob.points).toBe(5);
     expect(bob.matchesScored).toBe(1);
   });
 
-  it("gives a player with no score rows 0 points rather than omitting them (Late Joiner)", () => {
-    const rows = foldCompetitionScores(players, [
-      { playerId: "p1", points: 9 },
+  it("gives a player with no total row 0 points rather than omitting them (Late Joiner)", () => {
+    const rows = mergeCompetitionScoreTotals(players, [
+      { playerId: "p1", points: 9, matchesScored: 1, exactTips: 1, correctResults: 1 },
     ]);
     const larry = rows.find((r) => r.playerId === "p3")!;
     expect(larry.points).toBe(0);
@@ -68,91 +68,25 @@ describe("foldCompetitionScores", () => {
     expect(rows.length).toBe(3);
   });
 
-  it("counts a voided match's score row (writer zeroes it, but it's still a real scored match)", () => {
-    const rows = foldCompetitionScores(players, [
-      { playerId: "p1", points: 9 },
-      { playerId: "p1", points: 0 }, // voided match, recompute already zeroed it
+  it("passes through exactTips/correctResults as computed by the SQL aggregate", () => {
+    const rows = mergeCompetitionScoreTotals(players, [
+      { playerId: "p1", points: 20, matchesScored: 6, exactTips: 1, correctResults: 4 },
     ]);
     const alice = rows.find((r) => r.playerId === "p1")!;
-    expect(alice.points).toBe(9);
-    expect(alice.matchesScored).toBe(2);
-  });
-});
-
-// Golden values hand-derived from CLAUDE.md -> Scoring and
-// docs/adr/0009-match-scoring-formula-and-title-eligibility.md:
-//
-//   result 3 | goal difference 2 | each team score 1, only on a correct
-//   result | Wrong Way Round 1, mutually exclusive with all of the above.
-//
-// Reachable per-match scores are therefore exactly {0, 1, 3, 4, 5, 7}, and
-// each one is here with the outcome that produces it:
-//
-//   0  nothing right
-//   1  Wrong Way Round (called 2-1, finished 1-2) -- result wrong
-//   3  result only              (called 3-0, finished 1-0)
-//   4  result + one team score  (called 2-0, finished 2-1)
-//   5  result + goal difference (called 2-1, finished 3-2)
-//   7  exact scoreline          (called 2-1, finished 2-1)
-//
-// so `exactTips` counts 7s and `correctResults` counts >= 3.
-describe("foldCompetitionScores derived counts", () => {
-  const solo = [
-    {
-      id: "p1",
-      displayName: "Alice",
-      emoji: "🦊",
-      isBot: false,
-      joinedAt: "2026-08-01T00:00:00Z",
-    },
-  ];
-
-  const everyReachableScore = [0, 1, 3, 4, 5, 7].map((points) => ({
-    playerId: "p1",
-    points,
-  }));
-
-  it("counts one exact tip and four correct results across the whole reachable set", () => {
-    const alice = foldCompetitionScores(solo, everyReachableScore)[0];
-    expect(alice.matchesScored).toBe(6);
-    expect(alice.points).toBe(20);
     expect(alice.exactTips).toBe(1);
     expect(alice.correctResults).toBe(4);
   });
-
-  it("treats Wrong Way Round as neither exact nor a correct result", () => {
-    const alice = foldCompetitionScores(solo, [
-      { playerId: "p1", points: 1 },
-    ])[0];
-    expect(alice.exactTips).toBe(0);
-    expect(alice.correctResults).toBe(0);
-  });
-
-  it("counts an exact scoreline as a correct result too, not instead of one", () => {
-    const alice = foldCompetitionScores(solo, [
-      { playerId: "p1", points: 7 },
-      { playerId: "p1", points: 7 },
-    ])[0];
-    expect(alice.exactTips).toBe(2);
-    expect(alice.correctResults).toBe(2);
-  });
-
-  it("counts a voided match (0) as neither", () => {
-    const alice = foldCompetitionScores(solo, [
-      { playerId: "p1", points: 0 },
-      { playerId: "p1", points: 5 },
-    ])[0];
-    expect(alice.matchesScored).toBe(2);
-    expect(alice.exactTips).toBe(0);
-    expect(alice.correctResults).toBe(1);
-  });
-
-  it("gives a player with no score rows zero of both rather than omitting them", () => {
-    const alice = foldCompetitionScores(solo, [])[0];
-    expect(alice.exactTips).toBe(0);
-    expect(alice.correctResults).toBe(0);
-  });
 });
+
+// The {0, 1, 3, 4, 5, 7} reachable-score-set derivation that used to be
+// golden-value pinned here (points = 7 <=> exact, points >= 3 <=> correct
+// result) moved into the `competition_score_totals`/`score_totals_for_matches`
+// SQL migration with issue #182 (supabase/migrations/20260818020000_score_totals_aggregate.sql),
+// which carries the same reasoning in comment form. Not re-pinned by Vitest:
+// this repo has no SQL test runner, and other RPC-backed business logic
+// (e.g. `table_prediction_lock_status`) is likewise verified only at the
+// caller boundary (mocking `.rpc()`), not by re-deriving the SQL's own
+// arithmetic in TS.
 
 describe("foldCompetitionPicks", () => {
   const players = [
@@ -215,81 +149,64 @@ describe("isMatchLocked", () => {
 // A read that isn't scoped to one competition silently blends their points.
 //
 // Where the boundary actually lives, established by mutation-testing these
-// assertions (breaking the code on purpose to check the test notices):
+// assertions (breaking the code on purpose to check the test notices), and
+// unchanged by the move to a SQL aggregate (issue #182):
 //
-//   `foldCompetitionScores` is ROSTER-driven -- it maps over the players
-//   array and looks each player's score rows up by id. A foreign
-//   competition's score rows therefore can't attach to one of this
-//   competition's players, and can't appear as an extra row. So the single
-//   point of failure is the `players` query's competition_id filter: drop
-//   that and the other competition walks onto the leaderboard. The
-//   `.in("player_id", ...)` filter on `scores` is defence-in-depth and a
-//   smaller query, NOT the thing holding the boundary -- removing it alone
-//   changes no output, which is why the first draft of this test passed
-//   against deliberately broken code and had to be rewritten.
+//   `mergeCompetitionScoreTotals` is ROSTER-driven -- it maps over the
+//   players array and looks each player's total up by id. A foreign
+//   competition's total therefore can't attach to one of this competition's
+//   players, and can't appear as an extra row. So the single point of
+//   failure is the `players` query's competition_id filter: drop that and
+//   the other competition walks onto the leaderboard. The
+//   `p_player_ids` argument to the `competition_score_totals` RPC call is
+//   defence-in-depth and a smaller response, NOT the thing holding the
+//   boundary -- removing it alone changes no output, the same finding the
+//   pre-SQL-aggregate version of this test made against the raw
+//   `.in("player_id", ...)` filter it replaced.
 describe("scoresForCompetition competition scoping", () => {
   const COMP_A = "comp-a";
-  const SHARED_MATCH = "match-shared";
 
   /**
-   * Mock that honours `.eq()` and `.in()` rather than returning fixed rows,
-   * so dropping a filter in the implementation actually changes the result.
+   * Mock that honours `.eq()` on `players` and filters the RPC response by
+   * the args actually passed, rather than returning fixed rows, so dropping
+   * a filter in the implementation actually changes the result.
    */
   function createFilteringSupabase() {
-    const seen: { table: string; col: string; val: unknown }[] = [];
-    const rows: Record<string, Record<string, unknown>[]> = {
-      players: [
-        {
-          id: "a1",
-          display_name: "Comp A One",
-          emoji: "\u{1F98A}",
-          is_bot: false,
-          joined_at: "2026-08-01T00:00:00Z",
-          competition_id: COMP_A,
-        },
-        {
-          id: "b1",
-          display_name: "Comp B One",
-          emoji: "\u{1F427}",
-          is_bot: false,
-          joined_at: "2026-08-01T00:00:00Z",
-          competition_id: "comp-b",
-        },
-      ],
-      // Both competitions' players tipped the SAME global match.
-      scores: [
-        {
-          player_id: "a1",
-          points: 7,
-          match_id: SHARED_MATCH,
-          matches: { season_id: "season-1" },
-        },
-        {
-          player_id: "b1",
-          points: 3,
-          match_id: SHARED_MATCH,
-          matches: { season_id: "season-1" },
-        },
-      ],
+    const seen: { call: string; args: unknown }[] = [];
+    const players: Record<string, unknown>[] = [
+      {
+        id: "a1",
+        display_name: "Comp A One",
+        emoji: "\u{1F98A}",
+        is_bot: false,
+        joined_at: "2026-08-01T00:00:00Z",
+        competition_id: COMP_A,
+      },
+      {
+        id: "b1",
+        display_name: "Comp B One",
+        emoji: "\u{1F427}",
+        is_bot: false,
+        joined_at: "2026-08-01T00:00:00Z",
+        competition_id: "comp-b",
+      },
+    ];
+    // Both competitions' players tipped the SAME global match, in the same season.
+    const totalsByPlayerId: Record<
+      string,
+      { player_id: string; points: number; matches_scored: number; exact_tips: number; correct_results: number }
+    > = {
+      a1: { player_id: "a1", points: 7, matches_scored: 1, exact_tips: 1, correct_results: 1 },
+      b1: { player_id: "b1", points: 3, matches_scored: 1, exact_tips: 0, correct_results: 1 },
     };
 
     const from = (table: string) => {
-      let data = [...(rows[table] ?? [])];
+      let data = [...(table === "players" ? players : [])];
       const builder: Record<string, unknown> = {
         select: () => builder,
         eq(col: string, val: unknown) {
-          seen.push({ table, col, val });
-          const key = col.includes(".") ? col.split(".").pop()! : col;
-          data = data.filter((row) =>
-            key === "season_id"
-              ? (row.matches as { season_id: string }).season_id === val
-              : row[key] === val,
-          );
-          return builder;
-        },
-        in(col: string, vals: unknown[]) {
-          seen.push({ table, col, val: vals });
-          data = data.filter((row) => vals.includes(row[col]));
+          seen.push({ call: `${table}.eq.${col}`, args: val });
+          data = data.filter((row) => row[col] === val);
           return builder;
         },
         then: (resolve: (v: { data: unknown[]; error: null }) => unknown) =>
@@ -298,7 +215,21 @@ describe("scoresForCompetition competition scoping", () => {
       return builder;
     };
 
-    return { client: { from } as never, seen };
+    const rpc = (
+      fn: string,
+      args: { p_player_ids: string[]; p_season_id: string },
+    ) => {
+      seen.push({ call: fn, args });
+      const data =
+        fn === "competition_score_totals" && args.p_season_id === "season-1"
+          ? args.p_player_ids
+              .filter((id) => id in totalsByPlayerId)
+              .map((id) => totalsByPlayerId[id])
+          : [];
+      return Promise.resolve({ data, error: null });
+    };
+
+    return { client: { from, rpc } as never, seen };
   }
 
   it("returns only the asked-for competition's players when both tip the same global match", async () => {
@@ -317,34 +248,86 @@ describe("scoresForCompetition competition scoping", () => {
     expect(
       seen.some(
         (call) =>
-          call.table === "players" &&
-          call.col === "competition_id" &&
-          call.val === COMP_A,
+          call.call === "players.eq.competition_id" && call.args === COMP_A,
       ),
     ).toBe(true);
   });
 
-  it("narrows the scores read to this competition's player ids, never match_id alone", async () => {
+  it("narrows the score-totals RPC call to this competition's player ids, never match_id alone", async () => {
     const { client, seen } = createFilteringSupabase();
     await scoresForCompetition(client, COMP_A, "season-1");
-    const playerFilter = seen.find(
-      (call) => call.table === "scores" && call.col === "player_id",
-    );
-    expect(playerFilter).toBeDefined();
-    expect(playerFilter!.val).toEqual(["a1"]);
+    const rpcCall = seen.find((call) => call.call === "competition_score_totals") as
+      | { call: string; args: { p_player_ids: string[]; p_season_id: string } }
+      | undefined;
+    expect(rpcCall).toBeDefined();
+    expect(rpcCall!.args.p_player_ids).toEqual(["a1"]);
   });
 
-  it("scopes the scores read by season too, so two seasons never blend", async () => {
+  it("scopes the score-totals RPC call by season too, so two seasons never blend", async () => {
     const { client, seen } = createFilteringSupabase();
     await scoresForCompetition(client, COMP_A, "season-1");
-    expect(
-      seen.some(
-        (call) =>
-          call.table === "scores" &&
-          call.col === "matches.season_id" &&
-          call.val === "season-1",
-      ),
-    ).toBe(true);
+    const rpcCall = seen.find((call) => call.call === "competition_score_totals") as
+      | { call: string; args: { p_player_ids: string[]; p_season_id: string } }
+      | undefined;
+    expect(rpcCall!.args.p_season_id).toBe("season-1");
+  });
+});
+
+// Issue #182: the old scoresForCompetition selected one raw `scores` row per
+// scored match per player -- ~76 scored matches/season means the response
+// crossed Supabase's configured 1,000-row cap (supabase/config.toml) at 14
+// players, truncating silently with no `.order()` to make it deterministic.
+// The SQL aggregate returns one row PER PLAYER, not per match, so response
+// size is roster-bound regardless of season length -- this proves that
+// structurally, not just by asserting the new query shape looks right.
+describe("scoresForCompetition response size (issue #182)", () => {
+  it("returns exactly one row per player even when a full season's worth of points is aggregated behind it", async () => {
+    const rosterSize = 25; // above the 14-player crossing point the old query hit
+    const players = Array.from({ length: rosterSize }, (_, i) => ({
+      id: `p${i}`,
+      display_name: `Player ${i}`,
+      emoji: null,
+      is_bot: false,
+      joined_at: "2026-08-01T00:00:00Z",
+    }));
+    // Each total represents a full season's worth of scored matches (~76)
+    // already summed server-side -- what the old query would have needed
+    // ~76 raw rows per player to represent is now one row per player.
+    const totals: CompetitionScoreTotal[] = players.map((p) => ({
+      playerId: p.id,
+      points: 76 * 3,
+      matchesScored: 76,
+      exactTips: 10,
+      correctResults: 40,
+    }));
+
+    const client = {
+      from: (table: string) => {
+        if (table !== "players") throw new Error(`unexpected table: ${table}`);
+        const builder: Record<string, unknown> = {
+          select: () => builder,
+          eq: () => builder,
+          then: (resolve: (v: { data: unknown[]; error: null }) => unknown) =>
+            Promise.resolve({ data: players, error: null }).then(resolve),
+        };
+        return builder;
+      },
+      rpc: () =>
+        Promise.resolve({
+          data: totals.map((t) => ({
+            player_id: t.playerId,
+            points: t.points,
+            matches_scored: t.matchesScored,
+            exact_tips: t.exactTips,
+            correct_results: t.correctResults,
+          })),
+          error: null,
+        }),
+    } as never;
+
+    const result = await scoresForCompetition(client, "comp-a", "season-1");
+    expect(result.length).toBe(rosterSize);
+    expect(result.every((r) => r.matchesScored === 76)).toBe(true);
   });
 });
 
