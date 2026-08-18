@@ -4,6 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { scoreCompletedMatchesAndSnapshots } from "@/lib/gameweeks/sync-scoring";
 import { generateBotPicks } from "@/lib/bots/generate";
 import { selectNextGameweekSlots } from "@/lib/gameweeks/select-next";
+import { getCurrentSeasonId } from "@/app/_lib/gameweek-access";
 
 // Issue #11: fixture/result sync route, callable manually now and by this
 // issue's own GitHub Actions workflow on a schedule. Mirrors #88's standings
@@ -112,12 +113,28 @@ export async function POST(request: Request) {
   let matchesErrorMessage = "";
 
   try {
+    // Issue #182: an unscoped, unordered select here grows with every
+    // season (~380 rows/season) and would silently truncate past Supabase's
+    // configured 1,000-row cap around season 2-3 -- a dropped
+    // provider_match_id -> id mapping means that match stops syncing kickoff/
+    // result changes with no error. Scoping to the current season keeps this
+    // at ~380 rows regardless of how many past seasons accumulate. Falls
+    // back to unscoped only if no season is flagged current (shouldn't
+    // happen -- CLAUDE.md's seasons.is_current default -- but a sync outage
+    // is worse than a wide query here).
+    const currentSeasonId = await getCurrentSeasonId(supabase);
+    let matchesQuery = supabase
+      .from("matches")
+      .select("id, provider_match_id")
+      .eq("provider_name", PROVIDER_NAME)
+      .order("id", { ascending: true });
+    if (currentSeasonId) {
+      matchesQuery = matchesQuery.eq("season_id", currentSeasonId);
+    }
+
     const [matchesResponse, knownMatchesResult] = await Promise.all([
       fetchMatches(apiKey, dateFrom, dateTo),
-      supabase
-        .from("matches")
-        .select("id, provider_match_id")
-        .eq("provider_name", PROVIDER_NAME),
+      matchesQuery,
     ]);
 
     if (knownMatchesResult.error) throw knownMatchesResult.error;

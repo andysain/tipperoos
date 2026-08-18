@@ -70,6 +70,42 @@ function fakeSupabase(seed: {
         return Promise.resolve({ error: null });
       },
     }),
+    // Mirrors score_totals_for_matches (issue #182): reads the *current*
+    // (post-upsert) `scores` table, grouped by player_id -- the standings
+    // snapshot's seasonScoreRows are read back after this cycle's own
+    // scoring writes, so this must see the same mutable `tables.scores`
+    // the upsert above wrote into.
+    rpc: (
+      fn: string,
+      args: { p_player_ids: string[]; p_match_ids: string[] },
+    ) => {
+      if (fn !== "score_totals_for_matches") {
+        return Promise.resolve({
+          data: null,
+          error: new Error(`unexpected rpc: ${fn}`),
+        });
+      }
+      const totals = new Map<string, number>();
+      for (const row of tables.scores) {
+        const playerId = row.player_id as string;
+        const matchId = row.match_id as string;
+        if (
+          !args.p_player_ids.includes(playerId) ||
+          !args.p_match_ids.includes(matchId)
+        ) {
+          continue;
+        }
+        totals.set(
+          playerId,
+          (totals.get(playerId) ?? 0) + (row.points as number),
+        );
+      }
+      const data = [...totals.entries()].map(([player_id, points]) => ({
+        player_id,
+        points,
+      }));
+      return Promise.resolve({ data, error: null });
+    },
   } as unknown as SupabaseClient;
 
   return { client, tables };

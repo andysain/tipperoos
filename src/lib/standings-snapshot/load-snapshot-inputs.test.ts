@@ -36,6 +36,34 @@ function fakeSupabase(tables: {
     from: (table: keyof typeof tables) => ({
       select: (_cols: string) => filterable(tables[table]),
     }),
+    // Mirrors score_totals_for_matches (issue #182): group scores by
+    // player_id, restricted to the asked-for player and match ids -- the
+    // same filtering `.in()`/`.in()` did before the query moved into SQL.
+    rpc: (fn: string, args: { p_player_ids: string[]; p_match_ids: string[] }) => {
+      if (fn !== "score_totals_for_matches") {
+        return Promise.resolve({
+          data: null,
+          error: new Error(`unexpected rpc: ${fn}`),
+        });
+      }
+      const totals = new Map<string, number>();
+      for (const row of tables.scores) {
+        const playerId = row.player_id as string;
+        const matchId = row.match_id as string;
+        if (
+          !args.p_player_ids.includes(playerId) ||
+          !args.p_match_ids.includes(matchId)
+        ) {
+          continue;
+        }
+        totals.set(playerId, (totals.get(playerId) ?? 0) + (row.points as number));
+      }
+      const data = [...totals.entries()].map(([player_id, points]) => ({
+        player_id,
+        points,
+      }));
+      return Promise.resolve({ data, error: null });
+    },
   } as unknown as SupabaseClient;
 }
 
@@ -138,7 +166,10 @@ describe("loadStandingsSnapshotInputs", () => {
       2,
     );
 
-    expect(result.seasonScoreRows.length).toBe(3);
+    // Aggregated in SQL (issue #182): one row per player, not one row per
+    // scored match -- alice's three matches (3+4+7) collapse to a single
+    // 14-point row instead of three raw rows.
+    expect(result.seasonScoreRows.length).toBe(1);
     const total = result.seasonScoreRows.reduce((sum, r) => sum + r.points, 0);
     expect(total).toBe(14);
   });
@@ -203,6 +234,40 @@ describe("loadStandingsSnapshotInputs", () => {
 
     expect(result.seasonScoreRows.length).toBe(1);
     expect(result.seasonScoreRows[0].points).toBe(3);
+  });
+
+  // Issue #182: the old seasonScoreRows query selected one raw `scores` row
+  // per scored match per player, growing unbounded across a season. A full
+  // season is ~76 gameweek slots; this proves the aggregate collapses that
+  // to one row per player, not 76.
+  it("returns one row per player for a full season's worth of gameweeks, not one row per match", async () => {
+    const gameweekCount = 38;
+    const gameweeks = Array.from({ length: gameweekCount }, (_, i) => ({
+      number: i + 1,
+      match_1_id: `m${i * 2 + 1}`,
+      match_2_id: `m${i * 2 + 2}`,
+      competition_id: COMPETITION,
+      season_id: SEASON,
+    }));
+    const scores = gameweeks.flatMap((gw) => [
+      { player_id: "alice", match_id: gw.match_1_id, points: 3 },
+      { player_id: "alice", match_id: gw.match_2_id, points: 4 },
+    ]);
+    const supabase = fakeSupabase({
+      players: [{ id: "alice", competition_id: COMPETITION }],
+      gameweeks,
+      scores,
+    });
+
+    const result = await loadStandingsSnapshotInputs(
+      supabase,
+      COMPETITION,
+      SEASON,
+      gameweekCount,
+    );
+
+    expect(result.seasonScoreRows.length).toBe(1);
+    expect(result.seasonScoreRows[0].points).toBe(gameweekCount * (3 + 4));
   });
 
   it("returns empty inputs for a competition with no players, without erroring", async () => {
