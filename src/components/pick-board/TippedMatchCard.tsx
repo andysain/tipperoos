@@ -596,8 +596,8 @@ export function TippedMatchCard({
   // Once a pick or result exists, it bakes into the header rows and the
   // card collapses to just that header + seam -- no separate plate below
   // (accordion-style; see CardHeader's own doc comment). "See everyone's
-  // picks" is deliberately absent from "live" -- Match Centre (#91)
-  // doesn't exist yet, and #90's decision 2 is not to link to a route
+  // picks" now lives on the Pick Board itself, once per gameweek rather
+  // than once per card, since both slots share one destination
   // that isn't real (ADR-0005).
   //
   // Deliberately NOT gated on `!showEntryBody`: while editing a filed pick,

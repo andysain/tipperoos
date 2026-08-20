@@ -39,7 +39,10 @@ function fakeSupabase(tables: {
     // Mirrors score_totals_for_matches (issue #182): group scores by
     // player_id, restricted to the asked-for player and match ids -- the
     // same filtering `.in()`/`.in()` did before the query moved into SQL.
-    rpc: (fn: string, args: { p_player_ids: string[]; p_match_ids: string[] }) => {
+    rpc: (
+      fn: string,
+      args: { p_player_ids: string[]; p_match_ids: string[] },
+    ) => {
       if (fn !== "score_totals_for_matches") {
         return Promise.resolve({
           data: null,
@@ -56,7 +59,10 @@ function fakeSupabase(tables: {
         ) {
           continue;
         }
-        totals.set(playerId, (totals.get(playerId) ?? 0) + (row.points as number));
+        totals.set(
+          playerId,
+          (totals.get(playerId) ?? 0) + (row.points as number),
+        );
       }
       const data = [...totals.entries()].map(([player_id, points]) => ({
         player_id,

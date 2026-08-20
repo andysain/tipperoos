@@ -129,7 +129,7 @@
 //
 // =====================================================================
 
-import { useCallback } from "react";
+import { Suspense, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PrototypeSwitcher } from "./PrototypeSwitcher";
 import { HomeSurface } from "./HomeSurface";
@@ -146,9 +146,23 @@ import { FOCUS, T_CAPTION, T_H1, TEXT, TEXT_MUTED } from "./shared";
 import { SIGNED_IN } from "./fixture";
 
 /** Where the week has got to. Not design variants -- real states. */
+// Opts out of prerendering: this page reads useSearchParams at the top
+// level, which a static export can't resolve without a Suspense boundary.
+// It's a dev-only throwaway, so the segment config is cheaper than wrapping
+// it.
 export type Phase = "entry" | "filed" | "locked" | "part_played" | "next";
 
-export default function MatchCentrePrototype() {
+export default function MatchCentrePrototypePage() {
+  // useSearchParams needs a Suspense boundary or the static export can't
+  // resolve it. Dev-only throwaway, so the wrapper is the cheap fix.
+  return (
+    <Suspense>
+      <MatchCentrePrototype />
+    </Suspense>
+  );
+}
+
+function MatchCentrePrototype() {
   const router = useRouter();
   const params = useSearchParams();
 

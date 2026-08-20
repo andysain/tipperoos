@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import type { LeaderboardRow } from "@/lib/leaderboard/board";
 import { EmojiChip } from "@/components/ui/PlayerChip";
 import { T, TX, MICRO_LABEL, FOCUS, INSET } from "@/components/ui/tokens";
@@ -185,17 +187,29 @@ export function LeaderboardRowCard({
         // something different from an on-time player's 5 (D10).
         <div
           id={panelId}
-          className={`flex gap-1.5 border-t border-paper-line ${INSET} py-2.5`}
+          className={`flex flex-col gap-2 border-t border-paper-line ${INSET} py-2.5`}
         >
-          <Stat
-            value={`${row.exactTips} of ${row.matchesScored}`}
-            label="Exact score"
-          />
-          <Stat
-            value={`${row.correctResults} of ${row.matchesScored}`}
-            label="Right result"
-          />
-          <Stat value={String(row.gameweeksPlayed)} label="Weeks" />
+          <div className="flex gap-1.5">
+            <Stat
+              value={`${row.exactTips} of ${row.matchesScored}`}
+              label="Exact score"
+            />
+            <Stat
+              value={`${row.correctResults} of ${row.matchesScored}`}
+              label="Right result"
+            />
+            <Stat value={String(row.gameweeksPlayed)} label="Weeks" />
+          </div>
+          {/* The player axis's entry point (ADR 0013 D7): a fourth quiet
+              object in the panel, not the loudest thing on a page whose
+              subject is the ranking. */}
+          <Link
+            href={`/picks/${row.playerId}`}
+            className={`flex min-h-11 items-center justify-between rounded-btn bg-paper px-3 ${T.caption} font-bold text-text ${FOCUS}`}
+          >
+            See {row.isViewer ? "your" : `${row.displayName}'s`} picks
+            <ChevronRight className="size-4 stroke-text-muted" aria-hidden />
+          </Link>
         </div>
       ) : null}
     </li>

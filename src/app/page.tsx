@@ -1,4 +1,6 @@
 import { cookies } from "next/headers";
+import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { redirect } from "next/navigation";
 import { getSessionPlayerId } from "@/app/_lib/session-cookie";
 import {
@@ -31,6 +33,7 @@ import { SeasonStatsBlock } from "@/components/pick-board/SeasonStatsBlock";
 import { StatsStrip } from "@/components/pick-board/StatsStrip";
 import { TablePredictionStrip } from "@/components/pick-board/TablePredictionStrip";
 import { ScoringSummary } from "@/components/scoring/ScoringSummary";
+import { T, TX, FOCUS } from "@/components/ui/tokens";
 import {
   DEFAULT_TIME_ZONE,
   TIMEZONE_COOKIE_NAME,
@@ -191,9 +194,28 @@ export default async function PickBoardPage() {
               />
             ))}
           </div>
+
+          {/* The link the Pick Board has been holding a comment for since
+              #90: once a match locks there is a room to look at, and until
+              then there deliberately isn't (ADR 0013 D3/D6). */}
+          {gameweek.slots.some(
+            (slot) =>
+              slot.kind === "match" &&
+              isMatchLocked(new Date(slot.match.kickoffUtcIso), now),
+          ) ? (
+            <Link
+              href={`/gameweek/${String(gameweek.number)}`}
+              className={`flex min-h-11 items-center justify-between rounded-btn bg-ink px-3.5 text-on-ink ${FOCUS}`}
+            >
+              <span className={`${T.caption} font-bold`}>
+                See everyone&apos;s picks
+              </span>
+              <ChevronRight className="size-4" aria-hidden />
+            </Link>
+          ) : null}
         </>
       ) : (
-        <p className="text-sm text-ink/60">
+        <p className={`${T.caption} ${TX.muted}`}>
           No Tipped Matches yet -- check back soon.
         </p>
       )}

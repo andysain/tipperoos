@@ -53,7 +53,12 @@ function createSupabaseMock(tableData: Record<string, TableData>) {
     }[];
     const byPlayer = new Map<
       string,
-      { points: number; matches_scored: number; exact_tips: number; correct_results: number }
+      {
+        points: number;
+        matches_scored: number;
+        exact_tips: number;
+        correct_results: number;
+      }
     >();
     for (const row of rows) {
       if (!args.p_player_ids.includes(row.player_id)) continue;
