@@ -14,11 +14,8 @@ import {
   getTablePredictionRecord,
   getTablePredictionStripData,
 } from "@/app/_lib/table-prediction-access";
-import {
-  loadLastWeekSummary,
-  loadPickBoardGameweek,
-  loadSeasonStats,
-} from "@/app/_lib/pick-board-access";
+import { loadPickBoardGameweek } from "@/app/_lib/pick-board-access";
+import { loadLadder, loadRecap } from "@/app/_lib/summary-access";
 import { isMatchLocked } from "@/lib/competitions/scope";
 import {
   getTablePredictionEditability,
@@ -27,10 +24,8 @@ import {
 import { deriveTablePredictionStripState } from "@/lib/table-predictions/strip-state";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { GameweekHeader } from "@/components/pick-board/GameweekHeader";
-import { LastWeekStrip } from "@/components/pick-board/LastWeekStrip";
+import { SummarySection } from "@/components/pick-board/SummarySection";
 import { PickBoardSlotCard } from "@/components/pick-board/PickBoardSlotCard";
-import { SeasonStatsBlock } from "@/components/pick-board/SeasonStatsBlock";
-import { StatsStrip } from "@/components/pick-board/StatsStrip";
 import { TablePredictionStrip } from "@/components/pick-board/TablePredictionStrip";
 import { ScoringSummary } from "@/components/scoring/ScoringSummary";
 import { T, TX, FOCUS } from "@/components/ui/tokens";
@@ -100,8 +95,8 @@ export default async function PickBoardPage() {
 
   const [
     gameweek,
-    seasonStats,
-    lastWeek,
+    recap,
+    ladder,
     databaseTime,
     gameweekOneKickoff,
     tablePredictionStripData,
@@ -116,18 +111,19 @@ export default async function PickBoardPage() {
           gameweekNumber,
         )
       : Promise.resolve(null),
-    seasonId
-      ? loadSeasonStats(supabase, competitionId, playerId, seasonId)
-      : Promise.resolve(null),
     seasonId && previousGameweekNumber !== null
-      ? loadLastWeekSummary(
+      ? loadRecap(
           supabase,
           competitionId,
-          playerId,
           seasonId,
+          playerId,
           previousGameweekNumber,
+          now,
         )
       : Promise.resolve(null),
+    seasonId
+      ? loadLadder(supabase, competitionId, seasonId, playerId)
+      : Promise.resolve([]),
     getDatabaseTime(supabase),
     getGameweekOneKickoff(supabase),
     seasonId && tablePrediction
@@ -166,9 +162,13 @@ export default async function PickBoardPage() {
     // (PredictTableFlow.tsx) -- one column on phone, room for two slot
     // cards side by side once there's a tablet/desktop-width viewport.
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4">
-      <h1 className="text-[1.9rem] font-extrabold text-ink">Pick Board</h1>
-      <StatsStrip stats={seasonStats} />
-      <LastWeekStrip summary={lastWeek} />
+      {/* The summary sits above the picks. Recorded honestly: a review
+          measured that this pushes the second match card's entry controls
+          toward the fold on a pre-lock phone visit, against ADR 0007's
+          cost-of-missing logic. It is a deliberate call made with the
+          alternative on screen (ADR 0013 D15), helped by home no longer
+          carrying an H1 that restated the tab the player is standing on. */}
+      <SummarySection recap={recap} ladder={ladder} />
       <TablePredictionStrip state={tablePredictionStripState} />
 
       {gameweek ? (
@@ -219,8 +219,6 @@ export default async function PickBoardPage() {
           No Tipped Matches yet -- check back soon.
         </p>
       )}
-
-      <SeasonStatsBlock stats={seasonStats} />
     </main>
   );
 }
