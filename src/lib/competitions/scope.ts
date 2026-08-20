@@ -272,6 +272,139 @@ export async function picksForMatch(
   };
 }
 
+export interface PlayerPickRow {
+  matchId: string;
+  gameweekNumber: number;
+  /** True once picks have locked. A caller must never render a pick, or a
+   *  slot's pick cell, while this is false. */
+  locked: boolean;
+  /** Postponed after lock -- tipped, but never scored, for anyone. */
+  calledOff: boolean;
+  kickoffTime: string;
+  homeTeamId: string;
+  awayTeamId: string;
+  resultHome: number | null;
+  resultAway: number | null;
+  predHomeScore: number | null;
+  predAwayScore: number | null;
+}
+
+/**
+ * One player's picks across a season, for the picks record
+ * (`docs/adr/0013-match-centre-tense-and-axes.md` D9/D10).
+ *
+ * THIS IS THE ONE QUERY IN THE APP WHOSE NATURAL FORMULATION LEAKS.
+ * "Show me everything Andy picked" reads as
+ * `select ... from picks where player_id = $1`, which bypasses the per-match
+ * lock check entirely and exposes live, unlocked picks to anyone who opens
+ * that player's record -- the exact failure `picksForMatch` was written to
+ * make impossible, routed around. Issue #17's done-when ("a second test
+ * player cannot see another player's pick pre-lock via any route, including
+ * direct API calls") applies to this function verbatim.
+ *
+ * So it resolves the set of Tipped Matches FIRST, marks each locked or not
+ * itself rather than trusting its caller, and blanks the pick on anything
+ * unlocked before the row leaves this module. A caller cannot opt out, and a
+ * caller that forgets cannot leak: there is nothing to leak in the returned
+ * shape.
+ *
+ * `locked` is carried explicitly rather than inferred from a null result.
+ * Those are different facts -- "kicked off, no result yet" and "not locked,
+ * nobody may see this" -- and conflating them is precisely how the leak gets
+ * reintroduced by someone reading the row shape rather than this comment.
+ */
+export async function picksForPlayer(
+  supabase: SupabaseClient,
+  playerId: string,
+  competitionId: string,
+  seasonId: string,
+  now: Date = new Date(),
+): Promise<PlayerPickRow[]> {
+  // The player must belong to the competition being read. Without this a
+  // caller could pair any player id with any competition id.
+  const { data: player, error: playerError } = await supabase
+    .from("players")
+    .select("id")
+    .eq("id", playerId)
+    .eq("competition_id", competitionId)
+    .maybeSingle();
+  if (playerError) throw playerError;
+  if (!player) return [];
+
+  const { data: gameweeks, error: gameweekError } = await supabase
+    .from("gameweeks")
+    .select(
+      "number, match_1_id, match_2_id, match_1_voided_at, match_2_voided_at",
+    )
+    .eq("competition_id", competitionId)
+    .eq("season_id", seasonId)
+    .order("number", { ascending: false });
+  if (gameweekError) throw gameweekError;
+
+  const slots = (gameweeks ?? []).flatMap((gw) =>
+    (
+      [
+        [gw.match_1_id, gw.match_1_voided_at],
+        [gw.match_2_id, gw.match_2_voided_at],
+      ] as const
+    )
+      .filter(([matchId]) => matchId !== null)
+      .map(([matchId, voidedAt]) => ({
+        matchId: matchId as string,
+        gameweekNumber: gw.number as number,
+        calledOff: voidedAt !== null,
+      })),
+  );
+  if (slots.length === 0) return [];
+
+  const { data: matches, error: matchError } = await supabase
+    .from("matches")
+    .select(
+      "id, kickoff_time, team_a_id, team_b_id, team_a_score, team_b_score",
+    )
+    .in(
+      "id",
+      slots.map((s) => s.matchId),
+    );
+  if (matchError) throw matchError;
+  const matchById = new Map((matches ?? []).map((m) => [m.id, m]));
+
+  // Picks are read only for matches already resolved above, and only for
+  // this one player -- never as a standalone picks-by-player scan.
+  const { data: pickRows, error: pickError } = await supabase
+    .from("picks")
+    .select("match_id, pred_home_score, pred_away_score")
+    .eq("player_id", playerId)
+    .in(
+      "match_id",
+      slots.map((s) => s.matchId),
+    );
+  if (pickError) throw pickError;
+  const pickByMatch = new Map((pickRows ?? []).map((r) => [r.match_id, r]));
+
+  return slots.flatMap((slot) => {
+    const match = matchById.get(slot.matchId);
+    if (!match) return [];
+    const locked = isMatchLocked(new Date(match.kickoff_time), now);
+    const pick = locked ? pickByMatch.get(slot.matchId) : undefined;
+    return [
+      {
+        matchId: slot.matchId,
+        gameweekNumber: slot.gameweekNumber,
+        locked,
+        calledOff: slot.calledOff,
+        kickoffTime: match.kickoff_time,
+        homeTeamId: match.team_a_id,
+        awayTeamId: match.team_b_id,
+        resultHome: match.team_a_score,
+        resultAway: match.team_b_score,
+        predHomeScore: pick?.pred_home_score ?? null,
+        predAwayScore: pick?.pred_away_score ?? null,
+      },
+    ];
+  });
+}
+
 /**
  * Session-cookie -> competition lookup for authenticated routes (the
  * session holds only a player id). Returns null when the player id

@@ -27,6 +27,18 @@
   --color-info: #3e7c86;
   --color-paper: #f6f3ec;
   --color-paper-line: #e2dbc9;
+  --color-surface: #ffffff;
+
+  /* Text colour roles (docs/DESIGN_SYSTEM.md -> Text colour roles). Baked
+     hex, never an alpha over `ink`: an alpha inverts meaninglessly the
+     moment ink becomes a light colour, which is the exact thing the dark
+     mode commitment says the component layer exists to prevent. Contrast
+     measured against the ground each is used on. */
+  --color-text: #123c43; /* 12.0:1 on paper */
+  --color-text-muted: #567376; /* 4.61:1 on paper -- the AA floor */
+  --color-text-decorative: #a6b3b1; /* 1.95:1 -- never text a player reads */
+  --color-on-ink: #f6f3ec;
+  --color-on-ink-muted: #b2bcb9; /* 6.15:1 on ink */
 
   --radius-btn-sm: 11px;
   --radius-btn: 14px;

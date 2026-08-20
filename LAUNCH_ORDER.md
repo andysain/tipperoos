@@ -98,14 +98,14 @@ Anything touching `src/lib/**` needs your explicit approval before merge (CODEOW
 
 ## After launch, in order
 
-1. **#21 — Additive scoring engine.** Within days, not weeks: gameweek 1's results land 21–23 August and the Pick Board shows no points, rank or last-week strip until this runs.
-2. **#23 — Per-gameweek standings snapshot.** Lights up rank and the last-week strip on `/`.
-3. **#92 — Per-gameweek selection runner.** Hard deadline of gameweek 2, roughly 28 August.
-4. **#91 — Match Centre** (+ **#17** visibility rule). The read-path `picksForMatch` already exists; this is the surface that consumes it.
-5. **#24 — Leaderboard view.**
-6. **#28 / #29 / #30 — Transactional email + the two sends.** `CLAUDE.md` calls the post-result push the highest-leverage retention lever in the product; don't let it drift behind the reminder.
-7. **#35 — Bot picks** (Random, 1-1, Median).
-8. **#33 — Postponement-void handling**, plus the Skipped Slot and Voided Match card states, which are still undrawn (`docs/adr/0007-home-surface-and-pick-entry.md` → _Deferred_).
+- [x] **#21 — Additive scoring engine.** Within days, not weeks: gameweek 1's results land 21–23 August and the Pick Board shows no points, rank or last-week strip until this runs.
+- [x] **#23 — Per-gameweek standings snapshot.** Lights up rank and the last-week strip on `/`.
+- [x] **#92 — Per-gameweek selection runner.** Hard deadline of gameweek 2, roughly 28 August.
+- [x] **#35 — Bot picks** (Random, 1-1, Median).
+- [x] **#24 — Leaderboard view.**
+- [ ] **Match Centre** (+ **#17** visibility rule). Design settled in `docs/adr/0013-match-centre-tense-and-axes.md` and prototyped in `src/app/dev/match-centre-prototype/`. It is no longer one issue: `docs/match-centre-implementation-plan.md` sequences it as A–G, where A (design-system amendments) blocks the rest and needs one decision from Andy on the accent budget. **#91** is now the match axis (`/gameweek/[n]`) specifically; the player axis (`/picks/[playerId]`) is a follow-up.
+- [ ] **#33 — Postponement-void handling**, plus the Skipped Slot and Voided Match card states, which are still undrawn (`docs/adr/0007-home-surface-and-pick-entry.md` → _Deferred_).
+- [ ] **#28 / #29 / #30 — Transactional email + the two sends.** `CLAUDE.md` calls the post-result push the highest-leverage retention lever in the product; don't let it drift behind the reminder.
 
 ## Still deferred, deliberately
 
@@ -115,7 +115,7 @@ Offline/retry states for the filing stamp · the ambient countdown treatment · 
 
 Sizes are rough t-shirt estimates (XS ≈ &lt;1hr, S ≈ half day, M ≈ 1–2 days, L ≈ 3+ days), not commitments.
 
-- [ ] PRE Launch
+- [x] PRE Launch
 
   _Bar for PRE: either blocks a player from cleanly completing signup → pick filing → Predict the Table capture before gameweek 1 lock, or is cheap enough that deferring it buys nothing._
   - [x] General
@@ -125,9 +125,9 @@ Sizes are rough t-shirt estimates (XS ≈ &lt;1hr, S ≈ half day, M ≈ 1–2 d
     - [x] When logging in remove the "**Welcome back, Test2345!** You're logged in. Let's Go" screen. Have it just go straight to the home page
     - [x] **#126 — Login/signup polish: mask PIN on login, hide email input** — **XS** (bundles the PIN-mask and email-hide items)
     - [x] **#127 — Make emoji selection mandatory + add random-pick button** — **S** (`cut-if-behind`: the full emoji-library tier)
-  - [ ] Pick Board
+  - [x] Pick Board
     - [x] **#128 — Pick Board: show calendar date alongside kickoff time** — **S**
-    - [ ] **#156 — Table Prediction Strip** — **S/M**. Replaces the onboarding-only prompt with a permanent mini-card carrying the player's own Champion pick and that club's current league position, so Predict the Table doesn't vanish from home once the deadline passes. Champion gates on `submitted_at`, not on the deadline (a Late Joiner never locks). Renders nothing for a skipped table, or one whose Champion Band doesn't hold exactly one team. Shape settled by prototype — branch `prototype/table-prediction-strip`, verdict on the issue.
+    - [x] **#156 — Table Prediction Strip** — **S/M**. Replaces the onboarding-only prompt with a permanent mini-card carrying the player's own Champion pick and that club's current league position, so Predict the Table doesn't vanish from home once the deadline passes. Champion gates on `submitted_at`, not on the deadline (a Late Joiner never locks). Renders nothing for a skipped table, or one whose Champion Band doesn't hold exactly one team. Shape settled by prototype — branch `prototype/table-prediction-strip`, verdict on the issue.
   - [x] Predict the Table
     - [x] new predict the table input approach
     - [x] **#129 — Fix "locked in" confirmation to a fixed modal** — **S**
@@ -143,12 +143,8 @@ Sizes are rough t-shirt estimates (XS ≈ &lt;1hr, S ≈ half day, M ≈ 1–2 d
   - [ ] Pick Board
     - [ ] Reorder text on card. so that the match/pick meta data is up top in line with the `OPEN` chip. and the score prediction has its own line (idea is that this is the key item so it should maximise the space on the card not have to share it
     - [ ] Fix score input requiring two taps before the number pad/cursor appears — **XS**
-    - [ ] Reorder Match 1 / Match 2 by kickoff time (chronological), Top Pick as tiebreak only — supersedes the current fixed Match-1-first ordering in `docs/adr/0007` — **S**
+    - [x] Reorder Match 1 / Match 2 by kickoff time (chronological), Top Pick as tiebreak only — supersedes the current fixed Match-1-first ordering in `docs/adr/0007` — **S**
     - [ ] Decide on redesigning the score input (buttons vs. free text) — must resolve the "single digit on 5+" case too: multi-digit entry above the valid range currently fails with a vague error instead of being prevented or clearly explained — open design question, not committed — **M**
   - [ ] Predict the Table
     - [ ] **#157 — Live Table Prediction Score on the Strip** — **M**. Surfaces the continuously-computed score (`CLAUDE.md` → Predict the Table) in #156's card as points plus a meter. Precomputed on the standings sync, not per request — Bold Call rarity needs the whole cohort, so it can't be scored per player on `/`. Depends on #156.
     - [ ] _Future direction, not committed:_ after lock, mirror the weekly pick visibility rule — other players' full Table predictions become visible, plus a comparison against actual current standings
-  - [ ] Leaderboard
-    - [ ] Build it  - **Due by end of Gameweek 1**
-  - [ ] Match Centre
-    - [ ] Build it

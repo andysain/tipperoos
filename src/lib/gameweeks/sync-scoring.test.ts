@@ -62,7 +62,10 @@ function fakeSupabase(seed: {
             keys.every((k) => existing[k] === row[k]),
           );
           if (existingIndex >= 0) {
-            tables[table][existingIndex] = { ...tables[table][existingIndex], ...row };
+            tables[table][existingIndex] = {
+              ...tables[table][existingIndex],
+              ...row,
+            };
           } else {
             tables[table].push(row);
           }
@@ -134,11 +137,21 @@ describe("scoreCompletedMatchesAndSnapshots", () => {
       ],
       matches: [
         { id: "m1", team_a_score: 2, team_b_score: 1, status: "completed" },
-        { id: "m2", team_a_score: null, team_b_score: null, status: "scheduled" },
+        {
+          id: "m2",
+          team_a_score: null,
+          team_b_score: null,
+          status: "scheduled",
+        },
         { id: "m99", team_a_score: 5, team_b_score: 0, status: "completed" },
       ],
       picks: [
-        { match_id: "m1", player_id: "alice", pred_home_score: 2, pred_away_score: 1 },
+        {
+          match_id: "m1",
+          player_id: "alice",
+          pred_home_score: 2,
+          pred_away_score: 1,
+        },
       ],
     });
 
@@ -166,10 +179,20 @@ describe("scoreCompletedMatchesAndSnapshots", () => {
       ],
       matches: [
         { id: "m1", team_a_score: 2, team_b_score: 1, status: "completed" },
-        { id: "m2", team_a_score: null, team_b_score: null, status: "scheduled" },
+        {
+          id: "m2",
+          team_a_score: null,
+          team_b_score: null,
+          status: "scheduled",
+        },
       ],
       picks: [
-        { match_id: "m1", player_id: "alice", pred_home_score: 2, pred_away_score: 1 },
+        {
+          match_id: "m1",
+          player_id: "alice",
+          pred_home_score: 2,
+          pred_away_score: 1,
+        },
       ],
     });
 
@@ -201,18 +224,32 @@ describe("scoreCompletedMatchesAndSnapshots", () => {
         { id: "m2", team_a_score: 0, team_b_score: 0, status: "completed" },
       ],
       picks: [
-        { match_id: "m1", player_id: "alice", pred_home_score: 2, pred_away_score: 1 },
-        { match_id: "m2", player_id: "bot-bob", pred_home_score: 0, pred_away_score: 0 },
+        {
+          match_id: "m1",
+          player_id: "alice",
+          pred_home_score: 2,
+          pred_away_score: 1,
+        },
+        {
+          match_id: "m2",
+          player_id: "bot-bob",
+          pred_home_score: 0,
+          pred_away_score: 0,
+        },
       ],
     });
 
     await scoreCompletedMatchesAndSnapshots(client, ["m1", "m2"]);
 
     expect(tables.standings_snapshots.length).toBe(2);
-    const alice = tables.standings_snapshots.find((r) => r.player_id === "alice")!;
+    const alice = tables.standings_snapshots.find(
+      (r) => r.player_id === "alice",
+    )!;
     expect(alice.gameweek_score).toBe(7);
     expect(alice.season_total).toBe(7);
-    const bob = tables.standings_snapshots.find((r) => r.player_id === "bot-bob")!;
+    const bob = tables.standings_snapshots.find(
+      (r) => r.player_id === "bot-bob",
+    )!;
     expect(bob.gameweek_score).toBe(7);
     expect(bob.season_standing).toBe(1);
   });
@@ -233,12 +270,27 @@ describe("scoreCompletedMatchesAndSnapshots", () => {
         },
       ],
       matches: [
-        { id: "m1", team_a_score: null, team_b_score: null, status: "postponed" },
+        {
+          id: "m1",
+          team_a_score: null,
+          team_b_score: null,
+          status: "postponed",
+        },
         { id: "m2", team_a_score: 3, team_b_score: 0, status: "completed" },
       ],
       picks: [
-        { match_id: "m1", player_id: "alice", pred_home_score: 2, pred_away_score: 1 },
-        { match_id: "m2", player_id: "alice", pred_home_score: 3, pred_away_score: 0 },
+        {
+          match_id: "m1",
+          player_id: "alice",
+          pred_home_score: 2,
+          pred_away_score: 1,
+        },
+        {
+          match_id: "m2",
+          player_id: "alice",
+          pred_home_score: 3,
+          pred_away_score: 0,
+        },
       ],
     });
 
