@@ -39,7 +39,10 @@ export function ScoringBreakdown({
         onClick={() => setOpen((value) => !value)}
       >
         <span className="text-paper/75">How did you score?</span>
-        <span className="ml-auto rounded-full bg-success/25 px-2.5 py-1 font-extrabold text-success">
+        {/* success as a FILL behind paper text, not as text colour: on an
+            ink ground success measures 3.44:1 (docs/DESIGN_SYSTEM.md ->
+            Palette). Same reason for the two term values below. */}
+        <span className="ml-auto rounded-badge bg-success px-2.5 py-1 font-extrabold text-on-ink">
           +{points} pts
         </span>
         <ChevronDown
@@ -63,7 +66,7 @@ export function ScoringBreakdown({
                 Wrong Way Round: you said {pickHome}–{pickAway}, it finished{" "}
                 {resultHome}–{resultAway}.
               </span>
-              <strong className="shrink-0 text-success">
+              <strong className="shrink-0 text-on-ink">
                 +{breakdown.total}
               </strong>
             </div>
@@ -81,7 +84,7 @@ export function ScoringBreakdown({
                     </span>
                   ) : null}
                 </span>
-                <strong className="shrink-0 text-success">
+                <strong className="shrink-0 text-on-ink">
                   {row.points === null ? "—" : `+${row.points}`}
                 </strong>
               </div>
@@ -92,7 +95,7 @@ export function ScoringBreakdown({
           ) : null}
           <Link
             href={{ pathname: "/how-it-works", hash: "how-your-pick-scores" }}
-            className="text-sm font-bold text-accent hover:underline"
+            className="text-[0.8rem] font-bold text-on-ink underline underline-offset-2"
           >
             How points work →
           </Link>

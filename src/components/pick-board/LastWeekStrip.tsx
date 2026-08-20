@@ -1,4 +1,5 @@
 import type { LastWeekSummary } from "@/app/_lib/pick-board-access";
+import { CARD_SHADOW } from "@/components/ui/tokens";
 
 /**
  * Compact "here's what happened" strip shown above the new board the
@@ -15,7 +16,9 @@ export function LastWeekStrip({
   if (!summary) return null;
 
   return (
-    <div className="flex flex-col gap-2 rounded-card border border-paper-line bg-white p-4">
+    <div
+      className={`flex flex-col gap-2 rounded-card bg-surface p-4 ${CARD_SHADOW}`}
+    >
       <div className="flex items-center justify-between">
         <span className="text-xs font-bold uppercase tracking-[0.06em] text-ink/50">
           Gameweek {summary.gameweekNumber} recap

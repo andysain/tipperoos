@@ -1,4 +1,5 @@
 import type { SeasonStats } from "@/app/_lib/pick-board-access";
+import { CARD_SHADOW } from "@/components/ui/tokens";
 
 /**
  * Bottom-of-board season summary. Hidden entirely, not shown as zeros,
@@ -11,7 +12,9 @@ export function SeasonStatsBlock({ stats }: { stats: SeasonStats | null }) {
   if (!stats) return null;
 
   return (
-    <div className="flex flex-col gap-1 rounded-card border border-paper-line bg-white p-4">
+    <div
+      className={`flex flex-col gap-1 rounded-card bg-surface p-4 ${CARD_SHADOW}`}
+    >
       <span className="text-xs font-bold uppercase tracking-[0.06em] text-ink/50">
         Season so far
       </span>

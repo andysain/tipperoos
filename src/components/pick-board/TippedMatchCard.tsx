@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Dices, Star } from "lucide-react";
+import { Flame, Shuffle } from "lucide-react";
 import { tv } from "tailwind-variants";
 import {
   decomposeCountdown,
@@ -17,6 +17,8 @@ import {
   CardShellSeam,
 } from "@/components/ui/CardShell";
 import { ScoringBreakdown } from "@/components/scoring/ScoringBreakdown";
+import { ordinal } from "@/lib/format/ordinal";
+import { T, TX, MICRO_LABEL } from "@/components/ui/tokens";
 
 export interface TippedMatchTeam {
   name: string;
@@ -89,25 +91,30 @@ const provenanceLabel: Record<TippedMatchProvenance, string> = {
   top_matchup: "Top matchup",
   random_pick: "Random pick",
 };
-const ProvenanceIcon: Record<TippedMatchProvenance, typeof Star> = {
-  top_matchup: Star,
-  random_pick: Dices,
+// Shuffle, not Dices: a pair of dice is the most gambling-coded glyph in any
+// icon set, on an app whose spec bans gambling language (CLAUDE.md -> Hard
+// constraints). Flame, not Star: docs/in-app-help-spec.md -> Out of scope
+// says of the deferred Star Match feature "do not document or hint at it",
+// and a star on the marquee card is exactly that hint -- it also collides
+// with the universal favourite/starred meaning.
+const ProvenanceIcon: Record<TippedMatchProvenance, typeof Flame> = {
+  top_matchup: Flame,
+  random_pick: Shuffle,
 };
-
-function ordinalSuffix(n: number): string {
-  const rem = n % 100;
-  if (rem >= 11 && rem <= 13) return "th";
-  return (["th", "st", "nd", "rd"] as const)[n % 10] ?? "th";
-}
 
 type ChipTone = "open" | "locked" | "final";
 
+// No accent. A lifecycle status is not one of the accent budget's sanctioned
+// spots (docs/DESIGN_SYSTEM.md -> Accent budget), and here it was competing
+// with the card's one legitimate accent -- the player's own predicted
+// scoreline, two rows below. `locked` steps up in ground and weight instead,
+// so it still reads as the stronger state without spending the budget.
 const chipStyles = tv({
-  base: "shrink-0 rounded-full px-2 py-0.5 text-[0.64rem] font-bold uppercase tracking-wide",
+  base: `shrink-0 rounded-badge px-2 py-0.5 ${MICRO_LABEL}`,
   variants: {
     tone: {
-      open: "bg-paper/15 text-paper",
-      locked: "bg-accent text-accent-ink",
+      open: "bg-paper/15 text-on-ink",
+      locked: "bg-paper/25 text-on-ink font-extrabold",
       final: "bg-paper text-ink",
     },
   },
@@ -144,13 +151,15 @@ function chipForState(kind: TippedMatchCardState["kind"]): {
 function TeamRow({ team, fill }: { team: TippedMatchTeam; fill: string }) {
   return (
     <div className="flex min-w-0 items-center gap-1.5">
-      <span className="w-6 shrink-0 text-[0.68rem] font-bold tabular-nums text-paper/55">
-        {team.leaguePosition !== null
-          ? `${team.leaguePosition}${ordinalSuffix(team.leaguePosition)}`
-          : ""}
+      <span
+        className={`w-6 shrink-0 ${T.label} font-bold tabular-nums ${TX.onInkMuted}`}
+      >
+        {team.leaguePosition !== null ? ordinal(team.leaguePosition) : ""}
       </span>
       <ClubCodeBadge shortCode={team.shortCode} fill={fill} />
-      <span className="min-w-0 flex-1 truncate text-[1.125rem] font-bold text-paper">
+      <span
+        className={`min-w-0 flex-1 truncate ${T.body} font-bold ${TX.onInk}`}
+      >
         {team.name}
       </span>
     </div>
@@ -209,8 +218,12 @@ function MetaLine({
     countdownParts.hours === 0;
 
   return (
-    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.72rem] font-medium text-paper/60">
-      <span className="inline-flex items-center gap-1 font-bold text-accent">
+    <div
+      className={`flex flex-wrap items-center gap-x-1.5 gap-y-0.5 ${T.caption} font-medium ${TX.onInkMuted}`}
+    >
+      {/* Provenance is metadata, not one of the three emotional accent
+          moments -- weight and the icon differentiate it on an ink ground. */}
+      <span className="inline-flex items-center gap-1 font-bold">
         <Icon className="size-[0.8em]" aria-hidden />
         {provenanceLabel[provenance]}
       </span>
@@ -480,7 +493,11 @@ function FinishedFooter({
     <>
       <div className="flex items-center gap-2 bg-ink px-3.5 pt-0.5 pb-3.5 text-[0.86rem]">
         {exact ? (
-          <span className="font-bold text-success">You called it exactly</span>
+          <span
+            className={`rounded-badge bg-success px-2 py-0.5 ${MICRO_LABEL} text-on-ink`}
+          >
+            You called it exactly
+          </span>
         ) : ownHomeScore !== null && ownAwayScore !== null ? (
           <span className="text-paper/75">
             You tipped{" "}

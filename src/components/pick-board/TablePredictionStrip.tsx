@@ -3,12 +3,7 @@ import { TriangleAlert } from "lucide-react";
 import { ClubCodeBadge } from "@/components/ui/ClubCodeBadge";
 import { applyContrastFloor, kitColors } from "@/lib/teams/kit-colors";
 import type { TablePredictionStripState } from "@/lib/table-predictions/strip-state";
-
-function ordinalSuffix(n: number): string {
-  const rem = n % 100;
-  if (rem >= 11 && rem <= 13) return "th";
-  return (["th", "st", "nd", "rd"] as const)[n % 10] ?? "th";
-}
+import { ordinal } from "@/lib/format/ordinal";
 
 /**
  * Pick Board's permanent presence for a Player's own Table Prediction
@@ -86,8 +81,7 @@ export function TablePredictionStrip({
         {championRow}
         {state.leaguePosition !== null ? (
           <span className="shrink-0 text-sm font-bold text-ink/70">
-            {state.leaguePosition}
-            {ordinalSuffix(state.leaguePosition)} in the league
+            {ordinal(state.leaguePosition)} in the league
           </span>
         ) : null}
       </Link>
@@ -107,13 +101,9 @@ export function TablePredictionStrip({
       </div>
       {state.bandsUntidy ? (
         <div className="flex items-center gap-2 rounded-btn-sm bg-warning/10 px-3 py-2">
-          <TriangleAlert
-            className="size-4 shrink-0 text-warning"
-            aria-hidden
-          />
+          <TriangleAlert className="size-4 shrink-0 text-warning" aria-hidden />
           <p className="text-xs font-semibold text-ink/70">
-            Some of your Bands aren&apos;t quite right yet -- check your
-            table.
+            Some of your Bands aren&apos;t quite right yet -- check your table.
           </p>
         </div>
       ) : null}
