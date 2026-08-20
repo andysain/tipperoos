@@ -1,7 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isMatchLocked, scoresForCompetition } from "@/lib/competitions/scope";
-import { rankScores } from "@/lib/leaderboard/rank";
+import { isMatchLocked } from "@/lib/competitions/scope";
 import { orderBoardSlots } from "@/lib/pick-board/order-slots";
 
 // DB-fetching glue for the Pick Board route (issue #90) -- deliberately
