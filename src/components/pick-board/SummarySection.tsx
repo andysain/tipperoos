@@ -75,57 +75,37 @@ export function SummarySection({
             Leaderboard
             <ChevronRight className="size-3.5 stroke-text-muted" aria-hidden />
           </Link>
-          {ladder.map((row) => {
-            const viewer = ladder.find((r) => r.isViewer);
-            const diff = viewer ? row.points - viewer.points : 0;
-            return (
-              <div
-                key={row.playerId}
-                className={`relative flex items-center gap-1.5 ${INSET} py-1.5 ${
-                  row.isViewer ? "bg-accent/12" : ""
-                }`}
+          {ladder.map((row) => (
+            <div
+              key={row.playerId}
+              className={`relative flex items-center gap-1.5 ${INSET} py-1.5 ${
+                row.isViewer ? "bg-accent/12" : ""
+              }`}
+            >
+              {row.isViewer ? (
+                <span
+                  className="absolute inset-y-0 left-0 w-1 bg-accent"
+                  aria-hidden
+                />
+              ) : null}
+              <span
+                className={`w-5 shrink-0 ${T.caption} font-bold tabular-nums ${TX.muted}`}
               >
-                {row.isViewer ? (
-                  <span
-                    className="absolute inset-y-0 left-0 w-1 bg-accent"
-                    aria-hidden
-                  />
-                ) : null}
-                <span
-                  className={`w-5 shrink-0 ${T.caption} font-bold tabular-nums ${TX.muted}`}
-                >
-                  {row.rank}
-                </span>
-                <EmojiChip emoji={row.emoji} size="sm" />
-                <span
-                  className={`min-w-0 flex-1 truncate ${T.caption} font-bold ${TX.base}`}
-                >
-                  {row.isViewer ? "You" : row.displayName}
-                </span>
-                <span
-                  className={`${T.caption} font-bold tabular-nums ${TX.base}`}
-                >
-                  {row.points}
-                </span>
-                {/* Words, not a sign. `+5` already means "points scored"
-                    twice on this screen; a third signed number meaning
-                    "points ahead of you" is one meaning too many for one
-                    mark. The viewer's own row shows nothing -- an empty cell
-                    says "no gap to yourself" better than a dash. */}
-                <span
-                  className={`w-14 shrink-0 text-right ${T.label} tabular-nums ${TX.muted}`}
-                >
-                  {row.isViewer
-                    ? ""
-                    : diff === 0
-                      ? "level"
-                      : diff > 0
-                        ? `${diff} ahead`
-                        : `${Math.abs(diff)} behind`}
-                </span>
-              </div>
-            );
-          })}
+                {row.rank}
+              </span>
+              <EmojiChip emoji={row.emoji} size="sm" />
+              <span
+                className={`min-w-0 flex-1 truncate ${T.caption} font-bold ${TX.base}`}
+              >
+                {row.isViewer ? "You" : row.displayName}
+              </span>
+              <span
+                className={`${T.caption} font-bold tabular-nums ${TX.base}`}
+              >
+                {row.points}
+              </span>
+            </div>
+          ))}
         </div>
       ) : null}
     </div>

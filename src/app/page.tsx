@@ -162,6 +162,13 @@ export default async function PickBoardPage() {
     // (PredictTableFlow.tsx) -- one column on phone, room for two slot
     // cards side by side once there's a tablet/desktop-width viewport.
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4">
+      {/* Home carries a title like every other surface. It was dropped on
+          the grounds that it restated the tab the player is standing on --
+          true, but the shell's fixed top-right chrome (help, switch player)
+          has nothing to sit beside without it, so it landed on top of the
+          first card. Consistency across four surfaces beats the 54px. */}
+      <h1 className={`${T.h1} font-extrabold text-text`}>Pick Board</h1>
+
       {/* The summary sits above the picks. Recorded honestly: a review
           measured that this pushes the second match card's entry controls
           toward the fold on a pre-lock phone visit, against ADR 0007's

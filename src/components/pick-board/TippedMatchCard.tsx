@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/CardShell";
 import { ScoringBreakdown } from "@/components/scoring/ScoringBreakdown";
 import { ordinal } from "@/lib/format/ordinal";
-import { T, TX, MICRO_LABEL } from "@/components/ui/tokens";
+import { T, TX, MICRO_LABEL, INSET } from "@/components/ui/tokens";
 
 export interface TippedMatchTeam {
   name: string;
@@ -288,32 +288,36 @@ function CardHeader({
   scores?: RowScores;
   note?: string;
 }) {
+  // The "eyebrow": meta ABOVE the teams, so the card ends on the scoreline
+  // rather than trailing off into small print. Chosen over demoting only the
+  // chip and over a two-line variant. The status chip rides the eyebrow with
+  // it, which also frees the team rows' full width for the score.
   return (
-    <CardShellHeader>
-      <div className="flex items-start gap-2.5">
-        {scores ? (
-          <div className="grid min-w-0 flex-1 grid-cols-[1fr_auto] items-center gap-x-2.5 gap-y-1">
-            <TeamRow team={home} fill={homeFill} />
-            <ScoreCell value={scores.home} tone={scores.tone} />
-            <TeamRow team={away} fill={awayFill} />
-            <ScoreCell value={scores.away} tone={scores.tone} />
-          </div>
-        ) : (
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <TeamRow team={home} fill={homeFill} />
-            <TeamRow team={away} fill={awayFill} />
-          </div>
-        )}
+    <CardShellHeader className={INSET}>
+      <div className="flex items-center justify-between gap-2">
+        <MetaLine
+          provenance={provenance}
+          kickoffUtcIso={kickoffUtcIso}
+          timeZone={timeZone}
+          now={now}
+          showCountdown={showCountdown}
+          note={note}
+        />
         <StatusChip label={chip.label} tone={chip.tone} />
       </div>
-      <MetaLine
-        provenance={provenance}
-        kickoffUtcIso={kickoffUtcIso}
-        timeZone={timeZone}
-        now={now}
-        showCountdown={showCountdown}
-        note={note}
-      />
+      {scores ? (
+        <div className="grid min-w-0 grid-cols-[1fr_auto] items-center gap-x-2.5 gap-y-1">
+          <TeamRow team={home} fill={homeFill} />
+          <ScoreCell value={scores.home} tone={scores.tone} />
+          <TeamRow team={away} fill={awayFill} />
+          <ScoreCell value={scores.away} tone={scores.tone} />
+        </div>
+      ) : (
+        <div className="flex min-w-0 flex-col gap-1">
+          <TeamRow team={home} fill={homeFill} />
+          <TeamRow team={away} fill={awayFill} />
+        </div>
+      )}
     </CardShellHeader>
   );
 }
