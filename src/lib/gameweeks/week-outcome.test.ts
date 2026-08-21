@@ -17,6 +17,55 @@ const calledOff = (picked: boolean): WeekEntry => ({
   calledOff: true,
 });
 
+// Literal golden values, hand-derived from CLAUDE.md -> Scoring: a match
+// can only score {0,1,3,4,5,7}, and a gameweek is two matches, so a week
+// total is bounded at 14. These assert the arithmetic directly rather than
+// only the shape, per TESTING_STANDARD.md 1a.2 -- a test that asserts only
+// `{ kind: "scored" }` passes just as happily on a broken sum.
+describe("deriveWeekOutcome totals", () => {
+  const scored = (points: number) => ({
+    points,
+    picked: true,
+    calledOff: false,
+  });
+  const total = (entries: Parameters<typeof deriveWeekOutcome>[0]) => {
+    const outcome = deriveWeekOutcome(entries);
+    return outcome.kind === "scored" ? outcome.total : -1;
+  };
+
+  it("sums an exact tip and a correct result", () => {
+    expect(total([scored(7), scored(3)])).toBe(10);
+  });
+
+  it("sums the maximum reachable week", () => {
+    expect(total([scored(7), scored(7)])).toBe(14);
+  });
+
+  it("sums a Wrong Way Round pair", () => {
+    expect(total([scored(1), scored(1)])).toBe(2);
+  });
+
+  it("sums two goalless weeks to zero, not to null", () => {
+    expect(total([scored(0), scored(0)])).toBe(0);
+  });
+
+  it("counts only the played half of a half-played week", () => {
+    expect(
+      total([scored(5), { points: null, picked: true, calledOff: false }]),
+    ).toBe(5);
+  });
+
+  it("excludes a called-off match from the total", () => {
+    expect(
+      total([scored(4), { points: null, picked: true, calledOff: true }]),
+    ).toBe(4);
+  });
+
+  it("reports -1 for an unscored week, i.e. not a zero total", () => {
+    expect(total([{ points: null, picked: false, calledOff: false }])).toBe(-1);
+  });
+});
+
 describe("deriveWeekOutcome", () => {
   it("sums a fully played week", () => {
     expect(deriveWeekOutcome([played(7), played(3)])).toEqual({

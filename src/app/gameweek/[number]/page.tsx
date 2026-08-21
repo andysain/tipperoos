@@ -49,7 +49,10 @@ export default async function GameweekPage({
   const timeZone =
     cookieStore.get(TIMEZONE_COOKIE_NAME)?.value ?? DEFAULT_TIME_ZONE;
 
-  const [reveal, currentGameweek] = await Promise.all([
+  // One wave. The strip depends on nothing the other two produce, and was
+  // previously awaited after them for no reason
+  // (PERFORMANCE_TESTING_STANDARD.md §5).
+  const [reveal, currentGameweek, strip] = await Promise.all([
     loadGameweekReveal(
       supabase,
       competitionId,
@@ -64,6 +67,14 @@ export default async function GameweekPage({
       now,
       seasonId,
     ),
+    loadGameweekStrip(
+      supabase,
+      competitionId,
+      seasonId,
+      playerId,
+      now,
+      timeZone,
+    ),
   ]);
   if (!reveal) notFound();
 
@@ -71,14 +82,6 @@ export default async function GameweekPage({
   // before that the Pick Board is the whole story, and there is nothing here
   // to show that wouldn't breach pre-lock secrecy.
   if (reveal.matches.every((m) => !m.locked)) notFound();
-
-  const strip = await loadGameweekStrip(
-    supabase,
-    competitionId,
-    seasonId,
-    playerId,
-    now,
-  );
 
   const latest = currentGameweek ?? gameweekNumber;
   const prev = gameweekNumber - 1;

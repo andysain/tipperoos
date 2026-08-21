@@ -96,8 +96,12 @@ The rest are corrections the prototype and the reviews established:
   grammar (five signals for "this is tappable", two of them the same control).
 
 **Done when:** `DESIGN_SYSTEM.md` has one accent rule, a closed type scale, a
-named text-role table, and the three new grammars — and `docs/production-ui-findings.md`'s
-P0 is struck through with the decision recorded.
+named text-role table, and the three new grammars — and
+`docs/production-ui-findings.md`'s P0 records the decision taken.
+
+**Settled 2026-08-21:** the two-tier rule was accepted. Emotional accent as a
+fill on three named moments; functional accent capped at one object per
+viewport; never on a value, label, status chip, metadata or secondary link.
 
 ---
 
@@ -122,10 +126,15 @@ half-done.
 Reference implementations for all of these are in the prototype's
 `shared.tsx`.
 
-**Done when:** the tokens exist, the primitives exist and are used by at least
-one production surface, no app code sets a raw ink alpha or an off-scale size,
-and tabbing through `/`, `/leaderboard` and `/predict-table` shows the app's
-own focus ring.
+**Done when:** the tokens exist, the primitives exist, and every surface this
+branch touches uses them.
+
+**Scoped down 2026-08-21.** This originally read "no app code sets a raw ink
+alpha or an off-scale size, and tabbing through `/predict-table` shows the
+focus ring" — a claim about the whole app, not about this work. Predict the
+Table, login and how-it-works still carry ~44 sub-AA alphas, 58 Tailwind size
+keywords and no focus ring; that sweep is **#184**, deliberately kept out of
+this branch so the diff stays reviewable and doesn't collide with #157/#171.
 
 ---
 

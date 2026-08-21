@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isMatchLocked, picksForMatch } from "@/lib/competitions/scope";
+import { tippedSlots } from "@/lib/gameweeks/tipped-slots";
 import { scoreMatch } from "@/lib/scoring/match";
 import { deriveWeekOutcome } from "@/lib/gameweeks/week-outcome";
 import type { WeekOutcome } from "@/lib/gameweeks/week-outcome";
@@ -81,21 +82,9 @@ export async function loadGameweekReveal(
   if (gwError) throw gwError;
   if (!gw) return null;
 
-  const slots = (
-    [
-      ["top_matchup", gw.match_1_id, gw.match_1_voided_at],
-      ["random_pick", gw.match_2_id, gw.match_2_voided_at],
-    ] as const
-  ).map(([provenance, matchId, voidedAt]) => ({
-    provenance,
-    matchId: matchId as string | null,
-    calledOff: voidedAt !== null,
-  }));
-
-  const matchIds = slots
-    .map((s) => s.matchId)
-    .filter((id): id is string => id !== null);
-  if (matchIds.length === 0) return null;
+  const slots = tippedSlots([gw]);
+  if (slots.length === 0) return null;
+  const matchIds = slots.map((s) => s.matchId);
 
   const { data: matchRows, error: matchError } = await supabase
     .from("matches")
@@ -119,14 +108,22 @@ export async function loadGameweekReveal(
     ((matchRows ?? []) as unknown as Row[]).map((m) => [m.id, m]),
   );
 
-  const matches: RevealMatch[] = [];
-  for (const slot of slots) {
-    if (slot.matchId === null) continue;
-    const row = byId.get(slot.matchId);
-    if (!row) continue;
+  // Both slots' reveals resolve in one wave rather than serially --
+  // picksForMatch is itself several round trips deep, so awaiting it inside
+  // the loop doubled the page's latency for no reason
+  // (PERFORMANCE_TESTING_STANDARD.md §5).
+  const revealable = slots.filter((slot) => byId.has(slot.matchId));
+  const revealResults = await Promise.all(
+    revealable.map((slot) =>
+      picksForMatch(supabase, slot.matchId, competitionId),
+    ),
+  );
 
+  const matches: RevealMatch[] = [];
+  for (const [index, slot] of revealable.entries()) {
+    const row = byId.get(slot.matchId)!;
     const locked = isMatchLocked(new Date(row.kickoff_time), now);
-    const result = await picksForMatch(supabase, slot.matchId, competitionId);
+    const result = revealResults[index];
 
     const scored = (home: number | null, away: number | null) =>
       slot.calledOff ||
@@ -186,7 +183,7 @@ export async function loadGameweekReveal(
   return {
     number: gw.number as number,
     matches,
-    skippedSlot: slots.some((s) => s.matchId === null),
+    skippedSlot: slots.length === 1,
     viewerOutcome,
   };
 }

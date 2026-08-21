@@ -1,4 +1,5 @@
 import "server-only";
+import { tippedSlots } from "@/lib/gameweeks/tipped-slots";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
 
 type SupabaseClient = ReturnType<typeof createServerSupabaseClient>;
@@ -341,20 +342,7 @@ export async function picksForPlayer(
     .order("number", { ascending: false });
   if (gameweekError) throw gameweekError;
 
-  const slots = (gameweeks ?? []).flatMap((gw) =>
-    (
-      [
-        [gw.match_1_id, gw.match_1_voided_at],
-        [gw.match_2_id, gw.match_2_voided_at],
-      ] as const
-    )
-      .filter(([matchId]) => matchId !== null)
-      .map(([matchId, voidedAt]) => ({
-        matchId: matchId as string,
-        gameweekNumber: gw.number as number,
-        calledOff: voidedAt !== null,
-      })),
-  );
+  const slots = tippedSlots(gameweeks ?? []);
   if (slots.length === 0) return [];
 
   const { data: matches, error: matchError } = await supabase
@@ -390,7 +378,7 @@ export async function picksForPlayer(
     return [
       {
         matchId: slot.matchId,
-        gameweekNumber: slot.gameweekNumber,
+        gameweekNumber: slot.gameweek,
         locked,
         calledOff: slot.calledOff,
         kickoffTime: match.kickoff_time,

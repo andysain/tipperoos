@@ -119,6 +119,7 @@ export default async function PickBoardPage() {
           playerId,
           previousGameweekNumber,
           now,
+          timeZone,
         )
       : Promise.resolve(null),
     seasonId

@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
@@ -14,6 +15,10 @@ import {
 } from "@/components/gameweek/PicksTable";
 import { CardShell } from "@/components/ui/CardShell";
 import { T, TX, LABEL, INSET, FOCUS } from "@/components/ui/tokens";
+import {
+  DEFAULT_TIME_ZONE,
+  TIMEZONE_COOKIE_NAME,
+} from "@/components/nav/timezone-cookie";
 
 // The player axis (docs/adr/0013-match-centre-tense-and-axes.md D7/D9): a
 // picks RECORD, not a profile. Emoji, display name, picks, points -- and
@@ -39,12 +44,17 @@ export default async function PicksRecordPage({
   const seasonId = await getCurrentSeasonId(supabase);
   if (!seasonId) notFound();
 
+  const cookieStore = await cookies();
+  const timeZone =
+    cookieStore.get(TIMEZONE_COOKIE_NAME)?.value ?? DEFAULT_TIME_ZONE;
+
   const record = await loadPicksRecord(
     supabase,
     competitionId,
     seasonId,
     playerId,
     new Date(),
+    timeZone,
   );
   if (!record) notFound();
 
@@ -111,6 +121,7 @@ export default async function PicksRecordPage({
                     dateLabel={week.dateLabel}
                     outcome={week.outcome}
                     chevron
+                    owner={isViewer ? undefined : record.displayName}
                   />
                 </Link>
                 <ul className={`flex flex-col gap-1 ${INSET} pb-2.5`}>

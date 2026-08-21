@@ -36,7 +36,17 @@ export function RevealCard({
   const clusters = clusterPicks(match.picks, viewerId);
   const Icon = match.provenance === "top_matchup" ? Flame : Shuffle;
   const settled = match.homeScore !== null && match.awayScore !== null;
-  const chip = match.calledOff ? "called_off" : settled ? "final" : "locked";
+  // `locked` is carried per match, not inferred: a gameweek is routinely
+  // half-played, so one card can be final while its sibling hasn't locked
+  // (ADR 0013 D5). Reading "no result yet" as "locked" told a player picks
+  // were closed on a match still open to them.
+  const chip = match.calledOff
+    ? "called_off"
+    : settled
+      ? "final"
+      : match.locked
+        ? "locked"
+        : "open";
 
   return (
     <CardShell className="bg-surface">
@@ -97,6 +107,11 @@ export function RevealCard({
         <p className={`bg-surface ${INSET} py-3 ${T.caption} ${TX.muted}`}>
           Called off after picks closed — nobody scored on this one.
           Everyone&apos;s picks are still below.
+        </p>
+      ) : !match.locked ? (
+        <p className={`bg-surface ${INSET} py-3 ${T.caption} ${TX.muted}`}>
+          Picks are still open on this one — they close five minutes before
+          kick-off, {formatKickoffInTimeZone(match.kickoffUtcIso, timeZone)}.
         </p>
       ) : !settled ? (
         <p className={`bg-surface ${INSET} py-3 ${T.caption} ${TX.muted}`}>

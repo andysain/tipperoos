@@ -29,6 +29,7 @@ export async function loadRecap(
   playerId: string,
   gameweekNumber: number,
   now: Date,
+  timeZone: string,
 ): Promise<SummaryRecap | null> {
   const record = await loadPicksRecord(
     supabase,
@@ -36,6 +37,7 @@ export async function loadRecap(
     seasonId,
     playerId,
     now,
+    timeZone,
   );
   const week = record?.weeks.find((w) => w.gameweek === gameweekNumber);
   if (!week) return null;

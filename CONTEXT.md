@@ -25,6 +25,15 @@ The player-facing names for how each slot was chosen, shown on the Tipped Match 
 
 Renamed 2026-08-21 from **Top Matchup** / **Random Pick**. The pair now describes the same thing about both slots — _how each was chosen_ — where before Match 1 was named for its quality and Match 2 for its selection method. Both are also shorter, which the card's eyebrow row needed. The internal identifiers (`top_matchup`, `random_pick`, `match_1`, `match_2`) are unchanged: they are sourced meaning, not display copy.
 
+**Pick Reveal** / **Picks Record**:
+The two surfaces that show picks after they lock, at `/gameweek/[n]` and
+`/picks/[playerId]`. Together they are what earlier documents call the
+**Match Centre** — which is not a destination in this product but the Pick
+Board's past tense (`docs/adr/0013-match-centre-tense-and-axes.md` D1), so
+there is no Match Centre tab and no Match Centre route.
+_Avoid_: Match Centre as the name of a screen. It survives as a useful
+shorthand for "the two reveal surfaces" in conversation and in older ADRs.
+
 **Picker**:
 _Deferred, not in the current product._ The Player who would choose Match 2, determined by the previous Gameweek's Standings Snapshot. Superseded for the initial launch by auto-selection (`docs/adr/0006-auto-selected-tipped-matches.md`); the term is retained because the mechanic and its `gameweeks` columns are reserved for a possible return.
 _Avoid_: Loser, Last place (fine in casual conversation, but Picker is the domain term)

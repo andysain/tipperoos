@@ -12,6 +12,41 @@ const p = (playerId: string, points: number, isBot = false): LadderInput => ({
   points,
 });
 
+// Literal golden values for the ranks themselves, per TESTING_STANDARD.md
+// 1a.2. Dense ranking with bots excluded BEFORE ranking is the property
+// docs/adr/0012 D12 turns on, and asserting only row order would pass on a
+// ladder that numbered them wrongly.
+describe("buildLadder ranks", () => {
+  it("numbers a clean field 1, 2, 3", () => {
+    const l = buildLadder([p("a", 30), p("me", 20), p("c", 10)], "me");
+    expect(l[0].rank).toBe(1);
+    expect(l[1].rank).toBe(2);
+    expect(l[2].rank).toBe(3);
+  });
+
+  it("ranks past a bot rather than counting it", () => {
+    const l = buildLadder([p("a", 30), p("bot", 25, true), p("me", 20)], "me");
+    expect(l.length).toBe(2);
+    expect(l[1].rank).toBe(2);
+  });
+
+  // Dense ranking: a tie shares a place and the NEXT place is not skipped.
+  it("does not skip a place after a tie", () => {
+    const l = buildLadder([p("a", 20), p("me", 20), p("c", 10)], "me");
+    expect(l[1].rank).toBe(1);
+    expect(l[2].rank).toBe(2);
+  });
+
+  it("windows to exactly three rows in a long field", () => {
+    const l = buildLadder(
+      [p("a", 60), p("b", 50), p("me", 40), p("d", 30), p("e", 20)],
+      "me",
+    );
+    expect(l.length).toBe(3);
+    expect(l[1].points).toBe(40);
+  });
+});
+
 describe("buildLadder", () => {
   // The guarantee inherited from loadSeasonStats, which this supersedes.
   it("ranks past a bot sitting between two humans", () => {

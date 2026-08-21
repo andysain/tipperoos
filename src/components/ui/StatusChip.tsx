@@ -14,9 +14,12 @@ import { MICRO_LABEL } from "./tokens";
  * `called_off` is `warning`, not `danger`: a Voided Match is a neutral
  * non-event for every player equally.
  */
-export type MatchChipState = "locked" | "final" | "called_off";
+export type MatchChipState = "open" | "locked" | "final" | "called_off";
 
 const TONES: Record<MatchChipState, { label: string; cls: string }> = {
+  // Reachable on the reveal, where a half-played gameweek can show a settled
+  // match beside one that hasn't locked yet.
+  open: { label: "Open", cls: "bg-paper/15 text-on-ink" },
   locked: { label: "Locked", cls: "bg-paper/25 text-on-ink font-extrabold" },
   final: { label: "Final", cls: "bg-paper text-ink" },
   called_off: { label: "Called off", cls: "bg-warning text-ink" },

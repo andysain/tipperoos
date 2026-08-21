@@ -91,6 +91,34 @@ describe("clusterPicks", () => {
   });
 });
 
+// Literal cluster sizes: the whole point of clustering is that ~16 players
+// read as ~5 rows, so the counts are the behaviour, not an implementation
+// detail (docs/adr/0013 D13).
+describe("clusterPicks sizes", () => {
+  it("collapses a six-way agreement into one row", () => {
+    const six = ["a", "b", "c", "d", "e", "f"].map((id) => pick(id, 2, 1, 7));
+    const clusters = clusterPicks(six, "a");
+    expect(clusters.length).toBe(1);
+    expect(clusters[0].members.length).toBe(6);
+  });
+
+  it("keeps distinct scorelines apart", () => {
+    const clusters = clusterPicks(
+      [pick("a", 2, 1, 7), pick("b", 1, 1, 0), pick("c", 3, 0, 0)],
+      "a",
+    );
+    expect(clusters.length).toBe(3);
+  });
+
+  it("sixteen players across four scorelines is four rows", () => {
+    const picks = Array.from({ length: 16 }, (_, i) =>
+      pick(`p${i}`, i % 4, 1, 0),
+    );
+    expect(clusterPicks(picks, "p0").length).toBe(4);
+    expect(clusterPicks(picks, "p0")[0].members.length).toBe(4);
+  });
+});
+
 describe("isWrongWayRound", () => {
   it("fires on the exact scoreline reversed", () => {
     expect(isWrongWayRound(2, 1, 1, 2)).toBe(true);

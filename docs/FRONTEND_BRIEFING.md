@@ -11,14 +11,14 @@ A private Premier League tipping competition for ~10–20 family/friends across 
 - **Kid-friendly.** Youngest real users are ~10. Language and interaction design need to work for a 10-year-old, not just an adult.
 - **Mobile-first, fast, responsive — a stated product requirement, not a nice-to-have.** This whole rebuild exists partly as a reaction against the old app (Streamlit) being clunky and slow. Snappy interaction matters more here than usual.
 - **No gambling language, anywhere.** Use `prediction`, `pick`, `points`, `leaderboard`, `competition`. Never `bet`, `odds`, `wager`, `stake`, `payout`, `bookie` — including in copy, button labels, empty states, error messages.
-- **No chat, comments, public profiles, or social features** beyond the leaderboard and Match Centre. Don't design toward a social-app pattern.
+- **No chat, comments, public profiles, or social features** beyond the leaderboard and the pick reveal. Don't design toward a social-app pattern.
 - **All times display in `Australia/Sydney`**, even though kickoffs are UK time and everything is stored in UTC. Never show raw UTC to a user.
 - **No client-side Supabase access, ever.** This is a backend architecture rule, but it affects you directly: any data a page needs comes from a Server Component or an API route the backend agent builds — never a browser-side DB call. Design your data-fetching patterns around that (Server Components pulling data server-side, or `fetch`ing your own API routes), not a client SDK.
 
 ## Design system status
 
 **Decided** — see `docs/DESIGN_SYSTEM.md` for the full palette, type scale, radius/spacing tokens, and
-component conventions (icons, motion, copy tone, Match Centre structure, etc.). The real tokens are already
+component conventions (icons, motion, copy tone, gameweek-archive structure, etc.). The real tokens are already
 wired into `src/app/globals.css`'s `@theme` block (`bg-ink`, `bg-accent`, `rounded-card`, etc.) — use those
 Tailwind utilities, never a raw hex value. No components built yet beyond the `create-next-app` scaffold
 (`src/app/page.tsx`, `src/app/layout.tsx`) — build the shared primitives (`Button`, `Badge`, `Card`, ...) the
@@ -56,7 +56,7 @@ Not necessarily in build order — check with the backend agent/Andy on sequenci
 - **Picks entry**: each gameweek, exactly **two** matches are open for tipping (not a full round). Player enters a full scoreline (home/away) for each, not just a result. Locks 5 minutes before kickoff. Before lock: only your own pick is visible. After lock: everyone's picks for that match become visible. Design needs a clear locked-vs-open visual state.
 - **Match-2 Picker flow**: starting gameweek 2, whoever finished last the previous gameweek picks Match 2 themselves (from a deadline window, notified, with an auto-random fallback if they miss it). This is a distinct, occasional flow — needs its own notification/prompt UI, not just folded into normal picks entry.
 - **Leaderboard**: ranked by season total points. Bots clearly labelled (🤖). Admin's standing shown but visually distinguished as ineligible for the season "winner" title (see Admin below).
-- **Match Centre**: shows fixtures/results, and every admin result correction with a timestamped audit entry (who changed what, when) — this is a trust feature, needs to be visible, not buried.
+- **The pick reveal** (`/gameweek/[n]`): everyone's picks for a settled gameweek, and every result correction with a timestamped audit entry — a trust feature, visible not buried. Not a destination of its own: it is the Pick Board's past tense (`docs/adr/0013-match-centre-tense-and-axes.md`).
 - **Predict the Table**: season-long feature, captured once near season start (full 20-team ranking). Exact UI shape (full drag-reorder ranking vs. a simplified champion/top-4/relegation picker) is **still an open product decision** — flag before building, don't assume.
 - **Admin screens** (small, admin-only): match result/kickoff-time correction, admin-assisted PIN reset (a "forced reset" flow — admin sets a temp PIN, player is then forced to set a real one on next login).
 
@@ -97,7 +97,7 @@ Three screenshots of the retired Streamlit app: `screencapture-tipperoos-streaml
 **Explicitly don't carry forward:**
 
 - The Streamlit left-sidebar page-nav structure. This whole rebuild exists partly because the old app felt clunky/slow — don't reproduce its information architecture by default.
-- Match Centre's dense, cramped per-match comparison layout — likely a contributor to that "clunky" feedback, not a pattern to repeat.
+- The old Match Centre's dense, cramped per-match comparison layout — likely a contributor to that "clunky" feedback, not a pattern to repeat. The reveal groups identical scorelines instead (`docs/adr/0013` D13).
 - The score-progression line chart on the leaderboard. Explicitly out of scope for this rebuild (see `CLAUDE.md` → _Explicitly out of scope_: "Full analytics/stats pages... not carried forward for relaunch").
 - **"Winner pick"** (shown locked on the My Predictions screen) and **"Advance"** columns/terminology (Match Centre, leaderboard breakdown) — both World Cup knockout-tournament concepts. There's no tournament winner pick and no advancement bonus in a league season; don't design around them. (Note: this is different from **Predict the Table**, the actual EPL season-long feature — see above — which has no old-app screenshot since it didn't exist in that version.)
 - The score-breakdown columns shown (`Exact / Goal diff / Result / Advance`) reflect the old app's actual scoring code, which `CLAUDE.md` documents as having drifted from spec — the new additive formula's categories are different (`Result +3 / Goal difference +2 / Home score +1 / Away score +1 / Exact bonus +2`, no knockout-advancement term at all). If you build a similar score-breakdown UI, use the new categories, not these.

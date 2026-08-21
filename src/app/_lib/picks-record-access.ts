@@ -36,12 +36,16 @@ export async function loadPicksRecord(
   seasonId: string,
   playerId: string,
   now: Date,
+  /** CLAUDE.md -> Hard constraints: kickoff labels render in the viewer's
+   *  browser-detected timezone, falling back to Australia/Sydney. Hardcoding
+   *  UTC here put an evening UK kickoff on the wrong calendar DAY. */
+  timeZone: string,
 ): Promise<PicksRecord | null> {
   // Scoped to the VIEWER's competition, so a player id from another
   // competition resolves to nothing rather than to someone else's season.
   const { data: player, error: playerError } = await supabase
     .from("players")
-    .select("display_name, emoji, is_bot")
+    .select("display_name, emoji, is_bot, joined_at")
     .eq("id", playerId)
     .eq("competition_id", viewerCompetitionId)
     .maybeSingle();
@@ -69,7 +73,7 @@ export async function loadPicksRecord(
     weekday: "short",
     day: "numeric",
     month: "short",
-    timeZone: "UTC",
+    timeZone,
   });
 
   const byGameweek = new Map<number, typeof rows>();
@@ -154,18 +158,30 @@ export async function loadPicksRecord(
 
   // A Late Joiner's record starts where they do -- ADR 0012 D3 works hard to
   // stop absence reading as poor form, and a dozen rows of "no pick" for
-  // weeks they couldn't have played undoes all of it. `picksForPlayer`
-  // returns every gameweek in the season, so the boundary is derived from
-  // the earliest week they actually have a pick in.
-  const earliestPicked = weeks
-    .filter((w) => w.lines.some((l) => l.pick !== null))
-    .map((w) => w.gameweek)
-    .sort((a, b) => a - b)[0];
-  const firstGameweek = weeks[weeks.length - 1]?.gameweek ?? 1;
+  // weeks they couldn't have played undoes all of it.
+  //
+  // Derived from `joined_at`, NOT from the first week they happen to have a
+  // pick in: inferring it from picks silently deletes real weeks from a
+  // permanent record, so a founding player who blanked gameweeks 1-3 got
+  // truncated to gameweek 4 and captioned "Joined at Gameweek 4." Same rule
+  // as the leaderboard's per-week denominator -- the first gameweek whose
+  // earliest kickoff is at or after they joined.
+  const joinedAt = new Date(player.joined_at).getTime();
+  const earliestKickoffByGameweek = new Map<number, number>();
+  for (const row of rows) {
+    const at = new Date(row.kickoffTime).getTime();
+    const known = earliestKickoffByGameweek.get(row.gameweekNumber);
+    if (known === undefined || at < known) {
+      earliestKickoffByGameweek.set(row.gameweekNumber, at);
+    }
+  }
+  const eligible = [...earliestKickoffByGameweek.entries()]
+    .filter(([, kickoff]) => kickoff >= joinedAt)
+    .map(([gameweek]) => gameweek)
+    .sort((a, b) => a - b);
+  const firstGameweek = Math.min(...earliestKickoffByGameweek.keys());
   const joinedGameweek =
-    earliestPicked !== undefined && earliestPicked > firstGameweek
-      ? earliestPicked
-      : null;
+    eligible.length > 0 && eligible[0] > firstGameweek ? eligible[0] : null;
 
   return {
     displayName: player.display_name,

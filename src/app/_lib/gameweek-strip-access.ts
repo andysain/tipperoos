@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { scoreMatch } from "@/lib/scoring/match";
 import { deriveWeekOutcome } from "@/lib/gameweeks/week-outcome";
 import { isMatchLocked } from "@/lib/competitions/scope";
+import { tippedSlots } from "@/lib/gameweeks/tipped-slots";
 import type { StripWeek } from "@/components/gameweek/GameweekStrip";
 
 /**
@@ -19,6 +20,9 @@ export async function loadGameweekStrip(
   seasonId: string,
   playerId: string,
   now: Date,
+  /** See loadPicksRecord -- the month landmark is a date label like any
+   *  other, so it follows the same viewer-timezone rule. */
+  timeZone: string,
 ): Promise<StripWeek[]> {
   const { data: gameweeks, error } = await supabase
     .from("gameweeks")
@@ -31,20 +35,7 @@ export async function loadGameweekStrip(
   if (error) throw error;
   if (!gameweeks || gameweeks.length === 0) return [];
 
-  const slots = gameweeks.flatMap((gw) =>
-    (
-      [
-        [gw.match_1_id, gw.match_1_voided_at],
-        [gw.match_2_id, gw.match_2_voided_at],
-      ] as const
-    )
-      .filter(([id]) => id !== null)
-      .map(([id, voidedAt]) => ({
-        gameweek: gw.number as number,
-        matchId: id as string,
-        calledOff: voidedAt !== null,
-      })),
-  );
+  const slots = tippedSlots(gameweeks);
 
   const [matchesResult, picksResult] = await Promise.all([
     supabase
@@ -108,7 +99,7 @@ export async function loadGameweekStrip(
 
   const monthFmt = new Intl.DateTimeFormat("en-GB", {
     month: "short",
-    timeZone: "UTC",
+    timeZone,
   });
 
   return gameweeks.map((gw) => {

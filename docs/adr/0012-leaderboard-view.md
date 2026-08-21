@@ -22,7 +22,7 @@ Nothing here needs a migration. **Updated 2026-08-17: #166 and #35 have both mer
 
 `/leaderboard` joins Pick Board and Predict the Table in `TABS`. The route ships with a **segmented control** (Season Total / Predict the Table) as its layout, because the two-view shape is the settled long-term direction — but the Predict the Table segment is **absent until #157 lands**, not present-and-disabled. The app never shows a control that does nothing, and the second segment then becomes a data-wiring job against an existing layout rather than a redesign of a single-list page.
 
-Two segments in one route, rather than two routes: a fourth tab is the wrong price for a view most players will open once a season, and the two lists share a row component, a rank grammar and an ineligibility grammar. Match Centre (#91) is still owed a tab slot.
+Two segments in one route, rather than two routes: a fourth tab is the wrong price for a view most players will open once a season, and the two lists share a row component, a rank grammar and an ineligibility grammar. **Superseded 2026-08-21**: Match Centre never took a tab slot. `docs/adr/0013-match-centre-tense-and-axes.md` D1 makes it a _tense_ rather than a destination — `/gameweek/[n]` is reached from a settled slot and `/picks/[playerId]` from a row on this very board — so the tab bar stays at three.
 
 ### D2 — Rank is live; movement is against the last completed gameweek's snapshot
 
@@ -99,7 +99,7 @@ Correct results renders **against matches scored** (`12/16`), not as a bare coun
 
 **Amended 2026-08-16**: these two are the first stats in the panel, not the last. D11's tap-to-open placement was chosen specifically so the panel can take further stats later without the closed list paying for them in height — that extensibility is now a stated requirement of the design, not an accident of it.
 
-The bound that still holds: the panel is a **player's record against their own picks** (counts and averages derived from the `scores` ledger), never a trend, chart, streak or head-to-head. Those are the analytics pages `CLAUDE.md` puts explicitly out of scope, and the per-match detail behind any of it is Match Centre's job (#91). A stat that can't be computed by folding the score rows this route already reads is the signal that the line has been crossed.
+The bound that still holds: the panel is a **player's record against their own picks** (counts and averages derived from the `scores` ledger), never a trend, chart, streak or head-to-head. Those are the analytics pages `CLAUDE.md` puts explicitly out of scope, and the per-match detail behind any of it is `/gameweek/[n]`'s job. A stat that can't be computed by folding the score rows this route already reads is the signal that the line has been crossed.
 
 ### D11 — The row is a matchday-program card, not a table row
 
@@ -162,7 +162,7 @@ Per the prototype skill, this directory is a primary source and does not survive
 - **Median Bot as a divider row, or as a pinned benchmark strip** — rejected for now (D6).
 - **Two sections, eligible above ineligible** — rejected (D5).
 - **Rank read straight from the latest `standings_snapshots` row** — rejected: cheaper, but goes stale against the Pick Board's live stats strip between snapshots, and D2's movement needs live rank anyway.
-- **A per-row expansion showing a player's gameweek-by-gameweek history** — rejected as the leading edge of the analytics pages `CLAUDE.md` puts explicitly out of scope; per-match detail is Match Centre's job (#91). (Distinct from D10's three fixed counts, and from the tap-to-open _placement_ of those counts, which is still open below.)
+- **A per-row expansion showing a player's gameweek-by-gameweek history** — rejected as the leading edge of the analytics pages `CLAUDE.md` puts explicitly out of scope; per-match detail is `/gameweek/[n]`'s job. (Distinct from D10's three fixed counts, and from the tap-to-open _placement_ of those counts, which is still open below.)
 - **Variant A, the dense league table** — the most scannable option and the closest to how a football table is normally read, but it reads as a spreadsheet at this app's tone, has no room for D10's counts, and would have been the app's only screen not built from cards.
 - **Variant P, the podium** — top three broken out into a 2-1-3 block above the list. Rejected on two counts. `docs/DESIGN_SYSTEM.md` → _Motion_ tiers celebration deliberately, reserving the fuller moment for the once-a-season winner reveal; a permanent podium spends that budget every week and leaves nothing for the end. It also handles ties badly — it must either pick between equal totals (wrong) or share a plinth (built, and workable at two, awkward at three).
 - **Variant S, the ink spine** — a dark ink block down each card's left edge carrying rank and movement in reverse-out type, using the `CardShell` ink-as-surface grammar so the leaderboard reads as _this_ app's. Rejected because ink at sixteen-rows-in-a-column frequency stops being an accent and becomes the page. It also surfaced a real constraint worth recording: **`success`/`danger` don't clear the contrast floor on an ink ground**, so movement on a spine can only be carried by the ▲/▼ glyph, breaking the palette rule that rank movement always reuses those two colours. Movement on a light ground (T) keeps both the glyph and the colour.

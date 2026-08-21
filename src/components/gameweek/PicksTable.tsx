@@ -88,11 +88,16 @@ export function WeekHeading({
   dateLabel,
   outcome,
   chevron,
+  /** Whose record this is. Without it the heading said "You missed this
+   *  one" on another player's season -- second-person copy on a
+   *  third-person surface. */
+  owner,
 }: {
   gameweek: number;
   dateLabel?: string;
   outcome: WeekOutcome;
   chevron?: boolean;
+  owner?: string;
 }) {
   return (
     <span className="flex items-baseline justify-between gap-2">
@@ -127,7 +132,9 @@ export function WeekHeading({
           // player they'd missed a week they had actually played.
           <span className={`${LABEL} ${TX.muted}`}>
             {outcome.kind === "no_picks"
-              ? "You missed this one"
+              ? owner
+                ? `${owner} missed this one`
+                : "You missed this one"
               : outcome.kind === "called_off"
                 ? "Called off"
                 : "Not scored yet"}

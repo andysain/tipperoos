@@ -145,7 +145,7 @@ files**; beyond P7's two, the ones covered by neither list are the active tab
 in `TabBar.tsx`, `LastWeekStrip`'s `+N pts`, `TablePredictionStrip`'s `Edit`
 link, and `ScoringBreakdown`'s "How points work" link.
 
-**Proposed resolution — two tiers, not a flat count**, because "exactly three"
+**RESOLVED 2026-08-21 — accepted as written. Two tiers, not a flat count**, because "exactly three"
 was never going to survive having a `Button` primitive:
 
 > **Emotional accent** (the three named moments — 1st place, your own
