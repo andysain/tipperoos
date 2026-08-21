@@ -139,7 +139,7 @@ export function GameweekStrip<T extends string>({
         })}
       </div>
       <span className={`px-4 ${LABEL} ${TX.muted}`}>
-        Points you scored each week · – means you didn&apos;t pick
+        Points you scored each week
       </span>
     </div>
   );

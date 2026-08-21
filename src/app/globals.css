@@ -21,8 +21,16 @@
   --color-ink: #123c43;
   --color-accent: #f0a63d;
   --color-accent-ink: #123c43;
-  --color-success: #4c9a4a;
-  --color-danger: #d8434b;
+  /* Darkened 2026-08-21. At #4c9a4a `success` failed AA in EVERY direction
+     -- 3.14:1 as text on paper, 3.47:1 on white, and 3.14:1 as a fill under
+     paper text -- so no rule about how to use it could have made it legible.
+     #3d7b3c is the lightest value in the same hue family clearing 4.5:1 on
+     both grounds (4.63 on paper, 5.13 on white), which also makes the fill
+     and text directions both safe, since contrast is symmetric. */
+  --color-success: #3d7b3c;
+  /* Same problem, same fix: 3.93:1 on paper at #d8434b. #c23540 measures
+     4.89 on paper, 5.42 on white. */
+  --color-danger: #c23540;
   --color-warning: #ebc94c;
   --color-info: #3e7c86;
   --color-paper: #f6f3ec;

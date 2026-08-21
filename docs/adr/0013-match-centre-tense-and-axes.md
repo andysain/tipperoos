@@ -135,7 +135,9 @@ Two blocks at the top of `/`:
 
 **The recap** — one gameweek: its total, and per match the player's own pick, the result, and what it scored. The detail is load-bearing, not decorative: by the time a player next opens the app the Pick Board has advanced to the next gameweek, so this is the **only** place their pick for the finished week still exists. It renders `PicksTable`, the same grammar as the season record — one design at two lengths, so the player learns it once.
 
-**The ladder** — the two players either side of the viewer, and the gap, rather than a bare rank. "Where does that leave me" is a comparative question in a family competition. `docs/adr/0012` deferred exactly this ("12 behind the top") rather than rejecting it. Always three rows, wherever the viewer sits. The gap is written in words (`12 behind`, `level`) because a signed number is already spoken for by points scored.
+**The ladder** — the two players either side of the viewer, rather than a bare rank. "Where does that leave me" is a comparative question in a family competition. `docs/adr/0012` deferred exactly this ("12 behind the top") rather than rejecting it. Always three rows, wherever the viewer sits.
+
+**Amended 2026-08-21: no gap column.** This originally specified the gap written in words (`12 behind`, `level`). Built, seen on a real device, and cut: three ranked rows sitting next to each other already answer the comparative question, and on day one — with everyone on nothing — every row read `level`, which is noise dressed as information. The ladder also now hides entirely before the first scored match, matching the day-one rule `/leaderboard` already followed (`CLAUDE.md` → _Home surface_).
 
 Both are tappable at the **heading only** — the rows inside are inert, so a scroll ending in a slight tap can't navigate away.
 

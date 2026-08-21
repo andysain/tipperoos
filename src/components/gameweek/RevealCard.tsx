@@ -75,6 +75,24 @@ export function RevealCard({
         segments={[{ fill: badges.home }, { fill: badges.away }]}
       />
 
+      {/* RESERVED: the match-result audit trail (issue #31, ADR 0013 D12).
+          A trust feature -- CLAUDE.md -> Trust, fairness makes every result
+          edit visible on the Match Centre, and it is the mitigation for the
+          admin-is-also-a-player problem. It renders null today because no
+          audit store exists (`matches` has result_updated_at but no
+          updated_by, and #31 depends on #14, which doesn't exist).
+          The slot is here so #31 is a migration plus a row rather than a
+          decision about where this goes on a card that ends in a cluster
+          list -- which is the cost D12 was buying out.
+
+          When it lands: `warning/15` ground, a History icon, T.caption /
+          TX.muted, directly beneath the seam so it sits with the result it
+          modifies rather than below 600px of clusters. Copy avoids internal
+          vocabulary and the raw arrow:
+          "Result corrected {date} — this match was first recorded as {old}.
+           Points have been updated." */}
+      {null}
+
       {match.calledOff ? (
         <p className={`bg-surface ${INSET} py-3 ${T.caption} ${TX.muted}`}>
           Called off after picks closed — nobody scored on this one.

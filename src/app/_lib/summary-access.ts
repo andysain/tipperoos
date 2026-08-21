@@ -64,5 +64,13 @@ export async function loadLadder(
   playerId: string,
 ): Promise<LadderEntry[]> {
   const totals = await scoresForCompetition(supabase, competitionId, seasonId);
+
+  // Day one drops the numbers rather than showing a column of zeros
+  // (CLAUDE.md -> Home surface; docs/adr/0012 D8). /leaderboard already does
+  // this; the ladder did not, so one product rule had two answers inside one
+  // branch and the Pick Board rendered "1st, 0 points" three times over.
+  const scored = totals.some((t) => t.matchesScored > 0);
+  if (!scored) return [];
+
   return buildLadder(totals, playerId);
 }

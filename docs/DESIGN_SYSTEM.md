@@ -57,8 +57,8 @@ actually be drawn on (see the kit-colour rules under Palette below).
 | `ink`                                                              | `#123c43` | Headings, primary text, nav, card ink                                               |
 | `accent`                                                           | `#f0a63d` | See _Accent budget_ — two tiers, not a flat list                                    |
 | `accent-ink`                                                       | `#123c43` | Text color used on top of `accent` backgrounds                                      |
-| `success`                                                          | `#4c9a4a` | Correct pick, rank-up, season-total increases                                       |
-| `danger`                                                           | `#d8434b` | Wrong pick, rank-down                                                               |
+| `success`                                                          | `#3d7b3c` | Correct pick, rank-up, season-total increases                                       |
+| `danger`                                                           | `#c23540` | Wrong pick, rank-down                                                               |
 | `warning`                                                          | `#ebc94c` | Locks-soon countdown, a corrected result, a Called Off match, other caution states  |
 | `info`                                                             | `#3e7c86` | Bot / Admin / Late Joiner badges — neutral, non-alarming, never implies good or bad |
 | `paper`                                                            | `#f6f3ec` | App background — warm, not stark white                                              |
@@ -67,10 +67,19 @@ actually be drawn on (see the kit-colour rules under Palette below).
 No other colors. Rank-movement indicators reuse `success`/`danger` rather than introducing a separate palette,
 so color meaning stays consistent everywhere in the app, not just on the leaderboard.
 
-**`success` and `danger` are light-ground tokens.** On an `ink` surface, use them as a **fill behind `paper`
-text**, never as text colour. Measured: `success` on `ink` is 3.44:1, below AA at any size the app uses. This
-generalises the rule previously recorded under _Icons_ for rank-movement glyphs only — it was never specific to
-movement.
+**`success` and `danger` are light-ground tokens, and were darkened on 2026-08-21 to make that true.** At their
+original values they failed AA in _every_ direction — `success` `#4c9a4a` measured 3.14:1 as text on `paper`,
+3.47:1 on white, 3.44:1 as text on `ink`, and 3.14:1 as a **fill** under `paper` text. No usage rule could have
+rescued a mid-tone that carries nothing, which is why the first attempt at this rule ("use it as a fill behind
+paper text") prescribed something _worse_ than the defect it replaced.
+
+Current values measure: `success` 4.63:1 on `paper`, 5.13:1 on white; `danger` 4.89:1 and 5.42:1. Because
+contrast is symmetric, both now work **as text on a light ground** and **as a fill under `paper` text**. Use
+whichever suits; prefer text colour, since a fill is a heavier object than most verdicts deserve.
+
+They are still **not** text colours on an `ink` surface — that direction is a property of the ink, not of these
+tokens. On ink, use a fill. This generalises the rule previously recorded under _Icons_ for rank-movement
+glyphs only; it was never specific to movement.
 
 **A Voided Match is `warning`, not `danger`.** It is a neutral non-event for every player equally; red says
 "you got this wrong" to a ten-year-old. Player-facing copy calls it **Called off**, never "void".
@@ -158,8 +167,10 @@ jitter mid-column — apply via Tailwind's `tabular-nums` utility, don't hand-ro
 
 Points are labelled exactly one way per context, and there are three contexts:
 
-1. **A total** — a bare numeral, `tabular-nums`, with the word `points` as a Label beside or beneath it. Never
-   `pts`, never abbreviated.
+1. **A total** — a bare numeral, `tabular-nums`, with the word `points` as a Label beside or beneath it.
+   **Exception, added 2026-08-21:** inside a dense repeated row — a week heading in a season-length list — `pts`
+   is permitted, because `points` at that repetition rate is the noisier choice. ADR 0013 D16 relies on this.
+   `Pts`, `PTS`, `Season points` and `Per week` remain retired.
 2. **A delta** — signed and abbreviated, inline: `+5`. **`+` means points gained and nothing else**, so a value
    of zero renders `0`, never `+0`, and an absent value renders blank.
 3. **A rate** — `4.3/wk`, only on a leaderboard row.

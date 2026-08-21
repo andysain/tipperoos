@@ -94,7 +94,7 @@ export function TablePredictionStrip({
         {championRow}
         <Link
           href="/predict-table"
-          className="shrink-0 text-sm font-extrabold text-accent underline underline-offset-2"
+          className="shrink-0 text-[0.8rem] font-bold text-text underline underline-offset-2"
         >
           Edit
         </Link>

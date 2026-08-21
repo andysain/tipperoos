@@ -39,9 +39,9 @@ export function ScoringBreakdown({
         onClick={() => setOpen((value) => !value)}
       >
         <span className="text-paper/75">How did you score?</span>
-        {/* success as a FILL behind paper text, not as text colour: on an
-            ink ground success measures 3.44:1 (docs/DESIGN_SYSTEM.md ->
-            Palette). Same reason for the two term values below. */}
+        {/* A fill, because this panel sits on an INK ground -- the one
+            direction `success` still can't carry as text. The two term
+            values below are on the same ground for the same reason. */}
         <span className="ml-auto rounded-badge bg-success px-2.5 py-1 font-extrabold text-on-ink">
           +{points} pts
         </span>
