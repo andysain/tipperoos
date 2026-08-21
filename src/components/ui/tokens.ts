@@ -11,7 +11,10 @@ export const T = {
   dense: "text-[0.9rem]",
   body: "text-[1.0625rem]",
   h2: "text-[1.3rem]",
-  score: "text-[1.5rem]",
+  /** The Display role. 1.75rem, matching DESIGN_SYSTEM.md -- this token
+   *  previously invented 1.5rem, so a scoreline rendered at 28px on the
+   *  Pick Board and 24px on the reveal. */
+  score: "text-[1.75rem]",
   h1: "text-[1.9rem]",
 } as const;
 

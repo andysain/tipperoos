@@ -143,16 +143,21 @@ Three roles per ground, no more. `text-muted` is the AA floor; anything quieter 
 Geist only (already wired via `next/font/google` in `layout.tsx`) — no second typeface. Hierarchy comes from
 Geist's full variable weight range, not a second family:
 
-| Role                                   | Weight | Size (mobile)                 | Notes                        |
-| -------------------------------------- | ------ | ----------------------------- | ---------------------------- |
-| Display (score/rank, read at a glance) | 800    | `clamp(2.5rem, 7vw, 3.25rem)` | `tabular-nums`               |
-| H1 (page title)                        | 800    | `1.9rem`                      |                              |
-| H2 (section / gameweek header)         | 700    | `1.3rem`                      |                              |
-| Body                                   | 400    | `1.0625rem`                   | max `52ch` line length       |
-| Dense list body                        | 400    | `0.9rem`                      | Leaderboard rows and similar |
-| Caption / secondary                    | 400    | `0.8rem`                      | `text-muted`                 |
-| Label (uppercase, tracked)             | 700    | `0.7rem`                      | `letter-spacing: 0.08em`     |
-| Micro-label (inside chips only)        | 800    | `0.7rem`                      | `letter-spacing: 0.06em`     |
+| Role                                   | Weight | Size (mobile) | Notes                           |
+| -------------------------------------- | ------ | ------------- | ------------------------------- |
+| Display (score/rank, read at a glance) | 800    | `1.75rem`     | `tabular-nums` — see note below |
+| H1 (page title)                        | 800    | `1.9rem`      |                                 |
+| H2 (section / gameweek header)         | 700    | `1.3rem`      |                                 |
+| Body                                   | 400    | `1.0625rem`   | max `52ch` line length          |
+| Dense list body                        | 400    | `0.9rem`      | Leaderboard rows and similar    |
+| Caption / secondary                    | 400    | `0.8rem`      | `text-muted`                    |
+| Label (uppercase, tracked)             | 700    | `0.7rem`      | `letter-spacing: 0.08em`        |
+| Micro-label (inside chips only)        | 800    | `0.7rem`      | `letter-spacing: 0.06em`        |
+
+**Display was `clamp(2.5rem, 7vw, 3.25rem)` and nothing ever used it.** Corrected 2026-08-21 to `1.75rem`, the
+size the Tipped Match card's scoreline actually renders and the one that has been through real-device review.
+Three definitions of "how big is a score" existed at once — this table, a `T.score` token at `1.5rem`, and a
+hardcoded `1.75rem` — so the same scoreline rendered at two sizes on adjacent surfaces.
 
 **The scale is closed** (amended 2026-08-20). Those are the only values, and no Tailwind size keywords
 (`text-xs` … `text-xl`) appear in app code. **`0.7rem` is a hard floor** — nothing in this app is set smaller,
@@ -219,7 +224,11 @@ So that "this is tappable" has one signal rather than five:
 - **Navigation `›`** means "this card is a door to another screen" and sits at the **end of the card's own
   header line**, once per card — never on a row inside a card. Where a card is a door, only its heading is the
   tap target; the rows beneath are inert, so a scroll that ends in a slight tap can't navigate away.
-- **Expansion** carries no glyph. The panel's own presence and `aria-expanded` are the signal.
+- **Expansion** carries no glyph where the panel is supplementary detail — the panel's own presence and
+  `aria-expanded` are the signal (the leaderboard row's stat panel). **Where a header IS the navigation**, a
+  chevron is correct and expected: Predict the Table's Band headers are the only way through that flow
+  (`docs/adr/0011`), so they keep theirs. The test is whether the control is the primary way to move around the
+  screen or an optional aside.
 - **Direction glyphs are fixed by meaning**: `ChevronRight` navigates forward, `ChevronLeft` goes back. Arrows
   are **not** navigation — `→` is reserved for "became", as in a pick against a result.
 - Anything tappable that is not a card uses the `Button` primitive.

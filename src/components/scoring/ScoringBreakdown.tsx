@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { FOCUS } from "@/components/ui/tokens";
 import { useId, useState } from "react";
 import { getMatchBreakdown } from "./match-breakdown";
 
@@ -95,9 +96,10 @@ export function ScoringBreakdown({
           ) : null}
           <Link
             href={{ pathname: "/how-it-works", hash: "how-your-pick-scores" }}
-            className="text-[0.8rem] font-bold text-on-ink underline underline-offset-2"
+            className={`inline-flex items-center gap-0.5 text-[0.8rem] font-bold text-on-ink underline underline-offset-2 ${FOCUS}`}
           >
-            How points work →
+            How points work
+            <ChevronRight className="size-3.5" aria-hidden />
           </Link>
         </div>
       ) : null}

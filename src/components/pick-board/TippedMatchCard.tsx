@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/CardShell";
 import { ScoringBreakdown } from "@/components/scoring/ScoringBreakdown";
 import { ordinal } from "@/lib/format/ordinal";
-import { T, TX, MICRO_LABEL, INSET } from "@/components/ui/tokens";
+import { T, TX, MICRO_LABEL, INSET, FOCUS } from "@/components/ui/tokens";
 
 export interface TippedMatchTeam {
   name: string;
@@ -196,7 +196,7 @@ function ScoreCell({
 }) {
   return (
     <span
-      className={`shrink-0 text-center text-[1.75rem] font-extrabold leading-none tabular-nums ${
+      className={`shrink-0 text-center ${T.score} font-extrabold leading-none tabular-nums ${
         tone === "result" ? "text-paper" : "text-accent"
       }`}
     >
@@ -338,7 +338,7 @@ function CardHeader({
 }
 
 const digitCell = tv({
-  base: "flex h-11 flex-1 items-center justify-center rounded-btn-sm border border-paper-line bg-white text-base font-bold tabular-nums text-ink transition active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-50",
+  base: `flex h-11 flex-1 items-center justify-center rounded-btn-sm border border-paper-line bg-surface text-[1.0625rem] font-bold tabular-nums text-text transition active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`,
   variants: {
     selected: {
       true: "border-accent bg-accent text-accent-ink",
@@ -354,7 +354,7 @@ const digitCell = tv({
 const CUSTOM_SCORE_MAX = 20;
 
 const customScoreInput = tv({
-  base: "h-11 flex-1 min-w-0 rounded-btn-sm border bg-white text-center text-base font-bold tabular-nums text-ink outline-none transition placeholder:font-semibold placeholder:text-ink/35 disabled:cursor-not-allowed disabled:opacity-50",
+  base: `h-11 flex-1 min-w-0 rounded-btn-sm border bg-surface text-center text-[1.0625rem] font-bold tabular-nums text-text outline-none transition placeholder:font-semibold placeholder:text-text-decorative disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`,
   variants: {
     active: {
       true: "border-accent bg-accent/10",
@@ -482,7 +482,7 @@ function ChangeButton({ onClick }: { onClick: () => void }) {
     <div className="bg-ink px-3.5 pt-2 pb-3">
       <button
         type="button"
-        className="flex h-9 w-full items-center justify-center rounded-btn-sm border border-accent/50 bg-accent/12 text-[0.8rem] font-bold tracking-wide text-accent uppercase transition hover:border-accent hover:bg-accent/22"
+        className={`flex h-9 w-full items-center justify-center rounded-btn-sm border border-paper/30 bg-paper/15 text-[0.8rem] font-bold tracking-wide text-on-ink uppercase transition hover:bg-paper/25 ${FOCUS}`}
         onClick={onClick}
       >
         Change
