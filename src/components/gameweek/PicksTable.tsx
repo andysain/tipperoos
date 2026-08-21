@@ -32,7 +32,7 @@ const COL_PTS = "w-7 text-right";
  *  this table has to prevent -- so its cells must line up with the row's. */
 export function PicksLegend() {
   return (
-    <span className={`flex items-baseline gap-3 ${LABEL} ${TX.decorative}`}>
+    <span className={`flex items-baseline gap-3 ${LABEL} ${TX.muted}`}>
       <span className="min-w-0 flex-1" />
       <span className={COL_PICK}>pick</span>
       <span className={COL_FINAL}>final</span>
@@ -62,7 +62,7 @@ export function PicksRow({ line }: { line: PickLine }) {
         ) : (
           // The words, never a dash: "No pick, no points" is a rule with
           // real weight, and the dash already carries four other meanings.
-          <span className={`font-medium ${TX.decorative}`}>no pick</span>
+          <span className={`font-medium ${TX.muted}`}>no pick</span>
         )}
       </span>
       <span

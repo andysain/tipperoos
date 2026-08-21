@@ -62,6 +62,7 @@ export function RevealCard({
             team={match.home}
             fill={badges.home}
             score={match.homeScore}
+            home
           />
           <TeamRow
             team={match.away}
@@ -91,7 +92,7 @@ export function RevealCard({
           -- and a Wrong Way Round pick is the one case where reading it
           backwards inverts the meaning entirely. */}
       <div
-        className={`flex items-baseline justify-between border-b border-paper-line bg-surface ${INSET} py-1.5 ${LABEL} ${TX.decorative}`}
+        className={`flex items-baseline justify-between border-b border-paper-line bg-surface ${INSET} py-1.5 ${LABEL} ${TX.muted}`}
       >
         <span>
           {match.home.shortCode} (home) v {match.away.shortCode}
@@ -182,16 +183,23 @@ function TeamRow({
   team,
   fill,
   score,
+  home,
 }: {
   team: RevealMatch["home"];
   fill: string;
   score: number | null;
+  home?: boolean;
 }) {
   return (
     <div className="flex min-w-0 items-center gap-1.5">
       <ClubCodeBadge shortCode={team.shortCode} fill={fill} />
+      {/* Home takes visual dominance rather than a label -- the form of the
+          home/away rule that survives sharing a line with a scoreline
+          (DESIGN_SYSTEM.md -> Team display in fixtures, amended 2026-08-20). */}
       <span
-        className={`min-w-0 flex-1 truncate ${T.body} font-bold text-on-ink`}
+        className={`min-w-0 flex-1 truncate ${T.body} ${
+          home ? "font-bold text-on-ink" : "font-medium text-on-ink-muted"
+        }`}
       >
         {team.name}
       </span>

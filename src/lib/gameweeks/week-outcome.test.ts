@@ -71,6 +71,21 @@ describe("deriveWeekOutcome", () => {
     });
   });
 
+  // The picks-record regression this module exists to prevent, at the shape
+  // the call site actually produces: picksForPlayer blanks an UNLOCKED pick,
+  // so a caller that derives `picked` from the blanked value reports false
+  // for a week the player did file in. The guard is that such weeks never
+  // reach here -- but if one does, "not scored" is the honest answer and
+  // "no picks" is a false accusation.
+  it("treats an unfiled-because-unlocked week as unscored, given the caller marks it so", () => {
+    expect(
+      deriveWeekOutcome([
+        { points: null, picked: true, calledOff: false },
+        { points: null, picked: false, calledOff: false },
+      ]),
+    ).toEqual({ kind: "not_scored" });
+  });
+
   it("an empty week is not scored at zero", () => {
     expect(deriveWeekOutcome([])).toEqual({ kind: "no_picks" });
   });

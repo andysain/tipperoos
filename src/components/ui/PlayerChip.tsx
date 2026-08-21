@@ -26,7 +26,7 @@ export function EmojiChip({
 }) {
   return (
     <span
-      className={`grid shrink-0 place-items-center rounded-full ${
+      className={`grid shrink-0 place-items-center rounded-badge ${
         size === "sm" ? "size-5 text-[0.7rem]" : "size-9 text-lg"
       } ${muted ? "bg-ink/8" : onDark ? "bg-paper/20" : "bg-paper"}`}
       aria-hidden

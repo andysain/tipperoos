@@ -112,9 +112,7 @@ export function GameweekStrip<T extends string>({
               {newMonth ? (
                 <span className="flex shrink-0 flex-col items-center justify-center gap-0.5">
                   <span className="h-6 w-px bg-paper-line" aria-hidden />
-                  <span className={`${LABEL} ${TX.decorative}`}>
-                    {week.month}
-                  </span>
+                  <span className={`${LABEL} ${TX.muted}`}>{week.month}</span>
                 </span>
               ) : null}
               {week.future ? (
@@ -140,7 +138,7 @@ export function GameweekStrip<T extends string>({
           );
         })}
       </div>
-      <span className={`px-4 ${LABEL} ${TX.decorative}`}>
+      <span className={`px-4 ${LABEL} ${TX.muted}`}>
         Points you scored each week · – means you didn&apos;t pick
       </span>
     </div>

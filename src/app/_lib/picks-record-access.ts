@@ -81,6 +81,18 @@ export async function loadPicksRecord(
   }
 
   const weeks: RecordWeek[] = [...byGameweek.entries()]
+    // A gameweek with nothing locked has no place on a picks record: there
+    // is nothing to show, and `picksForPlayer` correctly blanks its picks --
+    // which used to make every unlocked week report `picked: false` and so
+    // render as "You missed this one", accusing a player of skipping a week
+    // they had already filed. That is verbatim the failure deriveWeekOutcome
+    // exists to prevent, reintroduced at the call site.
+    //
+    // Dropping them also stops the week heading linking to a route that
+    // 404s: /gameweek/[n] deliberately does not exist until a match locks
+    // (ADR 0013 D6), so a listed-but-unlocked week was a guaranteed dead
+    // link. A HALF-locked week is kept -- it has something real to show.
+    .filter(([, groupRows]) => groupRows.some((row) => row.locked))
     .sort(([a], [b]) => b - a)
     .map(([gameweek, groupRows]) => {
       const entries = groupRows.map((row) => {
@@ -125,7 +137,10 @@ export async function loadPicksRecord(
         outcome: deriveWeekOutcome(
           entries.map(({ row, points }) => ({
             points,
-            picked: row.predHomeScore !== null,
+            // Only meaningful once locked: before that the pick is blanked
+            // upstream, so "no pick" would be a statement about the lock,
+            // not about the player.
+            picked: row.locked && row.predHomeScore !== null,
             calledOff: row.calledOff,
           })),
         ),

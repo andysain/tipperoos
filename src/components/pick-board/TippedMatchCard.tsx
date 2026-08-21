@@ -148,7 +148,15 @@ function chipForState(kind: TippedMatchCardState["kind"]): {
  * name bumped up a touch (1.0625rem -> 1.125rem) for balance against the
  * larger score column that sits alongside it once a pick or result exists.
  */
-function TeamRow({ team, fill }: { team: TippedMatchTeam; fill: string }) {
+function TeamRow({
+  team,
+  fill,
+  home,
+}: {
+  team: TippedMatchTeam;
+  fill: string;
+  home?: boolean;
+}) {
   return (
     <div className="flex min-w-0 items-center gap-1.5">
       <span
@@ -157,8 +165,15 @@ function TeamRow({ team, fill }: { team: TippedMatchTeam; fill: string }) {
         {team.leaguePosition !== null ? ordinal(team.leaguePosition) : ""}
       </span>
       <ClubCodeBadge shortCode={team.shortCode} fill={fill} />
+      {/* Home takes visual dominance rather than a label -- the form of the
+          home/away rule that survives sharing a line with a scoreline
+          (DESIGN_SYSTEM.md -> Team display in fixtures, amended 2026-08-20).
+          The card dropped the explicit `home` chip for width; this is what
+          replaced it, and it was specified but never applied here. */}
       <span
-        className={`min-w-0 flex-1 truncate ${T.body} font-bold ${TX.onInk}`}
+        className={`min-w-0 flex-1 truncate ${T.body} ${
+          home ? `font-bold ${TX.onInk}` : `font-medium ${TX.onInkMuted}`
+        }`}
       >
         {team.name}
       </span>
@@ -307,14 +322,14 @@ function CardHeader({
       </div>
       {scores ? (
         <div className="grid min-w-0 grid-cols-[1fr_auto] items-center gap-x-2.5 gap-y-1">
-          <TeamRow team={home} fill={homeFill} />
+          <TeamRow team={home} fill={homeFill} home />
           <ScoreCell value={scores.home} tone={scores.tone} />
           <TeamRow team={away} fill={awayFill} />
           <ScoreCell value={scores.away} tone={scores.tone} />
         </div>
       ) : (
         <div className="flex min-w-0 flex-col gap-1">
-          <TeamRow team={home} fill={homeFill} />
+          <TeamRow team={home} fill={homeFill} home />
           <TeamRow team={away} fill={awayFill} />
         </div>
       )}
