@@ -1,7 +1,7 @@
 # Match Centre — implementation plan and issue set
 
 Design is settled: `docs/adr/0013-match-centre-tense-and-axes.md` holds the
-decisions, `src/app/dev/match-centre-prototype/` holds the working reference,
+decisions, the throwaway branch `prototype/match-centre-design` holds the working reference,
 and `docs/production-ui-findings.md` holds the defects the prototype surfaced
 in shipped code.
 

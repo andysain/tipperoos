@@ -176,7 +176,7 @@ A **Late Joiner's record begins at the gameweek they joined**, with one closing 
 
 ## Prototype
 
-`src/app/dev/match-centre-prototype/` — throwaway, dev-only, not linked from nav (same convention as `src/app/dev/tipped-match-card/`). Six passes, then three independent design reviews (consistency, ergonomics, comprehension) whose findings are implemented in it. Per the prototype skill it does not survive into `main`: it moves to a throwaway branch, recorded on #91.
+`src/app/dev/match-centre-prototype/` — throwaway, dev-only, not linked from nav (same convention as `src/app/dev/tipped-match-card/`). Six passes, then three independent design reviews (consistency, ergonomics, comprehension) whose findings are implemented in it. Per the prototype skill it does not survive into `main`: it was removed from `feat/match-centre` before merge and preserved on the throwaway branch **`prototype/match-centre-design`**, which is the primary source for how these decisions were arrived at.
 
 Its fixture is derived from a **single generator** and every score comes from the real `scoreMatch()`, after an earlier version had three independent generators disagreeing across surfaces. It carries the states that break these designs: a called-off match, a skipped slot, a week the viewer blanked, a half-played week, a Late Joiner, a Wrong Way Round pick, a rank tie, and the viewer deliberately mid-table.
 
