@@ -78,10 +78,18 @@ export default async function LeaderboardPage() {
               actually TEACHES D12's rule -- a muted row and a small BOT label
               can hint that a bot sits outside the competition, but a sentence
               can say it, and this is where the confusion happens. */}
-          {scored ? (
+          {/* NOT gated on `scored`. Day one is the first time a player sees
+              this list, so it is exactly when three robots sitting in their
+              family competition need explaining -- gating it meant the one
+              view guaranteed to confuse was the one view with no explanation.
+              Only the second sentence waits, since it needs scores to mean
+              anything. */}
+          {rows.some((row) => row.isBot) ? (
             <p className={`${T.caption} ${TX.muted}`}>
-              Bots play too, but only a real player can win the season. Beat the
-              Median Bot and you beat the whole group&apos;s average.
+              Bots play too, but only a real player can win the season.
+              {scored
+                ? " Beat the Median Bot and you beat the whole group's average."
+                : ""}
             </p>
           ) : null}
 
