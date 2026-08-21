@@ -1,4 +1,24 @@
-# Production UI findings (not yet filed)
+# Production UI findings
+
+**Status, 2026-08-21.** P0, P1, P4–P7, P9 and P10 are fixed on
+`feat/match-centre`. The remainder is filed:
+
+| Finding                                      | Where it went                                                                  |
+| -------------------------------------------- | ------------------------------------------------------------------------------ |
+| P2 (focus ring), P3 (ink alphas), type scale | **#184** — design-system compliance sweep                                      |
+| Fixed chrome overlapping content             | **#185**                                                                       |
+| Kit colours on white grounds                 | **#186**                                                                       |
+| P8                                           | prototype-only, moot — the prototype is now on `prototype/match-centre-design` |
+
+P9's original remedy was **wrong** and is worth reading before trusting the
+rest: it prescribed using `success` as a fill behind paper text, which
+measured 3.14:1 against the 3.44:1 defect it replaced. The real cause was
+that `success` at `#4c9a4a` failed AA in every direction; both `success` and
+`danger` were darkened instead.
+
+Delete this document once #184–#186 are closed.
+
+---
 
 Surfaced during the Match Centre prototype's design reviews (2026-08-19/20).
 These are defects in **shipped components**, not in the prototype — the
