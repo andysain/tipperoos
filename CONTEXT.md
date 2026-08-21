@@ -13,14 +13,17 @@ A Fixture selected for player predictions in a given Gameweek. Exactly two per G
 _Avoid_: Open Match, Selected Match
 
 **Match 1**:
-The Tipped Match auto-selected each Gameweek as the **Top Matchup** — the Fixture whose two clubs have the best average league position (see `docs/adr/0006-auto-selected-tipped-matches.md` for the rule and its tiebreaks).
-_Avoid_: Marquee match (fine casually; Top Matchup is the term shown to players)
+The Tipped Match auto-selected each Gameweek as the **Headline** — the Fixture whose two clubs have the best average league position (see `docs/adr/0006-auto-selected-tipped-matches.md` for the rule and its tiebreaks).
+_Avoid_: Marquee match, Star Match (the first is broadcast jargon for a ten-year-old; the second hints at a deferred feature `docs/in-app-help-spec.md` says not to hint at). Both are fine casually and in ADRs — 0006 uses "marquee" throughout — just not on screen.
 
 **Match 2**:
-The Tipped Match auto-selected as the **Random Pick** — an equal-chance draw from the Gameweek's remaining Fixtures.
+The Tipped Match auto-selected as the **Random** — an equal-chance draw from the Gameweek's remaining Fixtures.
+_Avoid_: Random Pick. "Pick" is a Player's scoreline everywhere else in the app, so "Random Pick" reads as a randomly-chosen scoreline, which is the opposite of what it is.
 
-**Top Matchup** / **Random Pick**:
-The player-facing names for how each slot was chosen, shown on the Tipped Match card. They exist because nothing is player-chosen any more, so the card has to answer "why these two fixtures?" itself.
+**Headline** / **Random**:
+The player-facing names for how each slot was chosen, shown on the Tipped Match card and on the reveal. They exist because nothing is player-chosen any more, so the card has to answer "why these two fixtures?" itself.
+
+Renamed 2026-08-21 from **Top Matchup** / **Random Pick**. The pair now describes the same thing about both slots — _how each was chosen_ — where before Match 1 was named for its quality and Match 2 for its selection method. Both are also shorter, which the card's eyebrow row needed. The internal identifiers (`top_matchup`, `random_pick`, `match_1`, `match_2`) are unchanged: they are sourced meaning, not display copy.
 
 **Picker**:
 _Deferred, not in the current product._ The Player who would choose Match 2, determined by the previous Gameweek's Standings Snapshot. Superseded for the initial launch by auto-selection (`docs/adr/0006-auto-selected-tipped-matches.md`); the term is retained because the mechanic and its `gameweeks` columns are reserved for a possible return.

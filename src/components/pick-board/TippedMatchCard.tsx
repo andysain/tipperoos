@@ -88,8 +88,8 @@ export interface TippedMatchCardProps {
 }
 
 const provenanceLabel: Record<TippedMatchProvenance, string> = {
-  top_matchup: "Top matchup",
-  random_pick: "Random pick",
+  top_matchup: "Headline",
+  random_pick: "Random",
 };
 // Shuffle, not Dices: a pair of dice is the most gambling-coded glyph in any
 // icon set, on an app whose spec bans gambling language (CLAUDE.md -> Hard

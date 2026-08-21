@@ -47,9 +47,7 @@ export function RevealCard({
           >
             <span className="inline-flex items-center gap-1 font-bold">
               <Icon className="size-[0.9em]" aria-hidden />
-              {match.provenance === "top_matchup"
-                ? "Top matchup"
-                : "Random pick"}
+              {match.provenance === "top_matchup" ? "Headline" : "Random"}
             </span>
             <span aria-hidden>·</span>
             <span>
