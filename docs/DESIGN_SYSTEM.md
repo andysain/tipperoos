@@ -194,12 +194,18 @@ Four facts must always render differently, because a single muted dash previousl
 
 **A pick and the result it is judged against are shown side by side, never one restated as prose**
 (added 2026-08-23). On a finished Tipped Match card the Player's own scoreline sits in its own column beside
-the result, captioned `YOU` and `RESULT`, one number per team row — the same comparison the picks record makes
+the result, captioned `YOU` and `FINAL`, one number per team row — the same comparison the picks record makes
 with its `PICK` / `FINAL` columns, so the two surfaces read the same way. It replaces a `You tipped 1–3` line
 below the seam, which put the two halves of one comparison in different places and in different grammars. The
 own-pick column steps one stop down the type scale (`h2` against the result's `score`) and keeps the accent;
-the result keeps `paper`. The caption is `RESULT`, not `FINAL`, only because the status chip on the same card
-already says `FINAL`.
+the result keeps `paper`.
+
+**The captions take the `FINAL` status chip's slot, and the chip goes.** They sit at the end of the eyebrow
+rather than in a row of their own, right-aligned to the same card inset as the columns and carrying the same
+widths and gap, so they land over their columns for free — no caption row and no vertical cost. Dropping the
+chip costs nothing it was carrying: a card showing a result column is a finished match, and `FINAL` is now
+caption and status at once. Every other state keeps its chip, as does a finished match with no pick to compare
+against.
 
 The column is dropped entirely when no pick was filed, rather than showing an empty one — a dash there would
 break the four-facts rule directly above it, so the card falls back to the single result column and says
@@ -207,9 +213,9 @@ break the four-facts rule directly above it, so the card falls back to the singl
 
 **Measured note, 2026-08-23.** The second column costs the team name ~50px. At 375px the name row affords
 155px, which holds every current club name except `Brighton & Hove Albion` (191px) and `Tottenham Hotspur`
-(160px), both of which truncate on a finished card only. Captions are rendered in a row spanning the grid
-rather than as grid cells, so a caption wider than the digits beneath it can't widen the column — that alone
-was worth 24px, the difference between holding and clipping `Manchester United`.
+(160px), both of which truncate on a finished card only. Captions live on the eyebrow rather than in grid cells, so a
+caption wider than the digits beneath it can't widen the column — that alone was worth 24px, the difference
+between holding and clipping `Manchester United`.
 
 ## Spacing & radius
 

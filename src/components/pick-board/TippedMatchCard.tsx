@@ -214,24 +214,30 @@ function ScoreCell({
   );
 }
 
-/** Column captions for the finished card's two score columns. "Result",
- *  not "Final", because the status chip on the eyebrow above already says
- *  FINAL -- the same word twice on one card reads as a slip. The picks
- *  record keeps FINAL for its column, where nothing collides with it. Without these
- *  the pick and the result are two adjacent numbers with nothing saying
- *  which is which -- colour alone can't carry that (DESIGN_SYSTEM.md).
+/** Column captions for the finished card's two score columns -- without
+ *  them the pick and the result are two adjacent numbers with nothing
+ *  saying which is which, and colour alone can't carry that
+ *  (DESIGN_SYSTEM.md).
  *
- *  Rendered in a row of its own that spans the grid rather than as two
- *  grid cells, so the captions -- which are wider than the digits under
- *  them -- can't set the score columns' width and eat the team name's.
- *  Measured: as grid cells they cost 24px of name width at 375px, enough
- *  to clip "Manchester United". */
+ *  They take the FINAL status chip's own slot at the end of the eyebrow
+ *  rather than occupying a row of their own, and land exactly over their
+ *  columns because both are right-aligned to the same card inset and
+ *  carry the same widths and gap. That's what makes the swap free: no
+ *  caption row, no vertical cost, and no caption wide enough to widen a
+ *  column and eat the team name's width (as grid cells they cost 24px of
+ *  name at 375px -- enough to clip "Manchester United").
+ *
+ *  FINAL is caption and status at once, which is why the chip it replaces
+ *  isn't a loss: a card showing a result column IS a finished match. It
+ *  also restores the picks record's exact PICK / FINAL wording. Every
+ *  other state, and a finished match with no pick to compare against,
+ *  keeps the chip. */
 function ScoreColumnLabels() {
   const cap = `text-center ${MICRO_LABEL} ${TX.onInkMuted}`;
   return (
-    <div className="col-span-3 flex justify-end gap-x-1.5">
+    <div className="flex shrink-0 justify-end gap-x-1.5">
       <span className={`${cap} ${SCORE_COL_PICK}`}>You</span>
-      <span className={`${cap} ${SCORE_COL_RESULT}`}>Result</span>
+      <span className={`${cap} ${SCORE_COL_RESULT}`}>Final</span>
     </div>
   );
 }
@@ -359,11 +365,14 @@ function CardHeader({
           showCountdown={showCountdown}
           note={note}
         />
-        <StatusChip label={chip.label} tone={chip.tone} />
+        {scores?.own ? (
+          <ScoreColumnLabels />
+        ) : (
+          <StatusChip label={chip.label} tone={chip.tone} />
+        )}
       </div>
       {scores?.own ? (
-        <div className="grid min-w-0 grid-cols-[1fr_auto_auto] items-center gap-x-1.5 gap-y-1">
-          <ScoreColumnLabels />
+        <div className="grid min-w-0 grid-cols-[1fr_auto_auto] items-center gap-x-1.5">
           <TeamRow team={home} fill={homeFill} home />
           <ScoreCell
             value={scores.own.home}
