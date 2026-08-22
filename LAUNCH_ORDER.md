@@ -103,7 +103,8 @@ Anything touching `src/lib/**` needs your explicit approval before merge (CODEOW
 - [x] **#92 — Per-gameweek selection runner.** Hard deadline of gameweek 2, roughly 28 August.
 - [x] **#35 — Bot picks** (Random, 1-1, Median).
 - [x] **#24 — Leaderboard view.**
-- [ ] **Match Centre** (+ **#17** visibility rule). Design settled in `docs/adr/0013-match-centre-tense-and-axes.md` and prototyped in `src/app/dev/match-centre-prototype/`. It is no longer one issue: `docs/match-centre-implementation-plan.md` sequences it as A–G, where A (design-system amendments) blocks the rest and needs one decision from Andy on the accent budget. **#91** is now the match axis (`/gameweek/[n]`) specifically; the player axis (`/picks/[playerId]`) is a follow-up.
+- [x] **#91 — Match Centre** (+ **#17** visibility rule). Built on `feat/match-centre`: `/gameweek/[n]` (the pick reveal) and `/picks/[playerId]` (the picks record), plus the Pick Board summary and the leaderboard/match-card defect fixes the work surfaced. Design in `docs/adr/0013-match-centre-tense-and-axes.md`; the throwaway design prototype is on `prototype/match-centre-design`. **Not yet walked on a Preview URL** — both routes deliberately 404 until a gameweek locks, so that check waits for gameweek 1's first lock.
+  - Deferred out of it, filed: **#184** (app-wide design-system sweep), **#185** (fixed chrome overlapping content), **#186** (kit colours on white grounds).
 - [ ] **#33 — Postponement-void handling**, plus the Skipped Slot and Voided Match card states, which are still undrawn (`docs/adr/0007-home-surface-and-pick-entry.md` → _Deferred_).
 - [ ] **#28 / #29 / #30 — Transactional email + the two sends.** `CLAUDE.md` calls the post-result push the highest-leverage retention lever in the product; don't let it drift behind the reminder.
 

@@ -18,6 +18,8 @@ that `success` at `#4c9a4a` failed AA in every direction; both `success` and
 
 Delete this document once #184–#186 are closed.
 
+The sequencing rationale that used to live in `docs/match-centre-implementation-plan.md` is gone with it — that document described work that is now done, and `docs/adr/0013-match-centre-tense-and-axes.md` is the durable record of what was decided and why.
+
 ---
 
 Surfaced during the Match Centre prototype's design reviews (2026-08-19/20).
