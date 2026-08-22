@@ -4,6 +4,7 @@ import { isMatchLocked, picksForMatch } from "@/lib/competitions/scope";
 import { tippedSlots } from "@/lib/gameweeks/tipped-slots";
 import { scoreMatch } from "@/lib/scoring/match";
 import { deriveWeekOutcome } from "@/lib/gameweeks/week-outcome";
+import { orderBoardSlots } from "@/lib/pick-board/order-slots";
 import type { WeekOutcome } from "@/lib/gameweeks/week-outcome";
 
 // DB glue for /gameweek/[n] (docs/adr/0013-match-centre-tense-and-axes.md).
@@ -182,7 +183,16 @@ export async function loadGameweekReveal(
 
   return {
     number: gw.number as number,
-    matches,
+    // Same display order as the Pick Board, from the same function: by
+    // kickoff, earliest first, the Headline breaking a tie. The DB keeps its
+    // sourced slot order (match_1 = Headline, match_2 = Random -- ADR 0006)
+    // and neither surface reorders it there. Rendering these two surfaces in
+    // different orders makes the same gameweek look like two gameweeks.
+    matches: orderBoardSlots(
+      matches,
+      (m) => m.kickoffUtcIso,
+      (m) => m.provenance === "top_matchup",
+    ),
     skippedSlot: slots.length === 1,
     viewerOutcome,
   };

@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { picksForPlayer } from "@/lib/competitions/scope";
 import { scoreMatch } from "@/lib/scoring/match";
 import { deriveWeekOutcome } from "@/lib/gameweeks/week-outcome";
+import { orderBoardSlots } from "@/lib/pick-board/order-slots";
 import type { WeekOutcome } from "@/lib/gameweeks/week-outcome";
 import type { PickLine } from "@/components/gameweek/PicksTable";
 
@@ -101,7 +102,16 @@ export async function loadPicksRecord(
     .filter(([, groupRows]) => groupRows.some((row) => row.locked))
     .sort(([a], [b]) => b - a)
     .map(([gameweek, groupRows]) => {
-      const entries = groupRows.map((row) => {
+      // Same order as the Pick Board and the reveal (see
+      // gameweek-reveal-access): by kickoff, earliest first. A record that
+      // lists a week's two matches in a different order from the page it
+      // links to reads as a different week.
+      const ordered = orderBoardSlots(
+        groupRows,
+        (row) => row.kickoffTime,
+        () => false,
+      );
+      const entries = ordered.map((row) => {
         const scorable =
           !row.calledOff &&
           row.resultHome !== null &&
@@ -123,7 +133,7 @@ export async function loadPicksRecord(
 
       return {
         gameweek,
-        dateLabel: dateFmt.format(new Date(groupRows[0].kickoffTime)),
+        dateLabel: dateFmt.format(new Date(ordered[0].kickoffTime)),
         lines: entries.map(({ row, points }) => ({
           key: row.matchId,
           homeCode: codeById.get(row.homeTeamId) ?? null,
