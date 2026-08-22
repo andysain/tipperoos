@@ -36,6 +36,8 @@ export async function loadRecap(
     competitionId,
     seasonId,
     playerId,
+    // The recap is always the viewer's own week.
+    playerId,
     now,
     timeZone,
   );

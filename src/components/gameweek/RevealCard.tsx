@@ -120,94 +120,101 @@ export function RevealCard({
         </p>
       ) : null}
 
-      {/* Direction is stated, not implied. The header states it vertically
+      {/* Nothing below this point exists before the match locks: there are
+          no picks to reveal, so a "who picked it" header over an empty list
+          promises something the page is deliberately withholding. */}
+      {!match.locked ? null : (
+        <>
+          {/* Direction is stated, not implied. The header states it vertically
           and the clusters state it inline, so a reader has to rotate the axis
           -- and a Wrong Way Round pick is the one case where reading it
           backwards inverts the meaning entirely. */}
-      <div
-        className={`flex items-baseline justify-between border-b border-paper-line bg-surface ${INSET} py-1.5 ${LABEL} ${TX.muted}`}
-      >
-        <span>
-          {match.home.shortCode} (home) v {match.away.shortCode}
-        </span>
-        <span>who picked it</span>
-      </div>
+          <div
+            className={`flex items-baseline justify-between border-b border-paper-line bg-surface ${INSET} py-1.5 ${LABEL} ${TX.muted}`}
+          >
+            <span>
+              {match.home.shortCode} (home) v {match.away.shortCode}
+            </span>
+            <span>who picked it</span>
+          </div>
 
-      <ul className="flex flex-col divide-y divide-paper-line bg-surface">
-        {clusters.map((cluster) => {
-          const hit =
-            settled &&
-            cluster.homeScore === match.homeScore &&
-            cluster.awayScore === match.awayScore;
-          const mine = cluster.members.some((m) => m.playerId === viewerId);
-          const wwr = isWrongWayRound(
-            cluster.homeScore,
-            cluster.awayScore,
-            match.homeScore,
-            match.awayScore,
-          );
-          return (
-            <li
-              key={`${cluster.homeScore}-${cluster.awayScore}`}
-              className={`relative flex gap-3 ${INSET} py-3 ${hit ? "bg-success/10" : ""}`}
-            >
-              {/* Own-row findability is the accent stripe, the treatment ADR
+          <ul className="flex flex-col divide-y divide-paper-line bg-surface">
+            {clusters.map((cluster) => {
+              const hit =
+                settled &&
+                cluster.homeScore === match.homeScore &&
+                cluster.awayScore === match.awayScore;
+              const mine = cluster.members.some((m) => m.playerId === viewerId);
+              const wwr = isWrongWayRound(
+                cluster.homeScore,
+                cluster.awayScore,
+                match.homeScore,
+                match.awayScore,
+              );
+              return (
+                <li
+                  key={`${cluster.homeScore}-${cluster.awayScore}`}
+                  className={`relative flex gap-3 ${INSET} py-3 ${hit ? "bg-success/10" : ""}`}
+                >
+                  {/* Own-row findability is the accent stripe, the treatment ADR
                   0012 D7 settled for exactly this problem -- and inside the
                   budget, because this row IS the player's own predicted
                   scoreline. */}
-              {mine ? (
-                <span
-                  className="absolute inset-y-0 left-0 w-1 bg-accent"
-                  aria-hidden
-                />
-              ) : null}
-              <div className="flex w-14 shrink-0 flex-col items-center gap-1">
-                <span
-                  className={`${T.score} font-extrabold leading-none tabular-nums text-text`}
-                >
-                  {cluster.homeScore}–{cluster.awayScore}
-                </span>
-                <Points points={cluster.points} />
-              </div>
-              <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <ul className="flex flex-wrap items-start gap-1.5">
-                  {cluster.members.map((m) => (
-                    <li key={m.playerId}>
-                      <PlayerChip
-                        emoji={m.emoji}
-                        name={m.displayName}
-                        tone={
-                          m.playerId === viewerId
-                            ? "you"
-                            : m.isBot
-                              ? "bot"
-                              : "human"
-                        }
-                      />
-                    </li>
-                  ))}
-                </ul>
-                {wwr ? (
-                  <span className={`${T.label} ${TX.muted}`}>
-                    Wrong way round! It finished {match.homeScore}–
-                    {match.awayScore}. That&apos;s worth a point.
-                  </span>
-                ) : null}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+                  {mine ? (
+                    <span
+                      className="absolute inset-y-0 left-0 w-1 bg-accent"
+                      aria-hidden
+                    />
+                  ) : null}
+                  <div className="flex w-14 shrink-0 flex-col items-center gap-1">
+                    <span
+                      className={`${T.score} font-extrabold leading-none tabular-nums text-text`}
+                    >
+                      {cluster.homeScore}–{cluster.awayScore}
+                    </span>
+                    <Points points={cluster.points} />
+                  </div>
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <ul className="flex flex-wrap items-start gap-1.5">
+                      {cluster.members.map((m) => (
+                        <li key={m.playerId}>
+                          <PlayerChip
+                            emoji={m.emoji}
+                            name={m.displayName}
+                            tone={
+                              m.playerId === viewerId
+                                ? "you"
+                                : m.isBot
+                                  ? "bot"
+                                  : "human"
+                            }
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                    {wwr ? (
+                      <span className={`${T.label} ${TX.muted}`}>
+                        Wrong way round! It finished {match.homeScore}–
+                        {match.awayScore}. That&apos;s worth a point.
+                      </span>
+                    ) : null}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
 
-      {/* One warm sentence, not a wall of avatars under a "NO PICK" heading.
+          {/* One warm sentence, not a wall of avatars under a "NO PICK" heading.
           Naming non-filers is a nudge PRE-lock, where it has an action
           attached; this is the permanent, deep-linked archive. */}
-      {match.noPick.length > 0 ? (
-        <p className={`bg-surface ${INSET} py-2.5 ${T.label} ${TX.muted}`}>
-          No pick from {formatNames(match.noPick.map((p) => p.displayName))}{" "}
-          this week.
-        </p>
-      ) : null}
+          {match.noPick.length > 0 ? (
+            <p className={`bg-surface ${INSET} py-2.5 ${T.label} ${TX.muted}`}>
+              No pick from {formatNames(match.noPick.map((p) => p.displayName))}{" "}
+              this week.
+            </p>
+          ) : null}
+        </>
+      )}
     </CardShell>
   );
 }

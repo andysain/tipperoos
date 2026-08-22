@@ -7,6 +7,13 @@ import { LABEL, T, TX, FOCUS } from "@/components/ui/tokens";
 
 export interface StripWeek {
   gameweek: number;
+  /** Precomputed on the server. This used to be a `hrefFor(gw)` callback,
+   *  which crashed the route at runtime: React Server Components cannot
+   *  serialise a function across the boundary to a client component
+   *  ("Functions cannot be passed directly to Client Components"). Build,
+   *  typecheck and the whole suite passed — only rendering the page caught
+   *  it. A string crosses the boundary fine. */
+  href: Route;
   /** Viewer's points that week. Null when they filed nothing. */
   points: number | null;
   picked: boolean;
@@ -25,18 +32,12 @@ export interface StripWeek {
  * finger. Adjacency lives at the bottom of the page instead, where reading
  * ends and the thumb already is.
  */
-// Generic over the route it links to: Next's `Route<T>` only satisfies the
-// dynamic-route branch when T is the literal template type, so a bare
-// `Route` (T = string) is rejected. Keeping it generic also means the picks
-// record can reuse this strip against its own route without a cast.
-export function GameweekStrip<T extends string>({
+export function GameweekStrip({
   active,
   weeks,
-  hrefFor,
 }: {
   active: number;
   weeks: readonly StripWeek[];
-  hrefFor: (gameweek: number) => Route<T>;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const mounted = useRef(false);
@@ -55,6 +56,11 @@ export function GameweekStrip<T extends string>({
     });
     mounted.current = true;
   }, [active]);
+
+  // Nothing to navigate with one gameweek, and a lone chip under a "points
+  // you scored each week" caption reads as a broken control rather than an
+  // empty one. It appears once there is a week to travel between.
+  if (weeks.filter((w) => !w.future).length < 2) return null;
 
   return (
     <div className="-mx-4 flex flex-col gap-1">
@@ -126,7 +132,7 @@ export function GameweekStrip<T extends string>({
               ) : (
                 <Link
                   data-gw={week.gameweek}
-                  href={hrefFor(week.gameweek)}
+                  href={week.href}
                   aria-current={isActive ? true : undefined}
                   aria-label={label}
                   className={shape}

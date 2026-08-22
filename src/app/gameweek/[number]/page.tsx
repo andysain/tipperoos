@@ -101,11 +101,7 @@ export default async function GameweekPage({
         Gameweek {reveal.number}
       </h1>
 
-      <GameweekStrip
-        active={reveal.number}
-        weeks={strip}
-        hrefFor={(gw) => `/gameweek/${String(gw)}`}
-      />
+      <GameweekStrip active={reveal.number} weeks={strip} />
 
       {reveal.matches.map((match) => (
         <RevealCard

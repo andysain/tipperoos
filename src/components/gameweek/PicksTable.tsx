@@ -55,14 +55,24 @@ export function PicksRow({ line }: { line: PickLine }) {
         </span>
       </span>
       <span className={`${COL_PICK} tabular-nums ${TX.muted}`}>
-        {!line.locked ? (
-          ""
-        ) : line.pick ? (
+        {/* Renders whatever the loader hands over. It used to blank anything
+            unlocked as a second gate, which was defence in depth until the
+            loader started (correctly) returning the VIEWER's own pre-lock
+            pick -- CLAUDE.md: "a player can see their own pick". The
+            component cannot tell an own pick from a leaked one, so the gate
+            belongs solely in `picksForPlayer`, where it is tested on exactly
+            that distinction. */}
+        {line.pick ? (
           `${line.pick.home}–${line.pick.away}`
-        ) : (
+        ) : line.locked ? (
           // The words, never a dash: "No pick, no points" is a rule with
           // real weight, and the dash already carries four other meanings.
           <span className={`font-medium ${TX.muted}`}>no pick</span>
+        ) : (
+          // Unlocked and nothing to show: someone else's board, or the
+          // viewer genuinely hasn't picked yet. Neither is "no pick" -- that
+          // is a verdict on a closed match.
+          ""
         )}
       </span>
       <span

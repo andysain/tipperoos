@@ -53,6 +53,7 @@ export default async function PicksRecordPage({
     competitionId,
     seasonId,
     playerId,
+    viewerId,
     new Date(),
     timeZone,
   );

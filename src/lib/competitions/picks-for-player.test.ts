@@ -231,6 +231,41 @@ describe("picksForPlayer", () => {
     expect(rows.find((r) => r.matchId === "m-locked")?.predHomeScore).toBe(2);
   });
 
+  // CLAUDE.md -> Predictions: "Before lock: a player can see THEIR OWN
+  // pick; other players' and bots' picks for that match are hidden."
+  it("shows the viewer their own unlocked pick on their own record", async () => {
+    const rows = await picksForPlayer(
+      fakeSupabase(baseRows()),
+      "p1",
+      "c1",
+      "s1",
+      NOW,
+      "p1",
+    );
+    expect(rows.find((r) => r.matchId === "m-open")).toMatchObject({
+      locked: false,
+      predHomeScore: 3,
+      predAwayScore: 1,
+    });
+  });
+
+  // The half of that rule that matters: naming a viewer must not open
+  // anyone else's board.
+  it("still hides an unlocked pick when the viewer is someone else", async () => {
+    const rows = await picksForPlayer(
+      fakeSupabase(baseRows()),
+      "p1",
+      "c1",
+      "s1",
+      NOW,
+      "p2",
+    );
+    expect(rows.find((r) => r.matchId === "m-open")).toMatchObject({
+      locked: false,
+      predHomeScore: null,
+    });
+  });
+
   it("scopes to the season it was asked for", async () => {
     const rows = baseRows();
     rows.gameweeks[0].season_id = "other-season";

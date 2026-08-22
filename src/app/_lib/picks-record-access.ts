@@ -35,6 +35,7 @@ export async function loadPicksRecord(
   viewerCompetitionId: string,
   seasonId: string,
   playerId: string,
+  viewerId: string,
   now: Date,
   /** CLAUDE.md -> Hard constraints: kickoff labels render in the viewer's
    *  browser-detected timezone, falling back to Australia/Sydney. Hardcoding
@@ -58,6 +59,7 @@ export async function loadPicksRecord(
     viewerCompetitionId,
     seasonId,
     now,
+    viewerId,
   );
 
   const teamIds = [

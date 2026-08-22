@@ -320,6 +320,17 @@ export async function picksForPlayer(
   competitionId: string,
   seasonId: string,
   now: Date = new Date(),
+  /**
+   * Who is asking. CLAUDE.md -> Predictions: "Before lock: a player can see
+   * THEIR OWN pick; other players' and bots' picks for that match are
+   * hidden." Blanking every unlocked pick was over-strict -- on your own
+   * record it showed an empty cell for a pick you had already filed.
+   *
+   * Omit it and nothing unlocked is ever returned, which is the safe
+   * default: a caller has to name the viewer to see anything pre-lock, and
+   * can only ever name one.
+   */
+  viewerId?: string,
 ): Promise<PlayerPickRow[]> {
   // The player must belong to the competition being read. Without this a
   // caller could pair any player id with any competition id.
@@ -374,7 +385,12 @@ export async function picksForPlayer(
     const match = matchById.get(slot.matchId);
     if (!match) return [];
     const locked = isMatchLocked(new Date(match.kickoff_time), now);
-    const pick = locked ? pickByMatch.get(slot.matchId) : undefined;
+    // Own picks are visible pre-lock; anyone else's are not. `ownRecord` is
+    // computed from the two ids rather than trusted from a flag, so a caller
+    // cannot pass `true` and read a stranger's board.
+    const ownRecord = viewerId !== undefined && viewerId === playerId;
+    const pick =
+      locked || ownRecord ? pickByMatch.get(slot.matchId) : undefined;
     return [
       {
         matchId: slot.matchId,

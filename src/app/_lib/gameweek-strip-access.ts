@@ -113,6 +113,7 @@ export async function loadGameweekStrip(
       : undefined;
     return {
       gameweek: gw.number as number,
+      href: `/gameweek/${String(gw.number)}` as StripWeek["href"],
       points: outcome.kind === "scored" ? outcome.total : null,
       picked: entries.some((e) => e.picked),
       month: kickoff ? monthFmt.format(new Date(kickoff)) : "",
