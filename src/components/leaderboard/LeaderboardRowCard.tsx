@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import type { LeaderboardRow } from "@/lib/leaderboard/board";
 import { EmojiChip } from "@/components/ui/PlayerChip";
 import { T, TX, MICRO_LABEL, FOCUS, INSET } from "@/components/ui/tokens";
@@ -50,9 +50,7 @@ function RankSlot({
           // replaces the numeral, this sits under one -- and it reads as "new
           // to the top of the table". A temporary absence of data is not a
           // category, so it isn't `info`.
-          <span className={`mt-0.5 ${T.label} font-bold ${TX.muted}`}>
-            1st wk
-          </span>
+          <span className={`mt-0.5 ${T.label} font-bold ${TX.muted}`}>New</span>
         )
       ) : row.movement === 0 ? (
         <span
@@ -133,7 +131,7 @@ export function LeaderboardRowCard({
         aria-expanded={scored ? open : undefined}
         aria-controls={scored ? panelId : undefined}
         onClick={onToggle}
-        className={`flex w-full items-center gap-2 ${INSET} py-2 text-left ${FOCUS}`}
+        className={`flex w-full items-center gap-1.5 ${INSET} py-2 text-left ${FOCUS}`}
       >
         {scored ? (
           <RankSlot row={row} anyMovement={anyMovement} />
@@ -186,12 +184,22 @@ export function LeaderboardRowCard({
                 </span>
               ) : null}
             </span>
-            {/* No chevron. D4 sizes this row to hold a 20-character display
-                name without truncation and it didn't -- at 390px it cut off
-                around 16, worst on the signed-in player's own row because
-                that one also carries the You badge. Dropping the chevron
-                buys back 26px, and expansion carries no glyph anyway: the
-                panel's presence and aria-expanded are the signal. */}
+            {/* The chevron is back. It was dropped to buy width for ADR
+                0012 D4's "20-character name without truncation" -- but
+                measured, a 20-character name fits on a 393px viewport with
+                0px to spare and is ALREADY clipped at 375px, chevron or no
+                chevron. So withholding it bought nothing the rule promised,
+                and cost the only visual hint that a row opens: `aria-expanded`
+                and the panel's own presence tell you AFTER you've discovered
+                the gesture, not before. Small, muted, and it rotates.
+                D4's width promise is unmet at 375px either way — that is a
+                rule to revisit, not a reason to hide the affordance. */}
+            <ChevronDown
+              className={`size-3.5 shrink-0 stroke-text-muted transition-transform ${
+                open ? "rotate-180" : ""
+              }`}
+              aria-hidden
+            />
           </>
         ) : null}
       </button>

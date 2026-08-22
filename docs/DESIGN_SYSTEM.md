@@ -224,11 +224,11 @@ So that "this is tappable" has one signal rather than five:
 - **Navigation `›`** means "this card is a door to another screen" and sits at the **end of the card's own
   header line**, once per card — never on a row inside a card. Where a card is a door, only its heading is the
   tap target; the rows beneath are inert, so a scroll that ends in a slight tap can't navigate away.
-- **Expansion** carries no glyph where the panel is supplementary detail — the panel's own presence and
-  `aria-expanded` are the signal (the leaderboard row's stat panel). **Where a header IS the navigation**, a
-  chevron is correct and expected: Predict the Table's Band headers are the only way through that flow
-  (`docs/adr/0011`), so they keep theirs. The test is whether the control is the primary way to move around the
-  screen or an optional aside.
+- **Expansion carries a `ChevronDown`** that rotates when open — on the leaderboard row's stat panel and on
+  Predict the Table's Band headers alike. Amended 2026-08-23: this briefly said expansion carried no glyph, on
+  the grounds that `aria-expanded` and the panel's own presence are the signal. They are — but only _after_ a
+  player has discovered the gesture, and nothing told them it was there. The width that removing it was meant
+  to buy turned out not to exist (see _Team display_ note below), so it cost discoverability for nothing.
 - **Direction glyphs are fixed by meaning**: `ChevronRight` navigates forward, `ChevronLeft` goes back. Arrows
   are **not** navigation — `→` is reserved for "became", as in a pick against a result.
 - Anything tappable that is not a card uses the `Button` primitive.
@@ -309,6 +309,12 @@ The rule now has two forms:
 
 A rendered scoreline is still flanked by both badges on the Tipped Match card, so `2–1` can't be read
 backwards there.
+
+**Measured note on row width, 2026-08-23.** `docs/adr/0012` D4 asks the leaderboard row to hold a
+20-character display name without truncation. It doesn't, and can't at 375px: a real 20-character name needs
+172px and the row affords 172px at 393px with nothing to spare, 141px at 375px. Removing or restoring the
+expansion chevron changes that by ~14px and does not change the outcome. D4's promise needs revisiting — by
+shortening what else the row carries, not by stripping affordances.
 
 ## Match Centre structure
 
