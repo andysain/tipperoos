@@ -186,24 +186,60 @@ function TeamRow({
  * row -- keeps it vertically centred against that row regardless of the
  * row's own line-height, and lets it sit visually apart (bigger, its own
  * column) instead of reading as an afterthought at the row's tail end.
+ *
+ * `emphasis` exists only for the finished card's two-column comparison
+ * (own pick beside the result): the result keeps the Display role, the
+ * pick steps down one stop on the scale so the pair reads as
+ * "what happened, and what you said" rather than as two equal numbers.
  */
 function ScoreCell({
   value,
   tone,
+  emphasis = "primary",
+  className = "",
 }: {
   value: number | null;
   tone: "own-pick" | "result";
+  emphasis?: "primary" | "secondary";
+  className?: string;
 }) {
   return (
     <span
-      className={`shrink-0 text-center ${T.score} font-extrabold leading-none tabular-nums ${
-        tone === "result" ? "text-paper" : "text-accent"
-      }`}
+      className={`shrink-0 text-center font-extrabold leading-none tabular-nums ${
+        emphasis === "primary" ? T.score : T.h2
+      } ${tone === "result" ? "text-paper" : "text-accent"} ${className}`}
     >
       {value ?? "–"}
     </span>
   );
 }
+
+/** Column captions for the finished card's two score columns. "Result",
+ *  not "Final", because the status chip on the eyebrow above already says
+ *  FINAL -- the same word twice on one card reads as a slip. The picks
+ *  record keeps FINAL for its column, where nothing collides with it. Without these
+ *  the pick and the result are two adjacent numbers with nothing saying
+ *  which is which -- colour alone can't carry that (DESIGN_SYSTEM.md).
+ *
+ *  Rendered in a row of its own that spans the grid rather than as two
+ *  grid cells, so the captions -- which are wider than the digits under
+ *  them -- can't set the score columns' width and eat the team name's.
+ *  Measured: as grid cells they cost 24px of name width at 375px, enough
+ *  to clip "Manchester United". */
+function ScoreColumnLabels() {
+  const cap = `text-center ${MICRO_LABEL} ${TX.onInkMuted}`;
+  return (
+    <div className="col-span-3 flex justify-end gap-x-1.5">
+      <span className={`${cap} ${SCORE_COL_PICK}`}>You</span>
+      <span className={`${cap} ${SCORE_COL_RESULT}`}>Result</span>
+    </div>
+  );
+}
+
+/** Fixed widths so the two score columns line up row to row, and so the
+ *  captions above them overhang harmlessly instead of widening them. */
+const SCORE_COL_PICK = "w-7";
+const SCORE_COL_RESULT = "w-10";
 
 function MetaLine({
   provenance,
@@ -266,6 +302,11 @@ interface RowScores {
   home: number | null;
   away: number | null;
   tone: "own-pick" | "result";
+  /** Finished only: the Player's own pick, rendered in its own column
+   *  beside the result instead of as a "You tipped 1-3" line under the
+   *  seam -- the same side-by-side comparison the picks record makes
+   *  (PICK / FINAL), so the two surfaces read the same way. */
+  own?: { home: number; away: number };
 }
 
 /**
@@ -320,7 +361,35 @@ function CardHeader({
         />
         <StatusChip label={chip.label} tone={chip.tone} />
       </div>
-      {scores ? (
+      {scores?.own ? (
+        <div className="grid min-w-0 grid-cols-[1fr_auto_auto] items-center gap-x-1.5 gap-y-1">
+          <ScoreColumnLabels />
+          <TeamRow team={home} fill={homeFill} home />
+          <ScoreCell
+            value={scores.own.home}
+            tone="own-pick"
+            emphasis="secondary"
+            className={SCORE_COL_PICK}
+          />
+          <ScoreCell
+            value={scores.home}
+            tone={scores.tone}
+            className={SCORE_COL_RESULT}
+          />
+          <TeamRow team={away} fill={awayFill} />
+          <ScoreCell
+            value={scores.own.away}
+            tone="own-pick"
+            emphasis="secondary"
+            className={SCORE_COL_PICK}
+          />
+          <ScoreCell
+            value={scores.away}
+            tone={scores.tone}
+            className={SCORE_COL_RESULT}
+          />
+        </div>
+      ) : scores ? (
         <div className="grid min-w-0 grid-cols-[1fr_auto] items-center gap-x-2.5 gap-y-1">
           <TeamRow team={home} fill={homeFill} home />
           <ScoreCell value={scores.home} tone={scores.tone} />
@@ -491,9 +560,12 @@ function ChangeButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-/** Finished only: the one thing that doesn't fit in a header row -- the
- * verdict (exact / what you tipped) plus the points chip. Still flat ink,
- * still no separate plate -- just the header's natural continuation. */
+/** Finished only: the points chip, and the one verdict the header's own
+ * You/Result columns can't state for themselves -- that the two matched
+ * exactly. What the Player tipped is no longer repeated here as prose;
+ * it sits in the header beside the result (see RowScores.own), which is
+ * where the comparison the line was describing actually happens. Still
+ * flat ink, still no separate plate -- the header's continuation. */
 function FinishedFooter({
   ownHomeScore,
   ownAwayScore,
@@ -507,27 +579,35 @@ function FinishedFooter({
   awayScore: number;
   points: number | null;
 }) {
-  const exact = ownHomeScore === homeScore && ownAwayScore === awayScore;
+  const filed = ownHomeScore !== null && ownAwayScore !== null;
+  const exact =
+    filed && ownHomeScore === homeScore && ownAwayScore === awayScore;
+  // Nothing to say in the common case: the header already shows both
+  // scorelines, so a line restating one of them is the redundancy this
+  // change removed. Only the two exceptional readings still get a line.
+  const verdict = exact ? (
+    /* One of the three emotional accent moments, and a fill rather than
+       text because `success` can't carry text on an ink ground. */
+    <span
+      className={`rounded-badge bg-success px-2 py-0.5 ${MICRO_LABEL} text-on-ink`}
+    >
+      You called it exactly
+    </span>
+  ) : !filed ? (
+    <span className="text-paper/60">No pick filed</span>
+  ) : null;
   return (
     <>
-      <div className="flex items-center gap-2 bg-ink px-3.5 pt-0.5 pb-3.5 text-[0.86rem]">
-        {exact ? (
-          <span
-            className={`rounded-badge bg-success px-2 py-0.5 ${MICRO_LABEL} text-on-ink`}
-          >
-            You called it exactly
-          </span>
-        ) : ownHomeScore !== null && ownAwayScore !== null ? (
-          <span className="text-paper/75">
-            You tipped{" "}
-            <span className="font-extrabold text-accent">
-              {ownHomeScore}–{ownAwayScore}
-            </span>
-          </span>
-        ) : (
-          <span className="text-paper/60">No pick filed</span>
-        )}
-      </div>
+      {verdict !== null ? (
+        <div className="flex items-center gap-2 bg-ink px-3.5 pt-0.5 pb-3.5 text-[0.86rem]">
+          {verdict}
+        </div>
+      ) : (
+        // Keeps the card's bottom edge: with no verdict line and no
+        // breakdown (a finished match not yet scored), the seam would
+        // otherwise be the card's last pixel.
+        <div className={`bg-ink ${points !== null ? "pt-1" : "pb-4"}`} />
+      )}
       {points !== null ? (
         <ScoringBreakdown
           pickHome={ownHomeScore}
@@ -657,6 +737,15 @@ export function TippedMatchCard({
         home: state.homeScore,
         away: state.awayScore,
         tone: "result",
+        // Only when a pick exists: an empty You column would have to render
+        // a dash, and DESIGN_SYSTEM.md -> Numbers and units reserves "no
+        // pick" (the words) for that fact and forbids the dash. Without a
+        // pick the card keeps the single result column and the footer says
+        // it in words.
+        own:
+          state.ownHomeScore !== null && state.ownAwayScore !== null
+            ? { home: state.ownHomeScore, away: state.ownAwayScore }
+            : undefined,
       };
       break;
   }
