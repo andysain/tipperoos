@@ -12,7 +12,17 @@ import { T, TX, MICRO_LABEL, FOCUS, INSET } from "@/components/ui/tokens";
 // column -- D11 makes density a requirement, not polish, because a board
 // whose job is comparing players fails if it only shows six of them.
 
-function RankSlot({ row }: { row: LeaderboardRow }) {
+function RankSlot({
+  row,
+  anyMovement,
+}: {
+  row: LeaderboardRow;
+  /** Does ANY row have movement? In the first scored gameweek nobody does,
+   *  because there is no previous snapshot to compare against — so "1st wk"
+   *  is true of the whole board and marks nothing. It only means something
+   *  once it distinguishes one player from the rest. */
+  anyMovement: boolean;
+}) {
   // A Bot has no rank (D12). The reserved column carries BOT instead of
   // sitting empty, which also means the name line needs no "Bot" chip.
   if (row.rank === null) {
@@ -34,14 +44,16 @@ function RankSlot({ row }: { row: LeaderboardRow }) {
         {row.rank}
       </span>
       {row.movement === null ? (
-        // "1st wk", not "NEW": NEW was the same mark as BOT (short, teal,
-        // uppercase) 20px away, for a structurally opposite fact -- BOT
-        // replaces the numeral, this sits under one -- and it reads as "new
-        // to the top of the table". A temporary absence of data is not a
-        // category, so it isn't `info`.
-        <span className={`mt-0.5 ${T.label} font-bold ${TX.muted}`}>
-          1st wk
-        </span>
+        !anyMovement ? null : (
+          // "1st wk", not "NEW": NEW was the same mark as BOT (short, teal,
+          // uppercase) 20px away, for a structurally opposite fact -- BOT
+          // replaces the numeral, this sits under one -- and it reads as "new
+          // to the top of the table". A temporary absence of data is not a
+          // category, so it isn't `info`.
+          <span className={`mt-0.5 ${T.label} font-bold ${TX.muted}`}>
+            1st wk
+          </span>
+        )
       ) : row.movement === 0 ? (
         <span
           className={`mt-0.5 ${T.label} font-bold ${TX.decorative}`}
@@ -85,11 +97,13 @@ function Stat({ value, label }: { value: string; label: string }) {
 export function LeaderboardRowCard({
   row,
   scored,
+  anyMovement,
   open,
   onToggle,
 }: {
   row: LeaderboardRow;
   scored: boolean;
+  anyMovement: boolean;
   /** Owned by the list, not the row. Per-row state let every panel open at
    *  once, against docs/adr/0012-leaderboard-view.md D11 -- "one card is open
    *  at a time, so the list never doubles in height" -- which is the
@@ -121,7 +135,11 @@ export function LeaderboardRowCard({
         onClick={onToggle}
         className={`flex w-full items-center gap-2 ${INSET} py-2 text-left ${FOCUS}`}
       >
-        {scored ? <RankSlot row={row} /> : <span className="w-1 shrink-0" />}
+        {scored ? (
+          <RankSlot row={row} anyMovement={anyMovement} />
+        ) : (
+          <span className="w-1 shrink-0" />
+        )}
 
         {/* The chip's fill is never state (DESIGN_SYSTEM.md -> Icons), so a
             bot is MUTED rather than tinted -- info belongs on the BOT label,

@@ -22,6 +22,7 @@ export function LeaderboardList({
   scored: boolean;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
+  const anyMovement = rows.some((row) => row.movement !== null);
 
   return (
     <ul className="flex flex-col gap-1.5">
@@ -30,6 +31,7 @@ export function LeaderboardList({
           key={row.playerId}
           row={row}
           scored={scored}
+          anyMovement={anyMovement}
           open={openId === row.playerId}
           onToggle={() =>
             setOpenId((current) =>

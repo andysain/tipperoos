@@ -95,10 +95,15 @@ export default async function LeaderboardPage() {
 
           <LeaderboardList rows={ordered} scored={scored} />
 
+          {/* The per-week figure only appears once a gameweek has COMPLETED
+              (it needs a standings snapshot), so mid-gameweek the board shows
+              points and ranks but no "/wk" — and explaining a figure that
+              isn't on screen is worse than not explaining it. */}
           {scored ? (
             <p className={`${T.caption} ${TX.muted}`}>
-              &ldquo;/wk&rdquo; is your points for each gameweek since you
-              joined. Tap a player to see how they&apos;re doing.
+              {rows.some((row) => row.pointsPerGameweek !== null)
+                ? "“/wk” is your points for each gameweek since you joined. Tap a player to see how they’re doing."
+                : "Tap a player to see how they’re doing."}
             </p>
           ) : null}
         </>
