@@ -12,6 +12,6 @@ export const TAB_BAR_HEIGHT_REM = "4rem";
 // utility classes, not an interpolated value, so this table is the source
 // of truth and call sites hardcode the matching literal class.
 //
-//   z-10 -- persistent shell chrome (TabBar, SwitchPlayerButton)
-//   z-20 -- overlay scrims/backdrops (Predict the Table's picker drawer backdrop)
-//   z-30 -- overlay panels/content (the picker drawer itself; future modals)
+//   z-10 -- persistent shell chrome (TabBar)
+//   z-20 -- overlay scrims/backdrops (the "More" menu's backdrop; future modals)
+//   z-30 -- overlay panels/content (the "More" menu's panel; future modals)

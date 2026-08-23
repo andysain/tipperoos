@@ -155,19 +155,17 @@ export default async function PickBoardPage() {
     : ({ kind: "hidden" } as const);
 
   return (
-    // SwitchPlayerButton (fixed top-3 right-3, size-10) floats above content
-    // as it scrolls -- no reserved gutter (ADR-0005: the shell owns chrome,
-    // pages own content; the button's bg-paper + shadow make the overlay
-    // read as intentional rather than a rendering glitch).
     // md:max-w-4xl mx-auto matches predict-table's mobile/desktop pivot
     // (PredictTableFlow.tsx) -- one column on phone, room for two slot
     // cards side by side once there's a tablet/desktop-width viewport.
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4">
-      {/* Home carries a title like every other surface. It was dropped on
-          the grounds that it restated the tab the player is standing on --
-          true, but the shell's fixed top-right chrome (help, switch player)
-          has nothing to sit beside without it, so it landed on top of the
-          first card. Consistency across four surfaces beats the 54px. */}
+      {/* Home carries a title like every other surface, for consistency
+          across four surfaces. Help/Switch Player used to live as fixed
+          top-right chrome with no reserved gutter, which this h1 partially
+          mitigated by giving them something to sit beside above the fold
+          (issue #185) -- they've since moved into the bottom tab bar's
+          "More" menu (ADR-0005 amendment), so this h1 is now just the
+          page's title, nothing more. */}
       <h1 className={`${T.h1} font-extrabold text-text`}>Pick Board</h1>
 
       {/* The summary sits above the picks. Recorded honestly: a review
