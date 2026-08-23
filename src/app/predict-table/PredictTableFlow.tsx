@@ -533,7 +533,7 @@ export function PredictTableFlow({
               <button
                 type="button"
                 onClick={() => setConfirmingStartAgain(false)}
-                className={`-my-3 flex h-11 min-w-11 items-center justify-center px-2 ${TX.muted} hover:${TX.base} ${FOCUS}`}
+                className={`-my-3 flex h-11 min-w-11 items-center justify-center px-2 ${TX.muted} hover:text-text ${FOCUS}`}
               >
                 Cancel
               </button>
@@ -543,7 +543,7 @@ export function PredictTableFlow({
               type="button"
               onClick={() => setConfirmingStartAgain(true)}
               disabled={startingAgain}
-              className={`-my-3 flex h-11 min-w-11 shrink-0 items-center justify-center px-2 ${T.label} font-bold ${TX.muted} hover:${TX.base} disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`}
+              className={`-my-3 flex h-11 min-w-11 shrink-0 items-center justify-center px-2 ${T.label} font-bold ${TX.muted} hover:text-text disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`}
             >
               Start again
             </button>

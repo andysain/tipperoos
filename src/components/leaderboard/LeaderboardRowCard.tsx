@@ -40,7 +40,7 @@ function RankSlot({
 
   return (
     <span className="flex w-7 shrink-0 flex-col items-center leading-none">
-      <span className="text-[1.125rem] font-extrabold tabular-nums text-text">
+      <span className={`${T.body} font-extrabold tabular-nums text-text`}>
         {row.rank}
       </span>
       {row.movement === null ? (
@@ -168,7 +168,7 @@ export function LeaderboardRowCard({
           <>
             <span className="flex shrink-0 items-baseline gap-1.5">
               <span
-                className={`text-[1.125rem] leading-none tabular-nums ${
+                className={`${T.body} leading-none tabular-nums ${
                   row.isBot
                     ? `font-bold ${TX.muted}`
                     : "font-extrabold text-text"

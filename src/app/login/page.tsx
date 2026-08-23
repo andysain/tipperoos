@@ -319,7 +319,7 @@ function LoginFlow() {
                     }}
                     className={`flex items-center gap-3 rounded-btn border border-paper-line bg-paper px-4 py-3 text-left ${T.body} font-bold ${TX.base} transition hover:border-accent/60 ${FOCUS}`}
                   >
-                    <span className="text-[1.125rem]">{player.emoji ?? "⚽"}</span>
+                    <span className={T.body}>{player.emoji ?? "⚽"}</span>
                     {player.displayName}
                   </button>
                 ))}
@@ -337,7 +337,7 @@ function LoginFlow() {
             <button
               type="button"
               onClick={goToCode}
-              className={`mt-3 text-center ${T.dense} font-bold ${TX.muted} transition hover:${TX.base} ${FOCUS}`}
+              className={`mt-3 text-center ${T.dense} font-bold ${TX.muted} transition hover:text-text ${FOCUS}`}
             >
               Using a different competition? Enter another code
             </button>
@@ -349,7 +349,7 @@ function LoginFlow() {
             <button
               type="button"
               onClick={goToList}
-              className={`mb-4 ${T.dense} font-bold ${TX.muted} hover:${TX.base} ${FOCUS}`}
+              className={`mb-4 ${T.dense} font-bold ${TX.muted} hover:text-text ${FOCUS}`}
             >
               ← Not {selected.displayName}?
             </button>
@@ -377,7 +377,7 @@ function LoginFlow() {
             <button
               type="button"
               onClick={goToList}
-              className={`mb-4 ${T.dense} font-bold ${TX.muted} hover:${TX.base} ${FOCUS}`}
+              className={`mb-4 ${T.dense} font-bold ${TX.muted} hover:text-text ${FOCUS}`}
             >
               ← Back
             </button>
@@ -418,7 +418,7 @@ function LoginFlow() {
                       type="button"
                       onClick={() => setJoinEmoji(option)}
                       aria-pressed={joinEmoji === option}
-                      className={`flex h-11 w-11 items-center justify-center rounded-btn-sm border text-[1.125rem] transition ${FOCUS} ${
+                      className={`flex h-11 w-11 items-center justify-center rounded-btn-sm border ${T.body} transition ${FOCUS} ${
                         joinEmoji === option
                           ? "border-accent bg-accent/20"
                           : "border-paper-line bg-paper hover:border-accent/60"
@@ -448,7 +448,7 @@ function LoginFlow() {
                       <span className={`tracking-[0.08em] ${T.label} ${TX.muted} uppercase`}>
                         Selected
                       </span>
-                      <span className="text-[2.25rem] leading-none">{joinEmoji}</span>
+                      <span className={`${T.h1} leading-none`}>{joinEmoji}</span>
                     </span>
                   ) : null}
                 </div>

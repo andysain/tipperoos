@@ -113,7 +113,7 @@ function PlacedTeamCard({
             than a short one that does. */}
         <span
           title={team.name}
-          className={`min-w-0 flex-1 truncate font-bold text-ink ${emphasis ? "text-[1.125rem]" : T.dense}`}
+          className={`min-w-0 flex-1 truncate font-bold text-ink ${emphasis ? T.body : T.dense}`}
         >
           {team.displayName}
         </span>
@@ -328,7 +328,7 @@ function CollapsedBandRow({
                   fill={teamFill(team.shortCode)}
                 />
                 <span
-                  className={`min-w-0 truncate font-extrabold text-ink ${isChampion ? "text-[1.05rem]" : T.dense}`}
+                  className={`min-w-0 truncate font-extrabold text-ink ${isChampion ? T.body : T.dense}`}
                 >
                   {team.displayName}
                 </span>
