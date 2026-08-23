@@ -549,32 +549,34 @@ function DigitRow({
 
 /**
  * Filed (pre-lock) gets a slim, full-width Change affordance below the
- * seam -- the only settled state that still allows editing. Tied to the
- * accent color (rather than a neutral paper/white outline) so it reads
- * as a considered action in this card's own palette instead of a generic
- * form control, and pulled in tight under the seam instead of floating
- * in its own block of ink.
+ * seam -- the only settled state that still allows editing. It sits on
+ * the shell's white body like every other card's content, rather than on
+ * a further block of ink: a settled card that stayed ink all the way down
+ * left the seam bridging dark to dark and the board with no light surface
+ * at all (DESIGN_SYSTEM.md -> Card anatomy, amended 2026-08-23).
  */
 function ChangeButton({ onClick }: { onClick: () => void }) {
   return (
-    <div className="bg-ink px-3.5 pt-2 pb-3">
+    <CardShellBody className="py-3">
       <button
         type="button"
-        className={`flex h-9 w-full items-center justify-center rounded-btn-sm border border-paper/30 bg-paper/15 text-[0.8rem] font-bold tracking-wide text-on-ink uppercase transition hover:bg-paper/25 ${FOCUS}`}
+        className={`flex h-10 w-full items-center justify-center rounded-btn-sm border border-paper-line bg-surface ${T.caption} font-bold tracking-wide ${TX.base} uppercase transition hover:border-accent/60 ${FOCUS}`}
         onClick={onClick}
       >
         Change
       </button>
-    </div>
+    </CardShellBody>
   );
 }
 
 /** Finished only: the points chip, and the one verdict the header's own
- * You/Result columns can't state for themselves -- that the two matched
+ * You/Final columns can't state for themselves -- that the two matched
  * exactly. What the Player tipped is no longer repeated here as prose;
  * it sits in the header beside the result (see RowScores.own), which is
- * where the comparison the line was describing actually happens. Still
- * flat ink, still no separate plate -- the header's continuation. */
+ * where the comparison the line was describing actually happens.
+ *
+ * On the shell's white body, like the entry state's digit rows and the
+ * Change affordance -- the ink stops at the seam in every state now. */
 function FinishedFooter({
   ownHomeScore,
   ownAwayScore,
@@ -593,30 +595,21 @@ function FinishedFooter({
     filed && ownHomeScore === homeScore && ownAwayScore === awayScore;
   // Nothing to say in the common case: the header already shows both
   // scorelines, so a line restating one of them is the redundancy this
-  // change removed. Only the two exceptional readings still get a line.
+  // replaced. Only the two exceptional readings still get a line.
   const verdict = exact ? (
     /* One of the three emotional accent moments, and a fill rather than
-       text because `success` can't carry text on an ink ground. */
+       text -- `success` reads the same either way as a fill. */
     <span
-      className={`rounded-badge bg-success px-2 py-0.5 ${MICRO_LABEL} text-on-ink`}
+      className={`self-start rounded-badge bg-success px-2 py-0.5 ${MICRO_LABEL} text-on-ink`}
     >
       You called it exactly
     </span>
   ) : !filed ? (
-    <span className="text-paper/60">No pick filed</span>
+    <span className={`${T.caption} ${TX.muted}`}>No pick filed</span>
   ) : null;
   return (
-    <>
-      {verdict !== null ? (
-        <div className="flex items-center gap-2 bg-ink px-3.5 pt-0.5 pb-3.5 text-[0.86rem]">
-          {verdict}
-        </div>
-      ) : (
-        // Keeps the card's bottom edge: with no verdict line and no
-        // breakdown (a finished match not yet scored), the seam would
-        // otherwise be the card's last pixel.
-        <div className={`bg-ink ${points !== null ? "pt-1" : "pb-4"}`} />
-      )}
+    <CardShellBody className="gap-2 py-3">
+      {verdict}
       {points !== null ? (
         <ScoringBreakdown
           pickHome={ownHomeScore}
@@ -626,7 +619,7 @@ function FinishedFooter({
           points={points}
         />
       ) : null}
-    </>
+    </CardShellBody>
   );
 }
 

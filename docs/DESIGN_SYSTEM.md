@@ -35,11 +35,16 @@ Two card shapes exist, chosen by what a card needs to communicate, not by which 
   built this way its shape. Originated inside the Pick Board's Tipped Match card
   (`docs/adr/0007-home-surface-and-pick-entry.md`); extracted into `src/components/ui/` so a second screen can
   adopt the same shape without reading that component — Predict the Table's Band cards and picker sheet are
-  that second consumer (issue #107). A card built from this shell can still end a state below the seam with
-  more ink rather than a white body (see `TippedMatchCard.tsx`'s locked/live/finished states, which collapse to
-  header + seam with no separate plate), or skip the seam entirely when there's no kit colour to bridge (a
-  Table Band isn't two clubs — its cards go straight from header to body) — the seam and the white body are
-  each one option, not a hard requirement of the shell.
+  that second consumer (issue #107). A card built from this shell can skip the seam entirely when
+  there's no kit colour to bridge (a Table Band isn't two clubs — its cards go straight from header to body).
+
+  **Amended 2026-08-23: a card never ends below the seam in more ink.** The earlier form of this rule let a
+  state collapse to header + seam with no white body, and `TippedMatchCard.tsx`'s filed/locked/live/finished
+  states took it. One such card looks fine alone; a board carrying two of them plus an ink call-to-action has
+  no light content surface anywhere below the explainer, and the seam — whose whole job is bridging dark to
+  light — ends up bridging dark to dark, reading as a stray stripe. Ink marks a card's identity band; content
+  below the seam sits on the white body. If a state has nothing to put there, that's a reason to question the
+  state, not to extend the ink.
 
 Reach for the ink-header shell when a card's identity (which two clubs, whose pick) needs to read before its
 content does. Reach for the plain surface everywhere else — it's the default, not a fallback.

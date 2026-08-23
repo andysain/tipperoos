@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { FOCUS } from "@/components/ui/tokens";
+import { FOCUS, TX } from "@/components/ui/tokens";
 import { useId, useState } from "react";
 import { getMatchBreakdown } from "./match-breakdown";
 
@@ -31,43 +31,47 @@ export function ScoringBreakdown({
   );
 
   return (
-    <div className="bg-ink px-3.5 pb-3.5 text-paper">
+    // Content of the card's white body, not a band of its own: the ground
+    // and the inset both come from CardShellBody. This used to paint its
+    // own `bg-ink`, which is what made a settled card ink all the way down
+    // (see DESIGN_SYSTEM.md -> Card anatomy, amended 2026-08-23).
+    <div className="text-text">
       <button
         type="button"
-        className="flex min-h-11 w-full items-center gap-2 text-left text-[0.86rem]"
+        className={`flex min-h-11 w-full items-center gap-2 text-left text-[0.86rem] ${FOCUS}`}
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((value) => !value)}
       >
-        <span className="text-paper/75">How did you score?</span>
-        {/* A fill, because this panel sits on an INK ground -- the one
-            direction `success` still can't carry as text. The two term
-            values below are on the same ground for the same reason. */}
+        <span className={TX.base}>How did you score?</span>
+        {/* Still a fill rather than `success` as text: this is one of the
+            three emotional accent moments, and the fill reads the same on
+            either ground. */}
         <span className="ml-auto rounded-badge bg-success px-2.5 py-1 font-extrabold text-on-ink">
           +{points} pts
         </span>
         <ChevronDown
-          className={`size-4 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`size-4 ${TX.muted} transition-transform ${open ? "rotate-180" : ""}`}
           aria-hidden
         />
       </button>
       {open ? (
         <div
           id={panelId}
-          className="flex flex-col gap-2 border-t border-paper/15 pt-3"
+          className="mt-1 flex flex-col gap-2 border-t border-paper-line pt-3"
         >
           {pickHome === null || pickAway === null ? (
-            <p className="text-sm text-paper/75">
+            <p className={`text-sm ${TX.muted}`}>
               No pick was filed, so this match scored no points. Picks are never
               filled in automatically.
             </p>
           ) : breakdown.wrongWayRound ? (
             <div className="flex items-center justify-between gap-3 text-sm">
-              <span>
+              <span className={TX.muted}>
                 Wrong Way Round: you said {pickHome}–{pickAway}, it finished{" "}
                 {resultHome}–{resultAway}.
               </span>
-              <strong className="shrink-0 text-on-ink">
+              <strong className={`shrink-0 ${TX.base}`}>
                 +{breakdown.total}
               </strong>
             </div>
@@ -77,26 +81,26 @@ export function ScoringBreakdown({
                 key={row.label}
                 className="flex items-start justify-between gap-3 text-sm"
               >
-                <span className="text-paper/80">
+                <span className={TX.muted}>
                   {row.label}
                   {row.detail ? (
-                    <span className="block text-xs text-paper/50">
+                    <span className={`block text-xs ${TX.decorative}`}>
                       {row.detail}
                     </span>
                   ) : null}
                 </span>
-                <strong className="shrink-0 text-on-ink">
+                <strong className={`shrink-0 ${TX.base}`}>
                   {row.points === null ? "—" : `+${row.points}`}
                 </strong>
               </div>
             ))
           )}
           {kickoffLabel ? (
-            <p className="text-xs text-paper/55">{kickoffLabel}</p>
+            <p className={`text-xs ${TX.muted}`}>{kickoffLabel}</p>
           ) : null}
           <Link
             href={{ pathname: "/how-it-works", hash: "how-your-pick-scores" }}
-            className={`inline-flex items-center gap-0.5 text-[0.8rem] font-bold text-on-ink underline underline-offset-2 ${FOCUS}`}
+            className={`inline-flex items-center gap-0.5 text-[0.8rem] font-bold ${TX.base} underline underline-offset-2 ${FOCUS}`}
           >
             How points work
             <ChevronRight className="size-3.5" aria-hidden />
