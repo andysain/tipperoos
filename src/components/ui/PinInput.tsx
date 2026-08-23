@@ -102,7 +102,7 @@ export function PinInput({
             onChange={(e) => handleChange(index, e.target.value)}
             onKeyDown={(e) => handleKeyDown(index, e)}
             aria-label={`${label} digit ${index + 1}`}
-            className={`h-14 w-12 rounded-btn-sm border border-paper-line bg-paper text-center text-[1.5rem] font-bold tabular-nums ${TX.base} outline-none focus:border-accent ${FOCUS} ${
+            className={`h-14 w-12 rounded-btn-sm border border-paper-line bg-paper text-center ${T.h2} font-bold tabular-nums ${TX.base} outline-none focus:border-accent ${FOCUS} ${
               error ? "border-danger focus-visible:ring-danger/40" : ""
             }`}
           />
