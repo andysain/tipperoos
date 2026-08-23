@@ -109,7 +109,7 @@ export async function loadPicksRecord(
       const ordered = orderBoardSlots(
         groupRows,
         (row) => row.kickoffTime,
-        () => false,
+        (row) => row.provenance === "top_matchup",
       );
       const entries = ordered.map((row) => {
         const scorable =
@@ -153,10 +153,14 @@ export async function loadPicksRecord(
         outcome: deriveWeekOutcome(
           entries.map(({ row, points }) => ({
             points,
-            // Only meaningful once locked: before that the pick is blanked
-            // upstream, so "no pick" would be a statement about the lock,
-            // not about the player.
-            picked: row.locked && row.predHomeScore !== null,
+            // `picksForPlayer` already blanks predHomeScore for anything
+            // unlocked that isn't the viewer's own record, so checking the
+            // score directly is sufficient -- and required. Gating on
+            // `row.locked` as well made a half-played week where the viewer
+            // picked the not-yet-locked match but missed the already-locked
+            // one register as "picked: false" on BOTH entries, so the week
+            // rendered "You missed this one" for a week they had part-filed.
+            picked: row.predHomeScore !== null,
             calledOff: row.calledOff,
           })),
         ),
