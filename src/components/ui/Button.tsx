@@ -1,6 +1,6 @@
 import { type ButtonHTMLAttributes, type Ref } from "react";
 import { tv, type VariantProps } from "tailwind-variants";
-import { FOCUS } from "@/components/ui/tokens";
+import { FOCUS, T } from "@/components/ui/tokens";
 
 const button = tv({
   base: `inline-flex items-center justify-center gap-2 rounded-btn font-bold transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`,
@@ -11,8 +11,8 @@ const button = tv({
       ghost: "bg-transparent text-ink hover:bg-paper-line/60",
     },
     size: {
-      md: "px-5 py-3 text-[1.0625rem]",
-      sm: "px-3.5 py-2 text-[0.9rem]",
+      md: `px-5 py-3 ${T.body}`,
+      sm: `px-3.5 py-2 ${T.dense}`,
     },
     fullWidth: {
       true: "w-full",

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { FOCUS } from "@/components/ui/tokens";
+import { FOCUS, T, TX } from "@/components/ui/tokens";
 import { useId, useState } from "react";
 import {
   MATCH_SCORING_TERMS,
@@ -21,7 +21,7 @@ const bandBonusValues = [...new Set(TABLE_BANDS.map((band) => band.bonus))];
 function ScoreTable({ children }: { children: React.ReactNode }) {
   return (
     <div className="overflow-x-auto [mask-image:linear-gradient(to_right,black_0,black_calc(100%-16px),transparent_100%)] rounded-btn border border-paper-line">
-      <table className="w-full min-w-[18rem] border-collapse text-left text-sm">
+      <table className={`w-full min-w-[18rem] border-collapse text-left ${T.dense}`}>
         {children}
       </table>
     </div>
@@ -31,13 +31,13 @@ function ScoreTable({ children }: { children: React.ReactNode }) {
 export function WeeklyScoringTable() {
   return (
     <ScoreTable>
-      <thead className="bg-paper text-xs font-bold tracking-wide text-ink/60 uppercase">
+      <thead className={`bg-paper ${T.label} font-bold tracking-wide ${TX.muted} uppercase`}>
         <tr>
           <th className="px-3 py-2">What matched</th>
           <th className="px-3 py-2 text-right">Points</th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-paper-line text-ink">
+      <tbody className={`divide-y divide-paper-line ${TX.base}`}>
         {MATCH_SCORING_TERMS.map((term) => (
           <tr key={term.label}>
             <td className="px-3 py-2">{term.label}</td>
@@ -61,13 +61,13 @@ export function TableScoringTable() {
   return (
     <div className="flex flex-col gap-3">
       <ScoreTable>
-        <thead className="bg-paper text-xs font-bold tracking-wide text-ink/60 uppercase">
+        <thead className={`bg-paper ${T.label} font-bold tracking-wide ${TX.muted} uppercase`}>
           <tr>
             <th className="px-3 py-2">Club&apos;s actual Band</th>
             <th className="px-3 py-2 text-right">Points</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-paper-line text-ink">
+        <tbody className={`divide-y divide-paper-line ${TX.base}`}>
           <tr>
             <td className="px-3 py-2">Right Band</td>
             <td className="px-3 py-2 text-right font-extrabold text-success">
@@ -88,24 +88,24 @@ export function TableScoringTable() {
           </tr>
           <tr>
             <td className="px-3 py-2">3+ Bands away or unplaced</td>
-            <td className="px-3 py-2 text-right font-extrabold text-ink/45">
+            <td className={`px-3 py-2 text-right font-extrabold ${TX.decorative}`}>
               {PLACEMENT_POINTS_BY_DISTANCE[3] ?? NO_PICK_POINTS}
             </td>
           </tr>
         </tbody>
       </ScoreTable>
-      <p className="text-sm text-ink/65">
+      <p className={`${T.dense} ${TX.muted}`}>
         An exact Band Bonus means every club in that Band is right. The order of
         clubs inside the Band does not matter.
       </p>
       <ScoreTable>
-        <thead className="bg-paper text-xs font-bold tracking-wide text-ink/60 uppercase">
+        <thead className={`bg-paper ${T.label} font-bold tracking-wide ${TX.muted} uppercase`}>
           <tr>
             <th className="px-3 py-2">Extra scoring</th>
             <th className="px-3 py-2 text-right">Points</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-paper-line text-ink">
+        <tbody className={`divide-y divide-paper-line ${TX.base}`}>
           {bandBonusValues.map((bonus) => {
             const bands = TABLE_BANDS.filter((band) => band.bonus === bonus);
             return (
@@ -127,7 +127,7 @@ export function TableScoringTable() {
           </tr>
         </tbody>
       </ScoreTable>
-      <p className="text-sm text-ink/65">
+      <p className={`${T.dense} ${TX.muted}`}>
         A Bold Call is a correct club placement made by no more than roughly one
         in ten eligible players. Only the best {MAX_BOLD_CALLS} count.
       </p>
@@ -144,7 +144,7 @@ export function ScoringSummary({ kind }: { kind: "matches" | "table" }) {
     <section className="rounded-card bg-white shadow-card">
       <button
         type="button"
-        className="flex min-h-12 w-full items-center gap-2 px-4 text-left font-bold text-ink"
+        className={`flex min-h-12 w-full items-center gap-2 px-4 text-left font-bold ${TX.base} ${FOCUS}`}
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((value) => !value)}
@@ -162,7 +162,7 @@ export function ScoringSummary({ kind }: { kind: "matches" | "table" }) {
       {open ? (
         <div
           id={panelId}
-          className="flex flex-col gap-3 border-t border-paper-line px-4 py-4 text-[1rem] text-ink/75"
+          className={`flex flex-col gap-3 border-t border-paper-line px-4 py-4 ${T.body} ${TX.muted}`}
         >
           {table ? (
             <>
@@ -171,7 +171,7 @@ export function ScoringSummary({ kind }: { kind: "matches" | "table" }) {
                 scoring ladder.
               </p>
               <TableScoringTable />
-              <p className="text-sm text-ink/60">
+              <p className={`${T.dense} ${TX.muted}`}>
                 The Bands are {TABLE_BANDS.map((band) => band.name).join(", ")}.
               </p>
               <Link
@@ -189,7 +189,7 @@ export function ScoringSummary({ kind }: { kind: "matches" | "table" }) {
                 except for Wrong Way Round, which is its own result.
               </p>
               <WeeklyScoringTable />
-              <p className="text-sm text-ink/60">
+              <p className={`${T.dense} ${TX.muted}`}>
                 A missing pick scores {NO_PICK_POINTS}. It is never filled in
                 for you.
               </p>

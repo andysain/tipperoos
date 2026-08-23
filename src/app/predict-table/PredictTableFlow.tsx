@@ -48,6 +48,7 @@ import { BandsBoard, type UndoState } from "./BandsBoard";
 import { ChampionCelebration } from "./ChampionCelebration";
 import { SubmittedMoment } from "./SubmittedMoment";
 import { BAND_LABEL, type Team } from "./shared";
+import { FOCUS, T, TX } from "@/components/ui/tokens";
 
 // How long the champion ceremony stays on screen: the confetti-fall
 // animation (globals.css) is 1.1s, plus a 100ms buffer so the beat clears
@@ -80,7 +81,7 @@ function LockCountdown({
   if (remainingMs <= 0) return null;
   const soon = remainingMs < 24 * 60 * 60 * 1000;
   return (
-    <span className={soon ? "text-warning" : "text-ink/50"}>
+    <span className={soon ? "text-warning" : TX.muted}>
       Locks in {formatCountdown(remainingMs)}
     </span>
   );
@@ -439,10 +440,10 @@ export function PredictTableFlow({
   if (locked) {
     return (
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4">
-        <h1 className="text-[1.9rem] font-extrabold text-ink">
+        <h1 className={`${T.h1} font-extrabold ${TX.base}`}>
           Predict the Table
         </h1>
-        <p className="text-ink/70">
+        <p className={TX.muted}>
           {placedCount === teams.length
             ? "Locked in -- Predict the Table is locked after 31 August."
             : "Predict the Table is locked after 31 August. Here's what you had:"}
@@ -456,10 +457,10 @@ export function PredictTableFlow({
   if (isSkipped) {
     return (
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4">
-        <h1 className="text-[1.9rem] font-extrabold text-ink">
+        <h1 className={`${T.h1} font-extrabold ${TX.base}`}>
           You skipped Predict the Table
         </h1>
-        <p className="text-ink/70">
+        <p className={TX.muted}>
           No worries -- you can still call your table whenever you like.
         </p>
         <ScoringSummary kind="table" />
@@ -476,7 +477,7 @@ export function PredictTableFlow({
 
   return (
     <main className="relative mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4">
-      <h1 className="text-[1.9rem] font-extrabold text-ink">
+      <h1 className={`${T.h1} font-extrabold ${TX.base}`}>
         Predict the Table
       </h1>
       {/* The instruction line is for someone who hasn't done this before.
@@ -485,7 +486,7 @@ export function PredictTableFlow({
           it goes, and the persistent `?` link covers anyone who wants it
           back. */}
       {submittedAt ? null : (
-        <p className="-mt-2 text-ink/70">
+        <p className={`-mt-2 ${TX.muted}`}>
           {openBand
             ? "Tap clubs to add them to the open Band. Tap a Band's name to open or close it."
             : "Where will each Premier League club finish? Tap a Band to open it, then tap clubs to add them."}
@@ -494,7 +495,7 @@ export function PredictTableFlow({
       <ScoringSummary kind="table" />
 
       <div className="-mt-2 flex items-center justify-between gap-2">
-        <p className="flex items-center gap-1.5 text-xs font-bold text-ink/50">
+        <p className={`flex items-center gap-1.5 ${T.label} font-bold ${TX.muted}`}>
           <span>
             {placedCount} of {teams.length} placed
           </span>
@@ -519,20 +520,20 @@ export function PredictTableFlow({
 
         {placedCount > 0 ? (
           confirmingStartAgain ? (
-            <span className="flex shrink-0 items-center gap-2 text-xs font-bold">
-              <span className="text-ink/60">Start again?</span>
+            <span className={`flex shrink-0 items-center gap-2 ${T.label} font-bold`}>
+              <span className={TX.muted}>Start again?</span>
               <button
                 type="button"
                 onClick={handleStartAgain}
                 disabled={startingAgain}
-                className="-my-3 flex h-11 min-w-11 items-center justify-center px-2 text-danger hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                className={`-my-3 flex h-11 min-w-11 items-center justify-center px-2 text-danger hover:underline disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`}
               >
                 Yes
               </button>
               <button
                 type="button"
                 onClick={() => setConfirmingStartAgain(false)}
-                className="-my-3 flex h-11 min-w-11 items-center justify-center px-2 text-ink/50 hover:text-ink"
+                className={`-my-3 flex h-11 min-w-11 items-center justify-center px-2 ${TX.muted} hover:text-text ${FOCUS}`}
               >
                 Cancel
               </button>
@@ -542,7 +543,7 @@ export function PredictTableFlow({
               type="button"
               onClick={() => setConfirmingStartAgain(true)}
               disabled={startingAgain}
-              className="-my-3 flex h-11 min-w-11 shrink-0 items-center justify-center px-2 text-xs font-bold text-ink/50 hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+              className={`-my-3 flex h-11 min-w-11 shrink-0 items-center justify-center px-2 ${T.label} font-bold ${TX.muted} hover:text-text disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`}
             >
               Start again
             </button>
@@ -551,21 +552,21 @@ export function PredictTableFlow({
       </div>
 
       {isLateJoiner ? (
-        <p className="-mt-2 text-sm text-info">
+        <p className={`-mt-2 ${T.dense} text-info`}>
           You joined after Gameweek 1 kicked off, so this one&apos;s totally
           optional -- submit whenever you like, or skip it.
         </p>
       ) : null}
 
       {submittedAt ? (
-        <p className="-mt-2 flex items-center gap-1.5 text-sm text-success">
+        <p className={`-mt-2 flex items-center gap-1.5 ${T.dense} text-success`}>
           <CircleCheck className="size-4 shrink-0" aria-hidden />
           Submitted &mdash; you can keep editing until 31 August.
         </p>
       ) : null}
 
       {saveError ? (
-        <p role="alert" className="-mt-2 text-sm text-danger">
+        <p role="alert" className={`-mt-2 ${T.dense} text-danger`}>
           {saveError}
         </p>
       ) : null}
@@ -588,7 +589,7 @@ export function PredictTableFlow({
       />
 
       {actionError ? (
-        <p role="alert" className="text-sm text-danger">
+        <p role="alert" className={`${T.dense} text-danger`}>
           {actionError}
         </p>
       ) : null}
@@ -618,10 +619,10 @@ export function PredictTableFlow({
                 aria-hidden
               />
               <div>
-                <h2 className="font-extrabold text-ink">
+                <h2 className={`font-extrabold ${TX.base}`}>
                   Your table needs a quick tidy-up
                 </h2>
-                <p className="mt-1 text-sm text-ink/70">
+                <p className={`mt-1 ${T.dense} ${TX.muted}`}>
                   These groups do not have the right number of teams. You can
                   submit now, but they will miss their Band Bonus.
                 </p>
@@ -633,14 +634,14 @@ export function PredictTableFlow({
                 return (
                   <div
                     key={mismatch.band}
-                    className="flex items-center justify-between gap-3 rounded-btn-sm bg-warning/10 px-3 py-2 text-sm"
+                    className={`flex items-center justify-between gap-3 rounded-btn-sm bg-warning/10 px-3 py-2 ${T.dense}`}
                   >
-                    <span className="font-extrabold text-ink">
+                    <span className={`font-extrabold ${TX.base}`}>
                       {BAND_LABEL[mismatch.band]}
                     </span>
-                    <span className="text-right font-bold text-ink/70 tabular-nums">
+                    <span className={`text-right font-bold ${TX.muted} tabular-nums`}>
                       {mismatch.actual} of {mismatch.expected} teams
-                      <span className="block text-xs font-semibold text-warning">
+                      <span className={`block ${T.caption} font-semibold text-warning`}>
                         {difference > 0
                           ? `${difference} too many`
                           : `${Math.abs(difference)} more needed`}

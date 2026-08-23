@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { FOCUS, LABEL, T, TX } from "./tokens";
 
 export interface PinInputProps {
   length?: number;
@@ -84,9 +85,7 @@ export function PinInput({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-[0.8rem] font-bold tracking-[0.08em] text-ink uppercase">
-        {label}
-      </span>
+      <span className={`${LABEL} ${TX.base}`}>{label}</span>
       <div className="flex gap-3" onPaste={handlePaste}>
         {digits.map((digit, index) => (
           <input
@@ -103,15 +102,13 @@ export function PinInput({
             onChange={(e) => handleChange(index, e.target.value)}
             onKeyDown={(e) => handleKeyDown(index, e)}
             aria-label={`${label} digit ${index + 1}`}
-            className={`h-14 w-12 rounded-btn-sm border border-paper-line bg-paper text-center text-2xl font-bold tabular-nums text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/40 ${
-              error
-                ? "border-danger focus:border-danger focus:ring-danger/30"
-                : ""
+            className={`h-14 w-12 rounded-btn-sm border border-paper-line bg-paper text-center ${T.h2} font-bold tabular-nums ${TX.base} outline-none focus:border-accent ${FOCUS} ${
+              error ? "border-danger focus-visible:ring-danger/40" : ""
             }`}
           />
         ))}
       </div>
-      {error ? <p className="text-sm text-danger">{error}</p> : null}
+      {error ? <p className={`${T.dense} text-danger`}>{error}</p> : null}
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { PinInput } from "@/components/ui/PinInput";
 import { TextField } from "@/components/ui/TextField";
 import { detectBrowserTimeZone } from "@/components/nav/timezone-cookie";
 import { EMOJI_OPTIONS, pickRandomEmoji } from "@/lib/auth/emoji-options";
+import { FOCUS, LABEL, T, TX } from "@/components/ui/tokens";
 import { fetchPlayers, type Player } from "./fetch-players";
 
 const STORED_CODE_KEY = "tipperoos.competitionCode";
@@ -263,7 +264,7 @@ function LoginFlow() {
   if (step === "checking") {
     return (
       <main className="flex min-h-full flex-1 items-center justify-center bg-paper p-4">
-        <p className="text-ink/60">Loading…</p>
+        <p className={TX.muted}>Loading…</p>
       </main>
     );
   }
@@ -273,10 +274,10 @@ function LoginFlow() {
       <Card className="w-full max-w-sm">
         {step === "code" ? (
           <>
-            <h1 className="text-[1.9rem] font-extrabold text-ink">
+            <h1 className={`${T.h1} font-extrabold ${TX.base}`}>
               Welcome to Tipperoos
             </h1>
-            <p className="mt-1 mb-6 text-ink/70">
+            <p className={`mt-1 mb-6 ${TX.muted}`}>
               Enter your competition code to get started.
             </p>
             <form onSubmit={handleCodeSubmit} className="flex flex-col gap-5">
@@ -297,13 +298,13 @@ function LoginFlow() {
 
         {step === "list" ? (
           <>
-            <h1 className="text-[1.9rem] font-extrabold text-ink">
+            <h1 className={`${T.h1} font-extrabold ${TX.base}`}>
               Who&apos;s playing?
             </h1>
-            <p className="mt-1 mb-6 text-ink/70">Pick your name to log in.</p>
+            <p className={`mt-1 mb-6 ${TX.muted}`}>Pick your name to log in.</p>
 
             {players.length === 0 ? (
-              <p className="text-sm text-ink/60">
+              <p className={`${T.dense} ${TX.muted}`}>
                 No players yet — be the first to sign up!
               </p>
             ) : (
@@ -316,9 +317,9 @@ function LoginFlow() {
                       setSelected(player);
                       setStep("pin");
                     }}
-                    className="flex items-center gap-3 rounded-btn border border-paper-line bg-paper px-4 py-3 text-left text-[1.0625rem] font-bold text-ink transition hover:border-accent/60"
+                    className={`flex items-center gap-3 rounded-btn border border-paper-line bg-paper px-4 py-3 text-left ${T.body} font-bold ${TX.base} transition hover:border-accent/60 ${FOCUS}`}
                   >
-                    <span className="text-xl">{player.emoji ?? "⚽"}</span>
+                    <span className={T.body}>{player.emoji ?? "⚽"}</span>
                     {player.displayName}
                   </button>
                 ))}
@@ -328,7 +329,7 @@ function LoginFlow() {
             <button
               type="button"
               onClick={() => setStep("join")}
-              className="mt-6 flex w-full items-center justify-center rounded-btn border-2 border-accent bg-accent/10 px-4 py-3 text-center text-[1.0625rem] font-extrabold text-ink transition hover:bg-accent/20"
+              className={`mt-6 flex w-full items-center justify-center rounded-btn border-2 border-accent bg-accent/10 px-4 py-3 text-center ${T.body} font-extrabold ${TX.base} transition hover:bg-accent/20 ${FOCUS}`}
             >
               New here? Join the competition
             </button>
@@ -336,7 +337,7 @@ function LoginFlow() {
             <button
               type="button"
               onClick={goToCode}
-              className="mt-3 text-center text-sm font-bold text-ink/60 transition hover:text-ink"
+              className={`mt-3 text-center ${T.dense} font-bold ${TX.muted} transition hover:text-text ${FOCUS}`}
             >
               Using a different competition? Enter another code
             </button>
@@ -348,14 +349,14 @@ function LoginFlow() {
             <button
               type="button"
               onClick={goToList}
-              className="mb-4 text-sm font-bold text-ink/60 hover:text-ink"
+              className={`mb-4 ${T.dense} font-bold ${TX.muted} hover:text-text ${FOCUS}`}
             >
               ← Not {selected.displayName}?
             </button>
-            <h1 className="text-[1.9rem] font-extrabold text-ink">
+            <h1 className={`${T.h1} font-extrabold ${TX.base}`}>
               Hi {selected.displayName}! {selected.emoji ?? "⚽"}
             </h1>
-            <p className="mt-1 mb-6 text-ink/70">Enter your PIN.</p>
+            <p className={`mt-1 mb-6 ${TX.muted}`}>Enter your PIN.</p>
 
             <PinInput
               key={pinResetKey}
@@ -366,7 +367,7 @@ function LoginFlow() {
             />
 
             {pinSubmitting ? (
-              <p className="mt-4 text-sm text-ink/60">Checking…</p>
+              <p className={`mt-4 ${T.dense} ${TX.muted}`}>Checking…</p>
             ) : null}
           </>
         ) : null}
@@ -376,14 +377,14 @@ function LoginFlow() {
             <button
               type="button"
               onClick={goToList}
-              className="mb-4 text-sm font-bold text-ink/60 hover:text-ink"
+              className={`mb-4 ${T.dense} font-bold ${TX.muted} hover:text-text ${FOCUS}`}
             >
               ← Back
             </button>
-            <h1 className="text-[1.9rem] font-extrabold text-ink">
+            <h1 className={`${T.h1} font-extrabold ${TX.base}`}>
               Join Tipperoos
             </h1>
-            <p className="mt-1 mb-6 text-ink/70">Let&apos;s get you set up.</p>
+            <p className={`mt-1 mb-6 ${TX.muted}`}>Let&apos;s get you set up.</p>
 
             <form onSubmit={handleJoinSubmit} className="flex flex-col gap-5">
               <TextField
@@ -407,7 +408,7 @@ function LoginFlow() {
               />
 
               <div className="flex flex-col gap-1.5">
-                <span className="text-[0.8rem] font-bold tracking-[0.08em] text-ink uppercase">
+                <span className={`${LABEL} ${TX.base}`}>
                   Pick an emoji
                 </span>
                 <div className="grid grid-cols-6 gap-2">
@@ -417,7 +418,7 @@ function LoginFlow() {
                       type="button"
                       onClick={() => setJoinEmoji(option)}
                       aria-pressed={joinEmoji === option}
-                      className={`flex h-11 w-11 items-center justify-center rounded-btn-sm border text-xl transition ${
+                      className={`flex h-11 w-11 items-center justify-center rounded-btn-sm border ${T.body} transition ${FOCUS} ${
                         joinEmoji === option
                           ? "border-accent bg-accent/20"
                           : "border-paper-line bg-paper hover:border-accent/60"
@@ -443,18 +444,18 @@ function LoginFlow() {
                     Pick Random Emoji
                   </Button>
                   {joinEmoji ? (
-                    <span className="flex items-center gap-2 rounded-btn-sm border border-accent bg-accent/10 px-3 py-1.5 text-sm font-bold text-ink">
-                      <span className="text-xs tracking-[0.08em] text-ink/60 uppercase">
+                    <span className={`flex items-center gap-2 rounded-btn-sm border border-accent bg-accent/10 px-3 py-1.5 ${T.dense} font-bold ${TX.base}`}>
+                      <span className={`tracking-[0.08em] ${T.label} ${TX.muted} uppercase`}>
                         Selected
                       </span>
-                      <span className="text-4xl leading-none">{joinEmoji}</span>
+                      <span className={`${T.h1} leading-none`}>{joinEmoji}</span>
                     </span>
                   ) : null}
                 </div>
               </div>
 
               {joinError ? (
-                <p className="text-sm text-danger">{joinError}</p>
+                <p className={`${T.dense} text-danger`}>{joinError}</p>
               ) : null}
 
               <Button type="submit" fullWidth disabled={joinSubmitting}>
@@ -473,7 +474,7 @@ export default function LoginPage() {
     <Suspense
       fallback={
         <main className="flex min-h-full flex-1 items-center justify-center bg-paper p-4">
-          <p className="text-ink/60">Loading…</p>
+          <p className={TX.muted}>Loading…</p>
         </main>
       }
     >

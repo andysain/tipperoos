@@ -82,7 +82,7 @@ export default async function PicksRecordPage({
             {isViewer ? "Your picks" : `${record.displayName}'s picks`}
           </span>
           <span className="flex flex-col items-end leading-none">
-            <span className="text-[1.75rem] font-extrabold tabular-nums text-on-ink">
+            <span className={`${T.score} font-extrabold tabular-nums text-on-ink`}>
               {record.total}
             </span>
             <span className={`${LABEL} text-on-ink-muted`}>points</span>

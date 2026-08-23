@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { FOCUS, TX } from "@/components/ui/tokens";
+import { FOCUS, T, TX } from "@/components/ui/tokens";
 import { useId, useState } from "react";
 import { getMatchBreakdown } from "./match-breakdown";
 
@@ -38,7 +38,7 @@ export function ScoringBreakdown({
     <div className="text-text">
       <button
         type="button"
-        className={`flex min-h-11 w-full items-center gap-2 text-left text-[0.86rem] ${FOCUS}`}
+        className={`flex min-h-11 w-full items-center gap-2 text-left ${T.dense} ${FOCUS}`}
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((value) => !value)}
@@ -61,12 +61,12 @@ export function ScoringBreakdown({
           className="mt-1 flex flex-col gap-2 border-t border-paper-line pt-3"
         >
           {pickHome === null || pickAway === null ? (
-            <p className={`text-sm ${TX.muted}`}>
+            <p className={`${T.dense} ${TX.muted}`}>
               No pick was filed, so this match scored no points. Picks are never
               filled in automatically.
             </p>
           ) : breakdown.wrongWayRound ? (
-            <div className="flex items-center justify-between gap-3 text-sm">
+            <div className={`flex items-center justify-between gap-3 ${T.dense}`}>
               <span className={TX.muted}>
                 Wrong Way Round: you said {pickHome}–{pickAway}, it finished{" "}
                 {resultHome}–{resultAway}.
@@ -79,12 +79,12 @@ export function ScoringBreakdown({
             breakdown.rows.map((row) => (
               <div
                 key={row.label}
-                className="flex items-start justify-between gap-3 text-sm"
+                className={`flex items-start justify-between gap-3 ${T.dense}`}
               >
                 <span className={TX.muted}>
                   {row.label}
                   {row.detail ? (
-                    <span className={`block text-xs ${TX.decorative}`}>
+                    <span className={`block ${T.caption} ${TX.decorative}`}>
                       {row.detail}
                     </span>
                   ) : null}
@@ -96,11 +96,11 @@ export function ScoringBreakdown({
             ))
           )}
           {kickoffLabel ? (
-            <p className={`text-xs ${TX.muted}`}>{kickoffLabel}</p>
+            <p className={`${T.caption} ${TX.muted}`}>{kickoffLabel}</p>
           ) : null}
           <Link
             href={{ pathname: "/how-it-works", hash: "how-your-pick-scores" }}
-            className={`inline-flex items-center gap-0.5 text-[0.8rem] font-bold ${TX.base} underline underline-offset-2 ${FOCUS}`}
+            className={`inline-flex items-center gap-0.5 ${T.caption} font-bold ${TX.base} underline underline-offset-2 ${FOCUS}`}
           >
             How points work
             <ChevronRight className="size-3.5" aria-hidden />
