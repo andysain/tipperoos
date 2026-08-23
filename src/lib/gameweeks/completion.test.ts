@@ -14,14 +14,17 @@ import {
 // status === "postponed"), not voided_at alone.
 
 function slot(overrides: Partial<ScoringSlot> = {}): ScoringSlot {
-  return { matchId: "match-1", status: "scheduled", voidedAt: null, ...overrides };
+  return {
+    matchId: "match-1",
+    status: "scheduled",
+    voidedAt: null,
+    ...overrides,
+  };
 }
 
 describe("isSlotScoringDone", () => {
   it("is done for a Skipped Slot (null match id), regardless of status", () => {
-    expect(isSlotScoringDone(slot({ matchId: null, status: null }))).toBe(
-      true,
-    );
+    expect(isSlotScoringDone(slot({ matchId: null, status: null }))).toBe(true);
   });
 
   it("is done once the match has a completed result", () => {
@@ -151,7 +154,9 @@ describe("isSlotScoringDone across a mixed set", () => {
 // slot pair (matchId, voidedAt) plus a status lookup into a ScoringSlot.
 describe("toScoringSlot", () => {
   it("is a Skipped Slot when matchId is null, regardless of the status map", () => {
-    expect(toScoringSlot(null, null, new Map([["m1", { status: "completed" }]]))).toEqual({
+    expect(
+      toScoringSlot(null, null, new Map([["m1", { status: "completed" }]])),
+    ).toEqual({
       matchId: null,
       status: null,
       voidedAt: null,
@@ -166,7 +171,11 @@ describe("toScoringSlot", () => {
 
   it("carries voidedAt through unchanged", () => {
     expect(
-      toScoringSlot("m1", "2026-08-15T00:00:00Z", new Map([["m1", { status: "scheduled" }]])),
+      toScoringSlot(
+        "m1",
+        "2026-08-15T00:00:00Z",
+        new Map([["m1", { status: "scheduled" }]]),
+      ),
     ).toEqual({
       matchId: "m1",
       status: "scheduled",

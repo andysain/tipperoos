@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { FOCUS } from "@/components/ui/tokens";
 import { useId, useState } from "react";
 import {
   MATCH_SCORING_TERMS,
@@ -19,7 +20,7 @@ const bandBonusValues = [...new Set(TABLE_BANDS.map((band) => band.bonus))];
 
 function ScoreTable({ children }: { children: React.ReactNode }) {
   return (
-    <div className="overflow-x-auto rounded-btn border border-paper-line">
+    <div className="overflow-x-auto [mask-image:linear-gradient(to_right,black_0,black_calc(100%-16px),transparent_100%)] rounded-btn border border-paper-line">
       <table className="w-full min-w-[18rem] border-collapse text-left text-sm">
         {children}
       </table>
@@ -175,9 +176,10 @@ export function ScoringSummary({ kind }: { kind: "matches" | "table" }) {
               </p>
               <Link
                 href={{ pathname: "/how-it-works", hash: "predict-the-table" }}
-                className="font-bold text-ink underline"
+                className={`inline-flex items-center gap-0.5 font-bold text-text underline ${FOCUS}`}
               >
-                See the worked examples →
+                See the worked examples
+                <ChevronRight className="size-3.5" aria-hidden />
               </Link>
             </>
           ) : (
@@ -196,9 +198,10 @@ export function ScoringSummary({ kind }: { kind: "matches" | "table" }) {
                   pathname: "/how-it-works",
                   hash: "how-your-pick-scores",
                 }}
-                className="font-bold text-ink underline"
+                className={`inline-flex items-center gap-0.5 font-bold text-text underline ${FOCUS}`}
               >
-                See the worked examples →
+                See the worked examples
+                <ChevronRight className="size-3.5" aria-hidden />
               </Link>
             </>
           )}

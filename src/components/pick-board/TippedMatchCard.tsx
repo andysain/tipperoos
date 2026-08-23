@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Dices, Star } from "lucide-react";
+import { Flame, Shuffle } from "lucide-react";
 import { tv } from "tailwind-variants";
 import {
   decomposeCountdown,
@@ -17,6 +17,8 @@ import {
   CardShellSeam,
 } from "@/components/ui/CardShell";
 import { ScoringBreakdown } from "@/components/scoring/ScoringBreakdown";
+import { ordinal } from "@/lib/format/ordinal";
+import { T, TX, MICRO_LABEL, INSET, FOCUS } from "@/components/ui/tokens";
 
 export interface TippedMatchTeam {
   name: string;
@@ -86,28 +88,33 @@ export interface TippedMatchCardProps {
 }
 
 const provenanceLabel: Record<TippedMatchProvenance, string> = {
-  top_matchup: "Top matchup",
-  random_pick: "Random pick",
+  top_matchup: "Headline",
+  random_pick: "Random",
 };
-const ProvenanceIcon: Record<TippedMatchProvenance, typeof Star> = {
-  top_matchup: Star,
-  random_pick: Dices,
+// Shuffle, not Dices: a pair of dice is the most gambling-coded glyph in any
+// icon set, on an app whose spec bans gambling language (CLAUDE.md -> Hard
+// constraints). Flame, not Star: docs/in-app-help-spec.md -> Out of scope
+// says of the deferred Star Match feature "do not document or hint at it",
+// and a star on the marquee card is exactly that hint -- it also collides
+// with the universal favourite/starred meaning.
+const ProvenanceIcon: Record<TippedMatchProvenance, typeof Flame> = {
+  top_matchup: Flame,
+  random_pick: Shuffle,
 };
-
-function ordinalSuffix(n: number): string {
-  const rem = n % 100;
-  if (rem >= 11 && rem <= 13) return "th";
-  return (["th", "st", "nd", "rd"] as const)[n % 10] ?? "th";
-}
 
 type ChipTone = "open" | "locked" | "final";
 
+// No accent. A lifecycle status is not one of the accent budget's sanctioned
+// spots (docs/DESIGN_SYSTEM.md -> Accent budget), and here it was competing
+// with the card's one legitimate accent -- the player's own predicted
+// scoreline, two rows below. `locked` steps up in ground and weight instead,
+// so it still reads as the stronger state without spending the budget.
 const chipStyles = tv({
-  base: "shrink-0 rounded-full px-2 py-0.5 text-[0.64rem] font-bold uppercase tracking-wide",
+  base: `shrink-0 rounded-badge px-2 py-0.5 ${MICRO_LABEL}`,
   variants: {
     tone: {
-      open: "bg-paper/15 text-paper",
-      locked: "bg-accent text-accent-ink",
+      open: "bg-paper/15 text-on-ink",
+      locked: "bg-paper/25 text-on-ink font-extrabold",
       final: "bg-paper text-ink",
     },
   },
@@ -141,16 +148,33 @@ function chipForState(kind: TippedMatchCardState["kind"]): {
  * name bumped up a touch (1.0625rem -> 1.125rem) for balance against the
  * larger score column that sits alongside it once a pick or result exists.
  */
-function TeamRow({ team, fill }: { team: TippedMatchTeam; fill: string }) {
+function TeamRow({
+  team,
+  fill,
+  home,
+}: {
+  team: TippedMatchTeam;
+  fill: string;
+  home?: boolean;
+}) {
   return (
     <div className="flex min-w-0 items-center gap-1.5">
-      <span className="w-6 shrink-0 text-[0.68rem] font-bold tabular-nums text-paper/55">
-        {team.leaguePosition !== null
-          ? `${team.leaguePosition}${ordinalSuffix(team.leaguePosition)}`
-          : ""}
+      <span
+        className={`w-6 shrink-0 ${T.label} font-bold tabular-nums ${TX.onInkMuted}`}
+      >
+        {team.leaguePosition !== null ? ordinal(team.leaguePosition) : ""}
       </span>
       <ClubCodeBadge shortCode={team.shortCode} fill={fill} />
-      <span className="min-w-0 flex-1 truncate text-[1.125rem] font-bold text-paper">
+      {/* Home takes visual dominance rather than a label -- the form of the
+          home/away rule that survives sharing a line with a scoreline
+          (DESIGN_SYSTEM.md -> Team display in fixtures, amended 2026-08-20).
+          The card dropped the explicit `home` chip for width; this is what
+          replaced it, and it was specified but never applied here. */}
+      <span
+        className={`min-w-0 flex-1 truncate ${T.body} ${
+          home ? `font-bold ${TX.onInk}` : `font-medium ${TX.onInkMuted}`
+        }`}
+      >
         {team.name}
       </span>
     </div>
@@ -162,24 +186,66 @@ function TeamRow({ team, fill }: { team: TippedMatchTeam; fill: string }) {
  * row -- keeps it vertically centred against that row regardless of the
  * row's own line-height, and lets it sit visually apart (bigger, its own
  * column) instead of reading as an afterthought at the row's tail end.
+ *
+ * `emphasis` exists only for the finished card's two-column comparison
+ * (own pick beside the result): the result keeps the Display role, the
+ * pick steps down one stop on the scale so the pair reads as
+ * "what happened, and what you said" rather than as two equal numbers.
  */
 function ScoreCell({
   value,
   tone,
+  emphasis = "primary",
+  className = "",
 }: {
   value: number | null;
   tone: "own-pick" | "result";
+  emphasis?: "primary" | "secondary";
+  className?: string;
 }) {
   return (
     <span
-      className={`shrink-0 text-center text-[1.75rem] font-extrabold leading-none tabular-nums ${
-        tone === "result" ? "text-paper" : "text-accent"
-      }`}
+      className={`shrink-0 text-center font-extrabold leading-none tabular-nums ${
+        emphasis === "primary" ? T.score : T.h2
+      } ${tone === "result" ? "text-paper" : "text-accent"} ${className}`}
     >
       {value ?? "–"}
     </span>
   );
 }
+
+/** Column captions for the finished card's two score columns -- without
+ *  them the pick and the result are two adjacent numbers with nothing
+ *  saying which is which, and colour alone can't carry that
+ *  (DESIGN_SYSTEM.md).
+ *
+ *  They take the FINAL status chip's own slot at the end of the eyebrow
+ *  rather than occupying a row of their own, and land exactly over their
+ *  columns because both are right-aligned to the same card inset and
+ *  carry the same widths and gap. That's what makes the swap free: no
+ *  caption row, no vertical cost, and no caption wide enough to widen a
+ *  column and eat the team name's width (as grid cells they cost 24px of
+ *  name at 375px -- enough to clip "Manchester United").
+ *
+ *  FINAL is caption and status at once, which is why the chip it replaces
+ *  isn't a loss: a card showing a result column IS a finished match. It
+ *  also restores the picks record's exact PICK / FINAL wording. Every
+ *  other state, and a finished match with no pick to compare against,
+ *  keeps the chip. */
+function ScoreColumnLabels() {
+  const cap = `text-center ${MICRO_LABEL} ${TX.onInkMuted}`;
+  return (
+    <div className="flex shrink-0 justify-end gap-x-1.5">
+      <span className={`${cap} ${SCORE_COL_PICK}`}>You</span>
+      <span className={`${cap} ${SCORE_COL_RESULT}`}>Final</span>
+    </div>
+  );
+}
+
+/** Fixed widths so the two score columns line up row to row, and so the
+ *  captions above them overhang harmlessly instead of widening them. */
+const SCORE_COL_PICK = "w-7";
+const SCORE_COL_RESULT = "w-10";
 
 function MetaLine({
   provenance,
@@ -209,8 +275,12 @@ function MetaLine({
     countdownParts.hours === 0;
 
   return (
-    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.72rem] font-medium text-paper/60">
-      <span className="inline-flex items-center gap-1 font-bold text-accent">
+    <div
+      className={`flex flex-wrap items-center gap-x-1.5 gap-y-0.5 ${T.caption} font-medium ${TX.onInkMuted}`}
+    >
+      {/* Provenance is metadata, not one of the three emotional accent
+          moments -- weight and the icon differentiate it on an ink ground. */}
+      <span className="inline-flex items-center gap-1 font-bold">
         <Icon className="size-[0.8em]" aria-hidden />
         {provenanceLabel[provenance]}
       </span>
@@ -238,6 +308,11 @@ interface RowScores {
   home: number | null;
   away: number | null;
   tone: "own-pick" | "result";
+  /** Finished only: the Player's own pick, rendered in its own column
+   *  beside the result instead of as a "You tipped 1-3" line under the
+   *  seam -- the same side-by-side comparison the picks record makes
+   *  (PICK / FINAL), so the two surfaces read the same way. */
+  own?: { home: number; away: number };
 }
 
 /**
@@ -275,38 +350,73 @@ function CardHeader({
   scores?: RowScores;
   note?: string;
 }) {
+  // The "eyebrow": meta ABOVE the teams, so the card ends on the scoreline
+  // rather than trailing off into small print. Chosen over demoting only the
+  // chip and over a two-line variant. The status chip rides the eyebrow with
+  // it, which also frees the team rows' full width for the score.
   return (
-    <CardShellHeader>
-      <div className="flex items-start gap-2.5">
-        {scores ? (
-          <div className="grid min-w-0 flex-1 grid-cols-[1fr_auto] items-center gap-x-2.5 gap-y-1">
-            <TeamRow team={home} fill={homeFill} />
-            <ScoreCell value={scores.home} tone={scores.tone} />
-            <TeamRow team={away} fill={awayFill} />
-            <ScoreCell value={scores.away} tone={scores.tone} />
-          </div>
+    <CardShellHeader className={INSET}>
+      <div className="flex items-center justify-between gap-2">
+        <MetaLine
+          provenance={provenance}
+          kickoffUtcIso={kickoffUtcIso}
+          timeZone={timeZone}
+          now={now}
+          showCountdown={showCountdown}
+          note={note}
+        />
+        {scores?.own ? (
+          <ScoreColumnLabels />
         ) : (
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <TeamRow team={home} fill={homeFill} />
-            <TeamRow team={away} fill={awayFill} />
-          </div>
+          <StatusChip label={chip.label} tone={chip.tone} />
         )}
-        <StatusChip label={chip.label} tone={chip.tone} />
       </div>
-      <MetaLine
-        provenance={provenance}
-        kickoffUtcIso={kickoffUtcIso}
-        timeZone={timeZone}
-        now={now}
-        showCountdown={showCountdown}
-        note={note}
-      />
+      {scores?.own ? (
+        <div className="grid min-w-0 grid-cols-[1fr_auto_auto] items-center gap-x-1.5">
+          <TeamRow team={home} fill={homeFill} home />
+          <ScoreCell
+            value={scores.own.home}
+            tone="own-pick"
+            emphasis="secondary"
+            className={SCORE_COL_PICK}
+          />
+          <ScoreCell
+            value={scores.home}
+            tone={scores.tone}
+            className={SCORE_COL_RESULT}
+          />
+          <TeamRow team={away} fill={awayFill} />
+          <ScoreCell
+            value={scores.own.away}
+            tone="own-pick"
+            emphasis="secondary"
+            className={SCORE_COL_PICK}
+          />
+          <ScoreCell
+            value={scores.away}
+            tone={scores.tone}
+            className={SCORE_COL_RESULT}
+          />
+        </div>
+      ) : scores ? (
+        <div className="grid min-w-0 grid-cols-[1fr_auto] items-center gap-x-2.5 gap-y-1">
+          <TeamRow team={home} fill={homeFill} home />
+          <ScoreCell value={scores.home} tone={scores.tone} />
+          <TeamRow team={away} fill={awayFill} />
+          <ScoreCell value={scores.away} tone={scores.tone} />
+        </div>
+      ) : (
+        <div className="flex min-w-0 flex-col gap-1">
+          <TeamRow team={home} fill={homeFill} home />
+          <TeamRow team={away} fill={awayFill} />
+        </div>
+      )}
     </CardShellHeader>
   );
 }
 
 const digitCell = tv({
-  base: "flex h-11 flex-1 items-center justify-center rounded-btn-sm border border-paper-line bg-white text-base font-bold tabular-nums text-ink transition active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-50",
+  base: `flex h-11 flex-1 items-center justify-center rounded-btn-sm border border-paper-line bg-surface text-[1.0625rem] font-bold tabular-nums text-text transition active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`,
   variants: {
     selected: {
       true: "border-accent bg-accent text-accent-ink",
@@ -322,7 +432,7 @@ const digitCell = tv({
 const CUSTOM_SCORE_MAX = 20;
 
 const customScoreInput = tv({
-  base: "h-11 flex-1 min-w-0 rounded-btn-sm border bg-white text-center text-base font-bold tabular-nums text-ink outline-none transition placeholder:font-semibold placeholder:text-ink/35 disabled:cursor-not-allowed disabled:opacity-50",
+  base: `h-11 flex-1 min-w-0 rounded-btn-sm border bg-surface text-center text-[1.0625rem] font-bold tabular-nums text-text outline-none transition placeholder:font-semibold placeholder:text-text-decorative disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`,
   variants: {
     active: {
       true: "border-accent bg-accent/10",
@@ -439,29 +549,38 @@ function DigitRow({
 
 /**
  * Filed (pre-lock) gets a slim, full-width Change affordance below the
- * seam -- the only settled state that still allows editing. Tied to the
- * accent color (rather than a neutral paper/white outline) so it reads
- * as a considered action in this card's own palette instead of a generic
- * form control, and pulled in tight under the seam instead of floating
- * in its own block of ink.
+ * seam -- the only settled state that still allows editing. It sits on
+ * the shell's white body like every other card's content, rather than on
+ * a further block of ink: a settled card that stayed ink all the way down
+ * left the seam bridging dark to dark and the board with no light surface
+ * at all (DESIGN_SYSTEM.md -> Card anatomy, amended 2026-08-23).
  */
 function ChangeButton({ onClick }: { onClick: () => void }) {
   return (
-    <div className="bg-ink px-3.5 pt-2 pb-3">
+    <CardShellBody className="py-2">
       <button
         type="button"
-        className="flex h-9 w-full items-center justify-center rounded-btn-sm border border-accent/50 bg-accent/12 text-[0.8rem] font-bold tracking-wide text-accent uppercase transition hover:border-accent hover:bg-accent/22"
+        // h-11, not h-10: it matches the scoring disclosure's own row
+        // height, so a filed card and a finished card have white bodies of
+        // exactly the same depth (68px) instead of differing by 4px. It
+        // also puts the control back on the 44px touch-target floor.
+        className={`flex h-11 w-full items-center justify-center rounded-btn-sm border border-paper-line bg-surface ${T.caption} font-bold tracking-wide ${TX.base} uppercase transition hover:border-accent/60 ${FOCUS}`}
         onClick={onClick}
       >
         Change
       </button>
-    </div>
+    </CardShellBody>
   );
 }
 
-/** Finished only: the one thing that doesn't fit in a header row -- the
- * verdict (exact / what you tipped) plus the points chip. Still flat ink,
- * still no separate plate -- just the header's natural continuation. */
+/** Finished only: the points chip, and the one verdict the header's own
+ * You/Final columns can't state for themselves -- that the two matched
+ * exactly. What the Player tipped is no longer repeated here as prose;
+ * it sits in the header beside the result (see RowScores.own), which is
+ * where the comparison the line was describing actually happens.
+ *
+ * On the shell's white body, like the entry state's digit rows and the
+ * Change affordance -- the ink stops at the seam in every state now. */
 function FinishedFooter({
   ownHomeScore,
   ownAwayScore,
@@ -475,23 +594,26 @@ function FinishedFooter({
   awayScore: number;
   points: number | null;
 }) {
-  const exact = ownHomeScore === homeScore && ownAwayScore === awayScore;
+  const filed = ownHomeScore !== null && ownAwayScore !== null;
+  const exact =
+    filed && ownHomeScore === homeScore && ownAwayScore === awayScore;
+  // Nothing to say in the common case: the header already shows both
+  // scorelines, so a line restating one of them is the redundancy this
+  // replaced. Only the two exceptional readings still get a line.
+  const verdict = exact ? (
+    /* One of the three emotional accent moments, and a fill rather than
+       text -- `success` reads the same either way as a fill. */
+    <span
+      className={`self-start rounded-badge bg-success px-2 py-0.5 ${MICRO_LABEL} text-on-ink`}
+    >
+      You called it exactly
+    </span>
+  ) : !filed ? (
+    <span className={`${T.caption} ${TX.muted}`}>No pick filed</span>
+  ) : null;
   return (
-    <>
-      <div className="flex items-center gap-2 bg-ink px-3.5 pt-0.5 pb-3.5 text-[0.86rem]">
-        {exact ? (
-          <span className="font-bold text-success">You called it exactly</span>
-        ) : ownHomeScore !== null && ownAwayScore !== null ? (
-          <span className="text-paper/75">
-            You tipped{" "}
-            <span className="font-extrabold text-accent">
-              {ownHomeScore}–{ownAwayScore}
-            </span>
-          </span>
-        ) : (
-          <span className="text-paper/60">No pick filed</span>
-        )}
-      </div>
+    <CardShellBody className="gap-2 py-2">
+      {verdict}
       {points !== null ? (
         <ScoringBreakdown
           pickHome={ownHomeScore}
@@ -501,7 +623,7 @@ function FinishedFooter({
           points={points}
         />
       ) : null}
-    </>
+    </CardShellBody>
   );
 }
 
@@ -579,8 +701,8 @@ export function TippedMatchCard({
   // Once a pick or result exists, it bakes into the header rows and the
   // card collapses to just that header + seam -- no separate plate below
   // (accordion-style; see CardHeader's own doc comment). "See everyone's
-  // picks" is deliberately absent from "live" -- Match Centre (#91)
-  // doesn't exist yet, and #90's decision 2 is not to link to a route
+  // picks" now lives on the Pick Board itself, once per gameweek rather
+  // than once per card, since both slots share one destination
   // that isn't real (ADR-0005).
   //
   // Deliberately NOT gated on `!showEntryBody`: while editing a filed pick,
@@ -621,6 +743,15 @@ export function TippedMatchCard({
         home: state.homeScore,
         away: state.awayScore,
         tone: "result",
+        // Only when a pick exists: an empty You column would have to render
+        // a dash, and DESIGN_SYSTEM.md -> Numbers and units reserves "no
+        // pick" (the words) for that fact and forbids the dash. Without a
+        // pick the card keeps the single result column and the footer says
+        // it in words.
+        own:
+          state.ownHomeScore !== null && state.ownAwayScore !== null
+            ? { home: state.ownHomeScore, away: state.ownAwayScore }
+            : undefined,
       };
       break;
   }

@@ -58,8 +58,7 @@ function fakeSupabase(world: World) {
         const inserted: Row[] = [];
         for (const row of rows) {
           const exists = world.picks.some(
-            (p) =>
-              p.player_id === row.player_id && p.match_id === row.match_id,
+            (p) => p.player_id === row.player_id && p.match_id === row.match_id,
           );
           if (!exists) {
             world.picks.push(row);
@@ -172,9 +171,24 @@ describe("generateBotPicks", () => {
       ],
       // home [2, 1, 3] -> median 2; away [1, 0, 2] -> median 1.
       picks: [
-        { player_id: "h1", match_id: "m1", pred_home_score: 2, pred_away_score: 1 },
-        { player_id: "h2", match_id: "m1", pred_home_score: 1, pred_away_score: 0 },
-        { player_id: "h3", match_id: "m1", pred_home_score: 3, pred_away_score: 2 },
+        {
+          player_id: "h1",
+          match_id: "m1",
+          pred_home_score: 2,
+          pred_away_score: 1,
+        },
+        {
+          player_id: "h2",
+          match_id: "m1",
+          pred_home_score: 1,
+          pred_away_score: 0,
+        },
+        {
+          player_id: "h3",
+          match_id: "m1",
+          pred_home_score: 3,
+          pred_away_score: 2,
+        },
       ],
     };
     const { client } = fakeSupabase(world);
@@ -302,10 +316,25 @@ describe("generateBotPicks", () => {
       ],
       picks: [
         // Competition A's lone human says 4-0.
-        { player_id: "ha", match_id: "shared", pred_home_score: 4, pred_away_score: 0 },
+        {
+          player_id: "ha",
+          match_id: "shared",
+          pred_home_score: 4,
+          pred_away_score: 0,
+        },
         // Competition B's humans say 0-1 and 0-3 -> median 0-2.
-        { player_id: "hb1", match_id: "shared", pred_home_score: 0, pred_away_score: 1 },
-        { player_id: "hb2", match_id: "shared", pred_home_score: 0, pred_away_score: 3 },
+        {
+          player_id: "hb1",
+          match_id: "shared",
+          pred_home_score: 0,
+          pred_away_score: 1,
+        },
+        {
+          player_id: "hb2",
+          match_id: "shared",
+          pred_home_score: 0,
+          pred_away_score: 3,
+        },
       ],
     };
     const { client } = fakeSupabase(world);
@@ -346,13 +375,38 @@ describe("generateBotPicks", () => {
       ],
       picks: [
         // Humans: home [0, 0, 1] -> median 0; away [0, 0, 1] -> median 0.
-        { player_id: "h1", match_id: "m1", pred_home_score: 0, pred_away_score: 0 },
-        { player_id: "h2", match_id: "m1", pred_home_score: 0, pred_away_score: 0 },
-        { player_id: "h3", match_id: "m1", pred_home_score: 1, pred_away_score: 1 },
+        {
+          player_id: "h1",
+          match_id: "m1",
+          pred_home_score: 0,
+          pred_away_score: 0,
+        },
+        {
+          player_id: "h2",
+          match_id: "m1",
+          pred_home_score: 0,
+          pred_away_score: 0,
+        },
+        {
+          player_id: "h3",
+          match_id: "m1",
+          pred_home_score: 1,
+          pred_away_score: 1,
+        },
         // Pre-lock bot picks on the same match. Counting these would make
         // it home [0,0,1,3,1] -> median 1, not 0.
-        { player_id: "a-random", match_id: "m1", pred_home_score: 3, pred_away_score: 3 },
-        { player_id: "a-one-one", match_id: "m1", pred_home_score: 1, pred_away_score: 1 },
+        {
+          player_id: "a-random",
+          match_id: "m1",
+          pred_home_score: 3,
+          pred_away_score: 3,
+        },
+        {
+          player_id: "a-one-one",
+          match_id: "m1",
+          pred_home_score: 1,
+          pred_away_score: 1,
+        },
       ],
     };
     const { client } = fakeSupabase(world);

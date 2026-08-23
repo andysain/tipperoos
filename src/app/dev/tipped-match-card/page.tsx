@@ -80,7 +80,7 @@ const SETTLED_STATES: { label: string; state: TippedMatchCardState }[] = [
       awayScore: 1,
       ownHomeScore: 2,
       ownAwayScore: 1,
-      points: 9,
+      points: 7,
     },
   },
 ];

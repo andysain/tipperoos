@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useSyncExternalStore } from "react";
 import { TAB_BAR_HEIGHT_CLASS } from "./shell-metrics";
 import { TABS } from "./tabs";
+import { FOCUS } from "@/components/ui/tokens";
 
 // Fixed bottom tab bar, used at every breakpoint (docs/adr/0004-app-navigation-shell.md
 // -- no swap to a top nav/sidebar on tablet/desktop). Sits below the picker
@@ -63,17 +64,22 @@ export function TabBar() {
                     });
                   }
                 }}
-                className={`flex h-full flex-col items-center justify-center gap-0.5 text-xs font-bold ${toneClass}`}
+                className={`relative flex h-full flex-col items-center justify-center gap-0.5 text-[0.7rem] font-bold ${toneClass} ${FOCUS}`}
               >
+                {/* Anchored to the TAB, not hung off the label. Hung off a
+                    label that already fills its ~125px tab, this pushed 19px
+                    off a 375px viewport and rendered clipped -- and it was
+                    set at 0.6rem, below the hard 0.7rem floor. It is the
+                    onboarding affordance ADR 0007 relies on to make Predict
+                    the Table discoverable without a hub, so it clipping is
+                    not cosmetic. Shortened to "New" so it fits a tab. */}
+                {tab.href === "/predict-table" && needsTablePrediction ? (
+                  <span className="absolute top-1 right-2 rounded-badge bg-accent px-1.5 py-px text-[0.7rem] font-extrabold text-accent-ink">
+                    New
+                  </span>
+                ) : null}
                 <Icon className={`size-6 ${toneClass}`} />
-                <span className="relative">
-                  {tab.label}
-                  {tab.href === "/predict-table" && needsTablePrediction ? (
-                    <span className="absolute -top-2 -right-8 rounded-badge bg-accent px-1.5 py-0.5 text-[0.6rem] font-extrabold text-accent-ink">
-                      Next up
-                    </span>
-                  ) : null}
-                </span>
+                <span>{tab.label}</span>
               </Link>
             </li>
           );

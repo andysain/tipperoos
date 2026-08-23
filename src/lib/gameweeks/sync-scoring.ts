@@ -49,11 +49,16 @@ export async function scoreCompletedMatchesAndSnapshots(
 ): Promise<void> {
   if (completedMatchIds.length === 0) return;
 
-  const gameweekRows = await loadCandidateGameweeks(supabase, completedMatchIds);
+  const gameweekRows = await loadCandidateGameweeks(
+    supabase,
+    completedMatchIds,
+  );
   if (gameweekRows.length === 0) return;
 
   const referencedMatchIds = dedupe(
-    gameweekRows.flatMap((gw) => [gw.match_1_id, gw.match_2_id]).filter(nonNull),
+    gameweekRows
+      .flatMap((gw) => [gw.match_1_id, gw.match_2_id])
+      .filter(nonNull),
   );
 
   const { data: matchRows, error: matchesError } = await supabase
@@ -104,8 +109,14 @@ async function loadCandidateGameweeks(
   // hand-assembled PostgREST .or() filter string for what's otherwise a
   // plain .in() shape already used everywhere else in this module.
   const [byMatch1, byMatch2] = await Promise.all([
-    supabase.from("gameweeks").select(GW_COLS).in("match_1_id", completedMatchIds),
-    supabase.from("gameweeks").select(GW_COLS).in("match_2_id", completedMatchIds),
+    supabase
+      .from("gameweeks")
+      .select(GW_COLS)
+      .in("match_1_id", completedMatchIds),
+    supabase
+      .from("gameweeks")
+      .select(GW_COLS)
+      .in("match_2_id", completedMatchIds),
   ]);
   if (byMatch1.error) throw byMatch1.error;
   if (byMatch2.error) throw byMatch2.error;

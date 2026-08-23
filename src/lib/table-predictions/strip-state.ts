@@ -44,8 +44,13 @@ export interface TablePredictionStripInput {
 export function deriveTablePredictionStripState(
   input: TablePredictionStripInput,
 ): TablePredictionStripState {
-  const { prediction, editability, championTeam, bandCountsOk, leaguePosition } =
-    input;
+  const {
+    prediction,
+    editability,
+    championTeam,
+    bandCountsOk,
+    leaguePosition,
+  } = input;
 
   // Skipped is final and never reverses (CLAUDE.md's Predict the Table
   // section has no "un-skip" path) -- checked ahead of everything else.
@@ -54,7 +59,9 @@ export function deriveTablePredictionStripState(
   // A null `prediction` (never touched the flow) reads the same as an
   // un-submitted one -- both fall through to the not-submitted branch below.
   if (prediction?.submittedAt == null) {
-    return editability.editable ? { kind: "not_submitted" } : { kind: "hidden" };
+    return editability.editable
+      ? { kind: "not_submitted" }
+      : { kind: "hidden" };
   }
 
   // Champion Band not holding exactly one team -- either never assigned, or

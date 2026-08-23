@@ -268,7 +268,9 @@ async function getRankSourceContext(
   const liveStandingsAvailable =
     rows.length > 0 &&
     rows.every(
-      (r) => now.getTime() - new Date(r.updated_at).getTime() <= LIVE_STANDINGS_STALE_MS,
+      (r) =>
+        now.getTime() - new Date(r.updated_at).getTime() <=
+        LIVE_STANDINGS_STALE_MS,
     );
 
   const rankSource = chooseRankSource({ playedCounts, liveStandingsAvailable });

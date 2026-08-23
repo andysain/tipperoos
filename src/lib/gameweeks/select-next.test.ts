@@ -140,8 +140,12 @@ describe("selectNextGameweekSlots", () => {
     });
 
     expect(selected).toBe(1);
-    expect(tables.gameweeks.some((g) => g.competition_id === "c1" && g.number === 2)).toBe(true);
-    expect(tables.gameweeks.some((g) => g.competition_id === "c2" && g.number === 2)).toBe(false);
+    expect(
+      tables.gameweeks.some((g) => g.competition_id === "c1" && g.number === 2),
+    ).toBe(true);
+    expect(
+      tables.gameweeks.some((g) => g.competition_id === "c2" && g.number === 2),
+    ).toBe(false);
   });
 
   it("no-ops when the competition's latest gameweek isn't scoring-complete yet", async () => {
@@ -259,9 +263,7 @@ describe("selectNextGameweekSlots", () => {
   it("no-ops cleanly at end of season (no fixtures for the next matchday)", async () => {
     const { client, tables } = fakeSupabase({
       competitions: [COMPETITION],
-      gameweeks: [
-        gameweek({ number: 38, match_1_id: "m1", match_2_id: "m2" }),
-      ],
+      gameweeks: [gameweek({ number: 38, match_1_id: "m1", match_2_id: "m2" })],
       matches: [
         match("m1", { status: "completed", matchday: 38 }),
         match("m2", { status: "completed", matchday: 38 }),
@@ -291,12 +293,13 @@ describe("selectNextGameweekSlots", () => {
           team_a_id: "team-m1-a", // reuses previous Match 1's club
           team_b_id: "team-fresh",
         }),
-        match("m4", { matchday: 2, team_a_id: "team-m4-a", team_b_id: "team-m4-b" }),
+        match("m4", {
+          matchday: 2,
+          team_a_id: "team-m4-a",
+          team_b_id: "team-m4-b",
+        }),
       ],
-      teams: [
-        ...TEAMS,
-        { id: "team-fresh", previous_season_position: 2 },
-      ],
+      teams: [...TEAMS, { id: "team-fresh", previous_season_position: 2 }],
     });
 
     await selectNextGameweekSlots(client, { random: () => 0 });

@@ -173,7 +173,6 @@ export async function POST(request: Request) {
       status: "success",
       error_message: errorMessage,
     });
-
   } catch (err) {
     matchesFailed = true;
     matchesErrorMessage = err instanceof Error ? err.message : String(err);

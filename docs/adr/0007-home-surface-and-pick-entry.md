@@ -80,7 +80,8 @@ Sydney-based viewer, `Sun 13 Sep, 12:00am (Sat night)` rather than a bare weekda
 reads as the wrong night (see issue #93 for how the viewer's timezone is
 resolved). The Gameweek header shows the earliest lock across the board.
 
-**Provenance is stated inline, not badged.** `Top matchup` and `Random pick`
+**Provenance is stated inline, not badged.** `Headline` and `Random`
+(renamed 2026-08-21 from `Top matchup` / `Random pick`, see `CONTEXT.md`)
 sit on the card's single meta line with the kickoff and countdown, because
 nothing is player-chosen any more (`docs/adr/0006-auto-selected-tipped-matches.md`)
 and players will otherwise ask why these two fixtures.

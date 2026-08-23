@@ -42,7 +42,13 @@ describe("mergeCompetitionScoreTotals", () => {
 
   it("attaches a player's pre-aggregated total (summed in SQL, not folded here)", () => {
     const rows = mergeCompetitionScoreTotals(players, [
-      { playerId: "p1", points: 12, matchesScored: 2, exactTips: 0, correctResults: 1 },
+      {
+        playerId: "p1",
+        points: 12,
+        matchesScored: 2,
+        exactTips: 0,
+        correctResults: 1,
+      },
     ]);
     const alice = rows.find((r) => r.playerId === "p1")!;
     expect(alice.points).toBe(12);
@@ -51,7 +57,13 @@ describe("mergeCompetitionScoreTotals", () => {
 
   it("includes a bot's total using the same merge as a human player", () => {
     const rows = mergeCompetitionScoreTotals(players, [
-      { playerId: "p2", points: 5, matchesScored: 1, exactTips: 0, correctResults: 1 },
+      {
+        playerId: "p2",
+        points: 5,
+        matchesScored: 1,
+        exactTips: 0,
+        correctResults: 1,
+      },
     ]);
     const bob = rows.find((r) => r.playerId === "p2")!;
     expect(bob.points).toBe(5);
@@ -60,7 +72,13 @@ describe("mergeCompetitionScoreTotals", () => {
 
   it("gives a player with no total row 0 points rather than omitting them (Late Joiner)", () => {
     const rows = mergeCompetitionScoreTotals(players, [
-      { playerId: "p1", points: 9, matchesScored: 1, exactTips: 1, correctResults: 1 },
+      {
+        playerId: "p1",
+        points: 9,
+        matchesScored: 1,
+        exactTips: 1,
+        correctResults: 1,
+      },
     ]);
     const larry = rows.find((r) => r.playerId === "p3")!;
     expect(larry.points).toBe(0);
@@ -70,7 +88,13 @@ describe("mergeCompetitionScoreTotals", () => {
 
   it("passes through exactTips/correctResults as computed by the SQL aggregate", () => {
     const rows = mergeCompetitionScoreTotals(players, [
-      { playerId: "p1", points: 20, matchesScored: 6, exactTips: 1, correctResults: 4 },
+      {
+        playerId: "p1",
+        points: 20,
+        matchesScored: 6,
+        exactTips: 1,
+        correctResults: 4,
+      },
     ]);
     const alice = rows.find((r) => r.playerId === "p1")!;
     expect(alice.exactTips).toBe(1);
@@ -194,10 +218,28 @@ describe("scoresForCompetition competition scoping", () => {
     // Both competitions' players tipped the SAME global match, in the same season.
     const totalsByPlayerId: Record<
       string,
-      { player_id: string; points: number; matches_scored: number; exact_tips: number; correct_results: number }
+      {
+        player_id: string;
+        points: number;
+        matches_scored: number;
+        exact_tips: number;
+        correct_results: number;
+      }
     > = {
-      a1: { player_id: "a1", points: 7, matches_scored: 1, exact_tips: 1, correct_results: 1 },
-      b1: { player_id: "b1", points: 3, matches_scored: 1, exact_tips: 0, correct_results: 1 },
+      a1: {
+        player_id: "a1",
+        points: 7,
+        matches_scored: 1,
+        exact_tips: 1,
+        correct_results: 1,
+      },
+      b1: {
+        player_id: "b1",
+        points: 3,
+        matches_scored: 1,
+        exact_tips: 0,
+        correct_results: 1,
+      },
     };
 
     const from = (table: string) => {
@@ -256,7 +298,9 @@ describe("scoresForCompetition competition scoping", () => {
   it("narrows the score-totals RPC call to this competition's player ids, never match_id alone", async () => {
     const { client, seen } = createFilteringSupabase();
     await scoresForCompetition(client, COMP_A, "season-1");
-    const rpcCall = seen.find((call) => call.call === "competition_score_totals") as
+    const rpcCall = seen.find(
+      (call) => call.call === "competition_score_totals",
+    ) as
       | { call: string; args: { p_player_ids: string[]; p_season_id: string } }
       | undefined;
     expect(rpcCall).toBeDefined();
@@ -266,7 +310,9 @@ describe("scoresForCompetition competition scoping", () => {
   it("scopes the score-totals RPC call by season too, so two seasons never blend", async () => {
     const { client, seen } = createFilteringSupabase();
     await scoresForCompetition(client, COMP_A, "season-1");
-    const rpcCall = seen.find((call) => call.call === "competition_score_totals") as
+    const rpcCall = seen.find(
+      (call) => call.call === "competition_score_totals",
+    ) as
       | { call: string; args: { p_player_ids: string[]; p_season_id: string } }
       | undefined;
     expect(rpcCall!.args.p_season_id).toBe("season-1");

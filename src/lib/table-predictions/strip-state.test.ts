@@ -154,31 +154,36 @@ describe("deriveTablePredictionStripState", () => {
 
     it("keeps 1st exactly", () => {
       const result = locked(1);
-      if (result.kind !== "submitted_locked") throw new Error("expected locked");
+      if (result.kind !== "submitted_locked")
+        throw new Error("expected locked");
       expect(result.leaguePosition).toBe(1);
     });
 
     it("keeps 2nd exactly", () => {
       const result = locked(2);
-      if (result.kind !== "submitted_locked") throw new Error("expected locked");
+      if (result.kind !== "submitted_locked")
+        throw new Error("expected locked");
       expect(result.leaguePosition).toBe(2);
     });
 
     it("keeps 11th exactly", () => {
       const result = locked(11);
-      if (result.kind !== "submitted_locked") throw new Error("expected locked");
+      if (result.kind !== "submitted_locked")
+        throw new Error("expected locked");
       expect(result.leaguePosition).toBe(11);
     });
 
     it("keeps 17th exactly", () => {
       const result = locked(17);
-      if (result.kind !== "submitted_locked") throw new Error("expected locked");
+      if (result.kind !== "submitted_locked")
+        throw new Error("expected locked");
       expect(result.leaguePosition).toBe(17);
     });
 
     it("keeps 20th exactly (bottom of the table)", () => {
       const result = locked(20);
-      if (result.kind !== "submitted_locked") throw new Error("expected locked");
+      if (result.kind !== "submitted_locked")
+        throw new Error("expected locked");
       expect(result.leaguePosition).toBe(20);
     });
   });

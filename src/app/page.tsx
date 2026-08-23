@@ -1,4 +1,6 @@
 import { cookies } from "next/headers";
+import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { redirect } from "next/navigation";
 import { getSessionPlayerId } from "@/app/_lib/session-cookie";
 import {
@@ -12,11 +14,8 @@ import {
   getTablePredictionRecord,
   getTablePredictionStripData,
 } from "@/app/_lib/table-prediction-access";
-import {
-  loadLastWeekSummary,
-  loadPickBoardGameweek,
-  loadSeasonStats,
-} from "@/app/_lib/pick-board-access";
+import { loadPickBoardGameweek } from "@/app/_lib/pick-board-access";
+import { loadLadder, loadRecap } from "@/app/_lib/summary-access";
 import { isMatchLocked } from "@/lib/competitions/scope";
 import {
   getTablePredictionEditability,
@@ -25,12 +24,11 @@ import {
 import { deriveTablePredictionStripState } from "@/lib/table-predictions/strip-state";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { GameweekHeader } from "@/components/pick-board/GameweekHeader";
-import { LastWeekStrip } from "@/components/pick-board/LastWeekStrip";
+import { SummarySection } from "@/components/pick-board/SummarySection";
 import { PickBoardSlotCard } from "@/components/pick-board/PickBoardSlotCard";
-import { SeasonStatsBlock } from "@/components/pick-board/SeasonStatsBlock";
-import { StatsStrip } from "@/components/pick-board/StatsStrip";
 import { TablePredictionStrip } from "@/components/pick-board/TablePredictionStrip";
 import { ScoringSummary } from "@/components/scoring/ScoringSummary";
+import { T, TX, FOCUS } from "@/components/ui/tokens";
 import {
   DEFAULT_TIME_ZONE,
   TIMEZONE_COOKIE_NAME,
@@ -97,8 +95,8 @@ export default async function PickBoardPage() {
 
   const [
     gameweek,
-    seasonStats,
-    lastWeek,
+    recap,
+    ladder,
     databaseTime,
     gameweekOneKickoff,
     tablePredictionStripData,
@@ -113,18 +111,20 @@ export default async function PickBoardPage() {
           gameweekNumber,
         )
       : Promise.resolve(null),
-    seasonId
-      ? loadSeasonStats(supabase, competitionId, playerId, seasonId)
-      : Promise.resolve(null),
     seasonId && previousGameweekNumber !== null
-      ? loadLastWeekSummary(
+      ? loadRecap(
           supabase,
           competitionId,
-          playerId,
           seasonId,
+          playerId,
           previousGameweekNumber,
+          now,
+          timeZone,
         )
       : Promise.resolve(null),
+    seasonId
+      ? loadLadder(supabase, competitionId, seasonId, playerId)
+      : Promise.resolve([]),
     getDatabaseTime(supabase),
     getGameweekOneKickoff(supabase),
     seasonId && tablePrediction
@@ -163,9 +163,20 @@ export default async function PickBoardPage() {
     // (PredictTableFlow.tsx) -- one column on phone, room for two slot
     // cards side by side once there's a tablet/desktop-width viewport.
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4">
-      <h1 className="text-[1.9rem] font-extrabold text-ink">Pick Board</h1>
-      <StatsStrip stats={seasonStats} />
-      <LastWeekStrip summary={lastWeek} />
+      {/* Home carries a title like every other surface. It was dropped on
+          the grounds that it restated the tab the player is standing on --
+          true, but the shell's fixed top-right chrome (help, switch player)
+          has nothing to sit beside without it, so it landed on top of the
+          first card. Consistency across four surfaces beats the 54px. */}
+      <h1 className={`${T.h1} font-extrabold text-text`}>Pick Board</h1>
+
+      {/* The summary sits above the picks. Recorded honestly: a review
+          measured that this pushes the second match card's entry controls
+          toward the fold on a pre-lock phone visit, against ADR 0007's
+          cost-of-missing logic. It is a deliberate call made with the
+          alternative on screen (ADR 0013 D15), helped by home no longer
+          carrying an H1 that restated the tab the player is standing on. */}
+      <SummarySection recap={recap} ladder={ladder} />
       <TablePredictionStrip state={tablePredictionStripState} />
 
       {gameweek ? (
@@ -191,14 +202,31 @@ export default async function PickBoardPage() {
               />
             ))}
           </div>
+
+          {/* The link the Pick Board has been holding a comment for since
+              #90: once a match locks there is a room to look at, and until
+              then there deliberately isn't (ADR 0013 D3/D6). */}
+          {gameweek.slots.some(
+            (slot) =>
+              slot.kind === "match" &&
+              isMatchLocked(new Date(slot.match.kickoffUtcIso), now),
+          ) ? (
+            <Link
+              href={`/gameweek/${String(gameweek.number)}`}
+              className={`flex min-h-11 items-center justify-between rounded-btn bg-ink px-3.5 text-on-ink ${FOCUS}`}
+            >
+              <span className={`${T.caption} font-bold`}>
+                See everyone&apos;s picks
+              </span>
+              <ChevronRight className="size-4" aria-hidden />
+            </Link>
+          ) : null}
         </>
       ) : (
-        <p className="text-sm text-ink/60">
+        <p className={`${T.caption} ${TX.muted}`}>
           No Tipped Matches yet -- check back soon.
         </p>
       )}
-
-      <SeasonStatsBlock stats={seasonStats} />
     </main>
   );
 }

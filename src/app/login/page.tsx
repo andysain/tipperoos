@@ -1,6 +1,6 @@
 "use client";
 
-import { Dices } from "lucide-react";
+import { Shuffle } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
@@ -435,7 +435,11 @@ function LoginFlow() {
                     className="self-start"
                     onClick={() => setJoinEmoji(pickRandomEmoji(joinEmoji))}
                   >
-                    <Dices className="h-4 w-4" />
+                    {/* Shuffle, not Dices -- a pair of dice is the most
+                        gambling-coded glyph in any icon set, on an app whose
+                        spec bans gambling language (CLAUDE.md -> Hard
+                        constraints). Same swap as the match card. */}
+                    <Shuffle className="size-4" />
                     Pick Random Emoji
                   </Button>
                   {joinEmoji ? (

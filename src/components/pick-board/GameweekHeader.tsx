@@ -1,4 +1,5 @@
 import { formatKickoffInTimeZone } from "@/lib/dates/kickoff-format";
+import { T, TX } from "@/components/ui/tokens";
 
 // Picks lock 5 minutes before scheduled kickoff (CLAUDE.md, "Predictions"),
 // same window as src/lib/competitions/scope.ts's LOCK_WINDOW_MS -- the
@@ -25,13 +26,20 @@ export function GameweekHeader({
     : null;
 
   return (
-    <div className="flex items-baseline justify-between">
-      <h2 className="text-[1.3rem] font-bold text-ink">
+    // wrap + shrink-0 on the title: at 320-375px the two children competed
+    // for one line and the TITLE broke, orphaning "1" onto its own row --
+    // the gameweek number is the page's primary orientation cue, so it is
+    // the one thing that must not wrap. The deadline stacks beneath instead.
+    <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+      <h2 className={`shrink-0 ${T.h2} font-bold text-text`}>
         Gameweek {gameweekNumber}
       </h2>
       {earliestLockUtcIso ? (
-        <span className="text-xs font-semibold text-ink/55">
-          Locks from {formatKickoffInTimeZone(earliestLockUtcIso, timeZone)}
+        // The deadline is the fact that converts a visit into a pick, so it
+        // is not the quietest text on the page: text-muted is the AA floor,
+        // and ink/55 (3.0:1) was below it.
+        <span className={`${T.caption} font-bold ${TX.muted}`}>
+          Picks close {formatKickoffInTimeZone(earliestLockUtcIso, timeZone)}
         </span>
       ) : null}
     </div>

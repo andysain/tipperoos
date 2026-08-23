@@ -183,7 +183,9 @@ describe("POST /api/sync/matches", () => {
   it("scopes the known-matches lookup to the current season", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ matches: [] }) }),
+      vi
+        .fn()
+        .mockResolvedValue({ ok: true, json: async () => ({ matches: [] }) }),
     );
 
     await POST(request());

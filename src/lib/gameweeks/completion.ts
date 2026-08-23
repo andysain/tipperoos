@@ -30,7 +30,10 @@ export interface ScoringSlot {
 export function isSlotScoringDone(slot: ScoringSlot): boolean {
   if (slot.matchId === null) return true;
   if (slot.status === "completed") return true;
-  return isMatchVoided([{ voidedAt: slot.voidedAt }], slot.status ?? "scheduled");
+  return isMatchVoided(
+    [{ voidedAt: slot.voidedAt }],
+    slot.status ?? "scheduled",
+  );
 }
 
 export function isGameweekScoringComplete(
