@@ -64,7 +64,12 @@ export async function loadGameweekStrip(
 
   const byGameweek = new Map<
     number,
-    { points: number | null; picked: boolean; calledOff: boolean }[]
+    {
+      points: number | null;
+      picked: boolean;
+      calledOff: boolean;
+      locked: boolean;
+    }[]
   >();
   for (const slot of slots) {
     const match = matchById.get(slot.matchId);
@@ -90,6 +95,7 @@ export async function loadGameweekStrip(
         : null,
       picked: pick !== undefined,
       calledOff: slot.calledOff,
+      locked,
     };
     byGameweek.set(slot.gameweek, [
       ...(byGameweek.get(slot.gameweek) ?? []),
@@ -117,9 +123,11 @@ export async function loadGameweekStrip(
       points: outcome.kind === "scored" ? outcome.total : null,
       picked: entries.some((e) => e.picked),
       month: kickoff ? monthFmt.format(new Date(kickoff)) : "",
-      future:
-        entries.length === 0 ||
-        entries.every((e) => e.points === null && !e.picked),
+      // "Not played yet", not "nobody picked or scored" -- a locked-but-
+      // missed gameweek was previously indistinguishable from an upcoming
+      // one, which hid a real gameweek's reveal behind an unclickable
+      // dashed chip on the strip.
+      future: entries.length === 0 || entries.every((e) => !e.locked),
     };
   });
 }
