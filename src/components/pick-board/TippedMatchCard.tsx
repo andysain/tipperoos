@@ -416,7 +416,7 @@ function CardHeader({
 }
 
 const digitCell = tv({
-  base: `flex h-11 flex-1 items-center justify-center rounded-btn-sm border border-paper-line bg-surface text-[1.0625rem] font-bold tabular-nums text-text transition active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`,
+  base: `flex h-11 flex-1 items-center justify-center rounded-btn-sm border border-paper-line bg-surface ${T.body} font-bold tabular-nums text-text transition active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`,
   variants: {
     selected: {
       true: "border-accent bg-accent text-accent-ink",
@@ -432,7 +432,7 @@ const digitCell = tv({
 const CUSTOM_SCORE_MAX = 20;
 
 const customScoreInput = tv({
-  base: `h-11 flex-1 min-w-0 rounded-btn-sm border bg-surface text-center text-[1.0625rem] font-bold tabular-nums text-text outline-none transition placeholder:font-semibold placeholder:text-text-decorative disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`,
+  base: `h-11 flex-1 min-w-0 rounded-btn-sm border bg-surface text-center ${T.body} font-bold tabular-nums text-text outline-none transition placeholder:font-semibold placeholder:text-text-decorative disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`,
   variants: {
     active: {
       true: "border-accent bg-accent/10",

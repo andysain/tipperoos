@@ -1,4 +1,5 @@
 import { badgeTextColor } from "@/lib/teams/kit-colors";
+import { T } from "@/components/ui/tokens";
 
 /**
  * Rounded-rect club-code chip -- shared by every screen that renders a
@@ -20,7 +21,7 @@ export function ClubCodeBadge({
   const textToken = badgeTextColor(fill);
   return (
     <span
-      className={`inline-flex shrink-0 items-center justify-center rounded-md px-1.5 py-0.5 text-[0.7rem] font-extrabold tracking-wide ${
+      className={`inline-flex shrink-0 items-center justify-center rounded-md px-1.5 py-0.5 ${T.label} font-extrabold tracking-wide ${
         textToken === "ink" ? "text-ink" : "text-paper"
       }`}
       style={{ background: fill }}

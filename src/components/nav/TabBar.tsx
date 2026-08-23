@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useSyncExternalStore } from "react";
 import { TAB_BAR_HEIGHT_CLASS } from "./shell-metrics";
 import { TABS } from "./tabs";
-import { FOCUS, TX } from "@/components/ui/tokens";
+import { FOCUS, T, TX } from "@/components/ui/tokens";
 
 // Fixed bottom tab bar, used at every breakpoint (docs/adr/0004-app-navigation-shell.md
 // -- no swap to a top nav/sidebar on tablet/desktop). Sits below the picker
@@ -64,7 +64,7 @@ export function TabBar() {
                     });
                   }
                 }}
-                className={`relative flex h-full flex-col items-center justify-center gap-0.5 text-[0.7rem] font-bold ${toneClass} ${FOCUS}`}
+                className={`relative flex h-full flex-col items-center justify-center gap-0.5 ${T.label} font-bold ${toneClass} ${FOCUS}`}
               >
                 {/* Anchored to the TAB, not hung off the label. Hung off a
                     label that already fills its ~125px tab, this pushed 19px
@@ -74,7 +74,7 @@ export function TabBar() {
                     the Table discoverable without a hub, so it clipping is
                     not cosmetic. Shortened to "New" so it fits a tab. */}
                 {tab.href === "/predict-table" && needsTablePrediction ? (
-                  <span className="absolute top-1 right-2 rounded-badge bg-accent px-1.5 py-px text-[0.7rem] font-extrabold text-accent-ink">
+                  <span className={`absolute top-1 right-2 rounded-badge bg-accent px-1.5 py-px ${T.label} font-extrabold text-accent-ink`}>
                     New
                   </span>
                 ) : null}
