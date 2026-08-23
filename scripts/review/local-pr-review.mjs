@@ -39,9 +39,18 @@
 // small pushes iterating on the same branch no longer re-pay for the
 // already-reviewed portion. Falls back to the full merge-base diff if the
 // recorded SHA isn't an ancestor of HEAD anymore (rebase, branch reuse,
-// force-push) or isn't recorded yet. State is only written on the fully
-// clean path -- a run that blocked or fixed something must not mark
-// anything as reviewed, since the next push still needs to re-check it.
+// force-push) or isn't recorded yet.
+//
+// A run that *fixed* something records progress too, at the SHA HEAD was on
+// before any lane committed (see scripts/lib/review-state.mjs). Every lane
+// did review that content and came back clean on it; only the fix commits
+// are unreviewed. Recording it is what stops the abort-and-push-again loop
+// from re-paying for the whole branch each time -- on a 72-file diff that
+// was three full lane passes per attempt, four attempts deep, to land two
+// one-line fixes. A run that *blocked* still records nothing: the finding
+// lives inside the range just reviewed, so narrowing past it would mean the
+// next push never looks at the code the block was about. Nor does a run
+// where a lane's invocation errored -- that lane reviewed nothing.
 //
 // Tiering: lane selection scales with blast radius, judged by *which
 // files* the diff-under-review touches, not diff size -- a one-line change
@@ -78,6 +87,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { resolveRunOutcome } from "../lib/review-state.mjs";
 
 const LANES = ["correctness", "security", "spec-conformance"];
 const REVIEW_DIR = ".github/claude/review";
@@ -322,6 +332,11 @@ const procedure = readFileSync(join(REVIEW_DIR, "local-procedure.md"), "utf8");
 
 let blocked = false;
 let fixed = false;
+// A lane whose `claude` call errored reviewed nothing. Tracked so the
+// recorded "already reviewed" point can't claim coverage that never
+// happened -- previously such a run could still reach the clean path and
+// mark the whole diff reviewed.
+let laneFailed = false;
 
 for (const group of buildGroups(tier)) {
   const blockFile = join(workDir, `block-${group.name}.txt`);
@@ -350,6 +365,7 @@ for (const group of buildGroups(tier)) {
     console.error(
       `local-pr-review: ${group.name} lane's claude invocation failed (exit ${result.status}) -- not blocking the push on a tooling failure, but worth checking why.`,
     );
+    laneFailed = true;
     continue;
   }
 
@@ -407,23 +423,32 @@ for (const group of buildGroups(tier)) {
   }
 }
 
-if (blocked) {
-  console.error(
+const outcome = resolveRunOutcome({
+  blocked,
+  fixed,
+  laneFailed,
+  headBeforeFixes: head,
+  headNow: run("git rev-parse HEAD"),
+});
+
+if (outcome.record) {
+  writeState({ ...state, [branch]: outcome.record });
+}
+
+const MESSAGES = {
+  blocked:
     "\nlocal-pr-review: one or more lanes flagged a blocking issue, confirmed on independent review. Push aborted -- see output above.",
-  );
+  fixed: outcome.record
+    ? "\nlocal-pr-review: a lane committed a fix, confirmed on independent review. Push aborted so the fix is included -- run `git push` again. The next run reviews only that fix commit, not the whole branch."
+    : "\nlocal-pr-review: a lane committed a fix, confirmed on independent review. Push aborted so the fix is included -- run `git push` again. Another lane failed to run, so the next run re-reviews from the same point.",
+  "lane-failed":
+    "\nlocal-pr-review: a lane didn't run, so this diff isn't recorded as reviewed -- the next push will check it again.",
+  clean: "\nlocal-pr-review: all lanes clean.",
+};
+
+if (outcome.push === "abort") {
+  console.error(MESSAGES[outcome.reason]);
   process.exit(1);
 }
 
-if (fixed) {
-  console.error(
-    "\nlocal-pr-review: a lane committed a fix, confirmed on independent review. Push aborted so the fix is included -- run `git push` again.",
-  );
-  process.exit(1);
-}
-
-// Only the fully-clean path records progress -- a blocked/fixed run exits
-// above without reaching here, so the next push still re-reviews from the
-// same point rather than skipping past unresolved or just-fixed work.
-writeState({ ...state, [branch]: run("git rev-parse HEAD") });
-
-console.log("\nlocal-pr-review: all lanes clean.");
+console.log(MESSAGES[outcome.reason]);
