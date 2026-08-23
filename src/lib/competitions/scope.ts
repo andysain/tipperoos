@@ -282,6 +282,11 @@ export interface PlayerPickRow {
   /** Postponed after lock -- tipped, but never scored, for anyone. */
   calledOff: boolean;
   kickoffTime: string;
+  /** Which slot this was, in its sourced meaning (ADR 0006) -- callers use
+   *  this as the headline-breaks-a-kickoff-tie tiebreak, same as the Pick
+   *  Board and the reveal, so a week's two matches don't render in a
+   *  different order on different surfaces when they share a kickoff. */
+  provenance: "top_matchup" | "random_pick";
   homeTeamId: string;
   awayTeamId: string;
   resultHome: number | null;
@@ -398,6 +403,7 @@ export async function picksForPlayer(
         locked,
         calledOff: slot.calledOff,
         kickoffTime: match.kickoff_time,
+        provenance: slot.provenance,
         homeTeamId: match.team_a_id,
         awayTeamId: match.team_b_id,
         resultHome: match.team_a_score,
