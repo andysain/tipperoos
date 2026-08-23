@@ -492,10 +492,10 @@ function DigitRow({
       />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <div className="flex items-center gap-1.5">
-          <span className="truncate text-xs font-extrabold tracking-wide text-ink">
+          <span className={`truncate ${T.caption} font-extrabold tracking-wide ${TX.base}`}>
             {team.shortCode ?? "?"}
           </span>
-          <span className="text-[0.64rem] font-bold uppercase tracking-wide text-ink/50">
+          <span className={`${T.label} font-bold uppercase tracking-wide ${TX.muted}`}>
             {homeAwayLabel}
           </span>
         </div>
@@ -516,7 +516,7 @@ function DigitRow({
             <button
               type="button"
               disabled={disabled}
-              className="flex h-11 flex-1 items-center justify-center rounded-btn-sm border border-dashed border-paper-line text-xs font-bold text-ink/55 transition hover:border-accent/60 disabled:cursor-not-allowed disabled:opacity-50"
+              className={`flex h-11 flex-1 items-center justify-center rounded-btn-sm border border-dashed border-paper-line ${T.caption} font-bold ${TX.muted} transition hover:border-accent/60 disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`}
               onClick={onExpand}
             >
               5+
@@ -803,10 +803,10 @@ export function TippedMatchCard({
             onExpand={() => setAwayExpanded(true)}
           />
           {saving ? (
-            <p className="text-xs font-semibold text-ink/55">Filing…</p>
+            <p className={`${T.caption} font-semibold ${TX.muted}`}>Filing…</p>
           ) : null}
           {error ? (
-            <p className="text-xs font-semibold text-danger">{error}</p>
+            <p className={`${T.caption} font-semibold text-danger`}>{error}</p>
           ) : null}
         </CardShellBody>
       ) : state.kind === "filed" ? (

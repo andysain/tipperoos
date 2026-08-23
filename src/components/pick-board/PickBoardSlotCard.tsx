@@ -6,6 +6,7 @@ import {
   type TippedMatchCardState,
 } from "@/components/pick-board/TippedMatchCard";
 import type { PickBoardSlot } from "@/app/_lib/pick-board-access";
+import { T } from "@/components/ui/tokens";
 
 // Maps a loaded PickBoardSlot onto TippedMatchCard's states. `locked` is
 // computed server-side (page.tsx, via isMatchLocked -- src/lib/**, so it
@@ -75,10 +76,10 @@ function UnsettledSlotPlate({
 }) {
   return (
     <div className="flex flex-col items-center gap-1 rounded-card bg-ink px-4 py-5 text-center text-paper">
-      <span className="text-xs font-bold uppercase tracking-[0.06em] text-paper/60">
+      <span className={`${T.label} font-bold uppercase tracking-[0.06em] text-paper/60`}>
         {label}
       </span>
-      <span className="text-sm font-semibold text-paper/85">{detail}</span>
+      <span className={`${T.dense} font-semibold text-paper/85`}>{detail}</span>
     </div>
   );
 }

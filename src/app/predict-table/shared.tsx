@@ -13,6 +13,7 @@ import { ClubCodeBadge } from "@/components/ui/ClubCodeBadge";
 import { type BandKey, TABLE_BANDS } from "@/lib/table-predictions/rules";
 import { applyContrastFloor, kitColors } from "@/lib/teams/kit-colors";
 import { type FillTone } from "@/lib/table-predictions/board";
+import { T, TX } from "@/components/ui/tokens";
 
 export interface Team {
   id: string;
@@ -80,8 +81,8 @@ export const FILL_GROUND: Record<FillTone, string> = {
 };
 
 export const FILL_COUNT_TEXT: Record<FillTone, string> = {
-  under: "text-ink/40 font-semibold",
-  ok: "text-ink/70 font-extrabold",
+  under: `${TX.muted} font-semibold`,
+  ok: `${TX.base} font-extrabold`,
   over: "text-danger font-bold",
 };
 
@@ -108,7 +109,9 @@ export function DropDivider() {
             "repeating-linear-gradient(-45deg, var(--color-danger) 0 6px, transparent 6px 12px)",
         }}
       />
-      <span className="shrink-0 text-[0.65rem] font-extrabold tracking-[0.2em] text-danger uppercase">
+      <span
+        className={`shrink-0 ${T.label} font-extrabold tracking-[0.2em] text-danger uppercase`}
+      >
         The Drop
       </span>
       <span

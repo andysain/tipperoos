@@ -4,6 +4,7 @@ import { ClubCodeBadge } from "@/components/ui/ClubCodeBadge";
 import { applyContrastFloor, kitColors } from "@/lib/teams/kit-colors";
 import type { TablePredictionStripState } from "@/lib/table-predictions/strip-state";
 import { ordinal } from "@/lib/format/ordinal";
+import { FOCUS, T, TX } from "@/components/ui/tokens";
 
 /**
  * Pick Board's permanent presence for a Player's own Table Prediction
@@ -28,12 +29,12 @@ export function TablePredictionStrip({
     return (
       <Link
         href="/predict-table"
-        className="flex items-center justify-between gap-3 rounded-card bg-accent px-4 py-3 text-accent-ink transition hover:brightness-105"
+        className={`flex items-center justify-between gap-3 rounded-card bg-accent px-4 py-3 text-accent-ink transition hover:brightness-105 ${FOCUS}`}
       >
-        <span className="text-sm font-bold">
+        <span className={`${T.dense} font-bold`}>
           Your next step: predict the table!
         </span>
-        <span className="text-sm font-extrabold underline underline-offset-2">
+        <span className={`${T.dense} font-extrabold underline underline-offset-2`}>
           Go now
         </span>
       </Link>
@@ -61,12 +62,12 @@ export function TablePredictionStrip({
         style={{ background: fill }}
       />
       <div className="flex flex-col gap-0.5">
-        <span className="text-xs font-bold uppercase tracking-[0.06em] text-ink/50">
+        <span className={`${T.label} font-bold uppercase tracking-[0.06em] ${TX.muted}`}>
           Your predicted Champion
         </span>
         <div className="flex items-center gap-2">
           <ClubCodeBadge shortCode={champion.shortCode} fill={fill} />
-          <span className="text-sm font-bold text-ink">{champion.name}</span>
+          <span className={`${T.dense} font-bold ${TX.base}`}>{champion.name}</span>
         </div>
       </div>
     </div>
@@ -76,11 +77,11 @@ export function TablePredictionStrip({
     return (
       <Link
         href="/predict-table"
-        className="flex items-center gap-3 rounded-card border border-paper-line bg-white p-4 transition hover:bg-paper"
+        className={`flex items-center gap-3 rounded-card border border-paper-line bg-white p-4 transition hover:bg-paper ${FOCUS}`}
       >
         {championRow}
         {state.leaguePosition !== null ? (
-          <span className="shrink-0 text-sm font-bold text-ink/70">
+          <span className={`shrink-0 ${T.dense} font-bold ${TX.muted}`}>
             {ordinal(state.leaguePosition)} in the league
           </span>
         ) : null}
@@ -94,7 +95,7 @@ export function TablePredictionStrip({
         {championRow}
         <Link
           href="/predict-table"
-          className="shrink-0 text-[0.8rem] font-bold text-text underline underline-offset-2"
+          className={`shrink-0 ${T.caption} font-bold ${TX.base} underline underline-offset-2 ${FOCUS}`}
         >
           Edit
         </Link>
@@ -102,7 +103,7 @@ export function TablePredictionStrip({
       {state.bandsUntidy ? (
         <div className="flex items-center gap-2 rounded-btn-sm bg-warning/10 px-3 py-2">
           <TriangleAlert className="size-4 shrink-0 text-warning" aria-hidden />
-          <p className="text-xs font-semibold text-ink/70">
+          <p className={`${T.caption} font-semibold ${TX.muted}`}>
             Some of your Bands aren&apos;t quite right yet -- check your table.
           </p>
         </div>

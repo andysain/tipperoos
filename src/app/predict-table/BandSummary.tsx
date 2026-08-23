@@ -12,6 +12,7 @@ import {
   teamFill,
   type Team,
 } from "./shared";
+import { T, TX } from "@/components/ui/tokens";
 
 /** Read-only expanded board -- used once Predict the Table has locked. No
  * lifting, no drop targets, no tints: "one too many" is history, not a
@@ -38,10 +39,10 @@ export function BandSummary({
             <CardShell>
               <CardShellHeader>
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex shrink-0 items-center justify-center rounded-badge bg-paper/15 px-2 py-1 text-[0.7rem] font-extrabold text-paper tabular-nums">
+                  <span className={`inline-flex shrink-0 items-center justify-center rounded-badge bg-paper/15 px-2 py-1 ${T.label} font-extrabold text-paper tabular-nums`}>
                     {meta.positions}
                   </span>
-                  <h2 className="inline-flex items-center gap-1.5 text-[0.8rem] font-bold tracking-[0.04em] text-paper uppercase">
+                  <h2 className={`inline-flex items-center gap-1.5 ${T.caption} font-bold tracking-[0.04em] text-paper uppercase`}>
                     <meta.Icon className="size-4" aria-hidden />
                     {band.label}
                   </h2>
@@ -50,7 +51,7 @@ export function BandSummary({
               <CardShellBody>
                 <div className={`grid ${PLACED_TEAM_GRID_COLS} gap-2`}>
                   {teamIds.length === 0 ? (
-                    <span className="text-sm text-ink/40">-</span>
+                    <span className={`${T.dense} ${TX.decorative}`}>-</span>
                   ) : (
                     teamIds.map((teamId) => {
                       const team = teamsById.get(teamId);
@@ -78,7 +79,7 @@ export function BandSummary({
                             />
                             <span
                               title={team.name}
-                              className={`min-w-0 flex-1 truncate font-bold text-ink ${emphasis ? "text-lg" : "text-[0.95rem]"}`}
+                              className={`min-w-0 flex-1 truncate font-bold text-ink ${emphasis ? "text-[1.125rem]" : T.dense}`}
                             >
                               {team.name}
                             </span>

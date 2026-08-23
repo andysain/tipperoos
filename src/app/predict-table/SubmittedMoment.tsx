@@ -3,6 +3,7 @@ import { Trophy } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { type BandKey } from "@/lib/table-predictions/rules";
 import { ConfettiBurst, TeamIdentity, type Team } from "./shared";
+import { T, TX } from "@/components/ui/tokens";
 
 // Stays on screen until the player explicitly dismisses it -- no
 // auto-timeout. This is a "you're locked in" confirmation, not a passive
@@ -55,15 +56,15 @@ export function SubmittedMoment({
         <Trophy className="mx-auto size-12 text-accent" aria-hidden />
         <p
           id="submitted-moment-title"
-          className="mt-2 text-xl font-extrabold text-ink"
+          className={`mt-2 ${T.h2} font-extrabold ${TX.base}`}
         >
           You&apos;re locked in!
         </p>
-        <p className="mt-1 max-w-[26ch] text-sm text-ink/70">
+        <p className={`mt-1 max-w-[26ch] ${T.dense} ${TX.muted}`}>
           Submitted -- you can keep editing until 31 August.
         </p>
         {champion ? (
-          <div className="mt-3 inline-flex items-center gap-2 rounded-btn bg-accent/10 px-3 py-2 text-sm font-bold text-ink">
+          <div className={`mt-3 inline-flex items-center gap-2 rounded-btn bg-accent/10 px-3 py-2 ${T.dense} font-bold ${TX.base}`}>
             <Trophy className="size-4 shrink-0 text-accent" aria-hidden />
             <TeamIdentity team={champion} /> to win it all
           </div>

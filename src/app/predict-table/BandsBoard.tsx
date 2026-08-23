@@ -22,12 +22,12 @@ import {
   teamFill,
   type Team,
 } from "./shared";
+import { FOCUS, T, TX } from "@/components/ui/tokens";
 
 /** The forward prompt at the foot of the open Band. One appearance, two
  * meanings -- advance while there's work ahead, finish once there isn't --
  * so the styling lives in one place and the two can't drift apart. */
-const FORWARD_PROMPT =
-  "mt-3 flex w-full items-center justify-center gap-1 rounded-btn border-2 border-accent bg-accent/10 px-3 py-2.5 text-sm font-extrabold text-ink transition hover:bg-accent/20";
+const FORWARD_PROMPT = `mt-3 flex w-full items-center justify-center gap-1 rounded-btn border-2 border-accent bg-accent/10 px-3 py-2.5 ${T.dense} font-extrabold ${TX.base} transition hover:bg-accent/20 ${FOCUS}`;
 
 interface MoveUndo {
   kind: "move";
@@ -45,12 +45,12 @@ export type UndoState = MoveUndo;
  * to the thing it's talking about. */
 function UndoRow({ undo, onUndo }: { undo: UndoState; onUndo: () => void }) {
   return (
-    <div className="mb-2 flex items-center justify-between gap-2 rounded-btn-sm bg-ink/[0.06] px-3 py-2 text-xs text-ink/70">
+    <div className={`mb-2 flex items-center justify-between gap-2 rounded-btn-sm bg-ink/[0.06] px-3 py-2 ${T.label} ${TX.muted}`}>
       <span className="truncate">{undo.label}</span>
       <button
         type="button"
         onClick={onUndo}
-        className="shrink-0 font-extrabold text-ink underline"
+        className={`shrink-0 font-extrabold ${TX.base} underline ${FOCUS}`}
       >
         Undo
       </button>
@@ -96,7 +96,7 @@ function PlacedTeamCard({
       type="button"
       onClick={onTap}
       disabled={disabled}
-      className={`group flex min-h-12 items-stretch gap-3 overflow-hidden rounded-btn border py-3 pr-3 pl-2.5 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
+      className={`group flex min-h-12 items-stretch gap-3 overflow-hidden rounded-btn border py-3 pr-3 pl-2.5 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS} ${
         emphasis ? "border-accent bg-accent/10 ring-1 ring-accent/40" : ""
       } ${ground} ${celebrate ? "motion-safe:animate-swap-pulse" : ""}`}
     >
@@ -113,7 +113,7 @@ function PlacedTeamCard({
             than a short one that does. */}
         <span
           title={team.name}
-          className={`min-w-0 flex-1 truncate font-bold text-ink ${emphasis ? "text-lg" : "text-[0.95rem]"}`}
+          className={`min-w-0 flex-1 truncate font-bold text-ink ${emphasis ? "text-[1.125rem]" : T.dense}`}
         >
           {team.displayName}
         </span>
@@ -125,7 +125,7 @@ function PlacedTeamCard({
           defensible at all -- now lives entirely in the plain-English line
           above the roster, which names the club. This card keeps only the
           warm tint, so that sentence has something to point at. */}
-      <X aria-hidden className="size-4 shrink-0 self-center text-ink/30" />
+      <X aria-hidden className={`size-4 shrink-0 self-center ${TX.decorative}`} />
     </button>
   );
 }
@@ -169,7 +169,7 @@ function RosterChip({
           ? `Move ${team.name} out of ${BAND_LABEL[band]}`
           : `Place ${team.name}${position ? `, finished ${position}th` : ", promoted"}`
       }
-      className={`flex items-center gap-1.5 overflow-hidden rounded-btn-sm border py-1.5 pr-2 pl-1.5 text-left transition disabled:cursor-not-allowed disabled:opacity-40 ${
+      className={`flex items-center gap-1.5 overflow-hidden rounded-btn-sm border py-1.5 pr-2 pl-1.5 text-left transition disabled:cursor-not-allowed disabled:opacity-40 ${FOCUS} ${
         band
           ? "border-paper-line bg-ink/[0.06] opacity-55 hover:opacity-100"
           : "border-paper-line bg-white hover:border-accent/50"
@@ -181,17 +181,17 @@ function RosterChip({
         style={band ? undefined : { background: fill }}
       />
       {band ? (
-        <Check aria-hidden className="size-3 shrink-0 text-ink/45" />
+        <Check aria-hidden className={`size-3 shrink-0 ${TX.muted}`} />
       ) : (
         <span
           aria-hidden
-          className="w-4 shrink-0 text-right text-[0.62rem] leading-none font-bold text-ink/40 tabular-nums"
+          className={`w-4 shrink-0 text-right ${T.label} leading-none font-bold ${TX.muted} tabular-nums`}
         >
           {position ?? "\u2191"}
         </span>
       )}
       <span
-        className={`min-w-0 flex-1 truncate text-[0.76rem] leading-tight font-extrabold ${band ? "text-ink/55" : "text-ink"}`}
+        className={`min-w-0 flex-1 truncate ${T.label} leading-tight font-extrabold ${band ? TX.muted : TX.base}`}
       >
         {team.displayName}
       </span>
@@ -232,7 +232,7 @@ function MemberName({ team }: { team: Team }) {
         className="h-3.5 w-[3px] shrink-0 rounded-full"
         style={{ background: teamFill(team.shortCode) }}
       />
-      <span className="min-w-0 truncate text-[0.8rem] leading-snug font-bold text-ink/75">
+      <span className={`min-w-0 truncate ${T.caption} leading-snug font-bold ${TX.muted}`}>
         {team.displayName}
       </span>
     </span>
@@ -284,27 +284,27 @@ function CollapsedBandRow({
       type="button"
       onClick={onOpen}
       aria-label={`Open ${band.label}`}
-      className={`group flex w-full flex-col gap-1.5 rounded-card border px-3 py-2.5 text-left transition hover:border-accent hover:bg-accent/[0.04] ${marquee}`}
+      className={`group flex w-full flex-col gap-1.5 rounded-card border px-3 py-2.5 text-left transition hover:border-accent hover:bg-accent/[0.04] ${FOCUS} ${marquee}`}
     >
       <span className="flex w-full items-center gap-2">
         <span
-          className={`inline-flex min-w-8 shrink-0 items-center justify-center rounded-badge px-1.5 py-0.5 text-[0.65rem] font-extrabold tabular-nums ${
+          className={`inline-flex min-w-8 shrink-0 items-center justify-center rounded-badge px-1.5 py-0.5 ${T.label} font-extrabold tabular-nums ${
             isChampion && tone === "ok"
               ? "bg-accent text-accent-ink"
-              : "bg-ink/[0.07] text-ink/55"
+              : `bg-ink/[0.07] ${TX.muted}`
           }`}
         >
           {meta.positions}
         </span>
         <meta.Icon
-          className={`size-4 shrink-0 ${isChampion ? "text-accent" : "text-ink/60"}`}
+          className={`size-4 shrink-0 ${isChampion ? "text-accent" : TX.muted}`}
           aria-hidden
         />
         <span
           className={`min-w-0 truncate font-extrabold ${
             inlineMember
-              ? "shrink-0 text-[0.8rem] text-ink/55"
-              : `flex-1 text-ink ${isChampion ? "text-[0.95rem]" : "text-[0.8rem]"}`
+              ? `shrink-0 ${T.caption} ${TX.muted}`
+              : `flex-1 ${TX.base} ${isChampion ? T.dense : T.caption}`
           }`}
         >
           {band.label}
@@ -328,7 +328,7 @@ function CollapsedBandRow({
                   fill={teamFill(team.shortCode)}
                 />
                 <span
-                  className={`min-w-0 truncate font-extrabold text-ink ${isChampion ? "text-[1.05rem]" : "text-[0.95rem]"}`}
+                  className={`min-w-0 truncate font-extrabold text-ink ${isChampion ? "text-[1.05rem]" : T.dense}`}
                 >
                   {team.displayName}
                 </span>
@@ -336,7 +336,7 @@ function CollapsedBandRow({
             ))
           : null}
         <span
-          className={`shrink-0 text-[0.7rem] tabular-nums ${FILL_COUNT_TEXT[tone]}`}
+          className={`shrink-0 ${T.label} tabular-nums ${FILL_COUNT_TEXT[tone]}`}
         >
           {boardComplete ? "✓" : countRead(filled, band.target)}
         </span>
@@ -345,7 +345,7 @@ function CollapsedBandRow({
             phone there is no hover, so an affordance that only appears on
             one is no affordance at all. */}
         <ChevronDown
-          className="size-4 shrink-0 text-ink/35 transition group-hover:text-accent"
+          className={`size-4 shrink-0 ${TX.decorative} transition group-hover:text-accent`}
           aria-hidden
         />
       </span>
@@ -375,7 +375,7 @@ function CollapsedBandRow({
           ))}
         </span>
       ) : (
-        <span className="w-full text-[0.8rem] leading-snug font-semibold text-ink/35">
+        <span className={`w-full ${T.caption} leading-snug font-semibold ${TX.decorative}`}>
           Nobody yet
         </span>
       )}
@@ -488,19 +488,19 @@ export function BandsBoard({
                   onClick={onCloseBand}
                   aria-expanded
                   aria-label={`Close ${band.label}`}
-                  className="-my-1 flex w-full items-center justify-between gap-2 py-1 text-left"
+                  className={`-my-1 flex w-full items-center justify-between gap-2 py-1 text-left ${FOCUS}`}
                 >
                   <span className="flex min-w-0 items-center gap-2">
-                    <span className="inline-flex shrink-0 items-center justify-center rounded-badge bg-paper/15 px-2 py-1 text-[0.7rem] font-extrabold text-paper tabular-nums">
+                    <span className={`inline-flex shrink-0 items-center justify-center rounded-badge bg-paper/15 px-2 py-1 ${T.label} font-extrabold text-paper tabular-nums`}>
                       {meta.positions}
                     </span>
-                    <h2 className="inline-flex min-w-0 items-center gap-1.5 truncate text-[0.8rem] font-bold tracking-[0.04em] text-paper uppercase">
+                    <h2 className={`inline-flex min-w-0 items-center gap-1.5 truncate ${T.caption} font-bold tracking-[0.04em] text-paper uppercase`}>
                       <meta.Icon className="size-4 shrink-0" aria-hidden />
                       {band.label}
                     </h2>
                   </span>
                   <span className="flex shrink-0 items-center gap-1.5">
-                    <span className="text-xs font-bold tabular-nums text-paper/85">
+                    <span className={`${T.label} font-bold tabular-nums text-paper/85`}>
                       {countRead(inBand.length, band.target)}
                     </span>
                     <ChevronUp className="size-4 text-paper/70" aria-hidden />
@@ -517,7 +517,7 @@ export function BandsBoard({
                     eight collapsed rows would be noise; burying it in the
                     scoring accordion (where it also lives) is too late. */}
                 {band.target > 1 ? (
-                  <p className="mb-2 px-0.5 text-[0.72rem] font-semibold text-ink/45">
+                  <p className={`mb-2 px-0.5 ${T.label} font-semibold ${TX.muted}`}>
                     Any order &mdash; only who&apos;s in the Band counts.
                   </p>
                 ) : null}
@@ -540,7 +540,7 @@ export function BandsBoard({
                         (_, index) => (
                           <div
                             key={`empty-${band.key}-${index}`}
-                            className="flex min-h-12 items-center justify-center rounded-btn border-2 border-dashed border-paper-line bg-paper/60 px-3 text-sm font-bold text-ink/35"
+                            className={`flex min-h-12 items-center justify-center rounded-btn border-2 border-dashed border-paper-line bg-paper/60 px-3 ${T.dense} font-bold ${TX.decorative}`}
                             aria-label={`${band.label} empty slot`}
                           >
                             Empty slot
@@ -587,7 +587,7 @@ export function BandsBoard({
                 ) : null}
 
                 <>
-                  <p className="mt-3 mb-2 px-0.5 text-[0.68rem] font-bold tracking-[0.12em] text-ink/40 uppercase">
+                  <p className={`mt-3 mb-2 px-0.5 ${T.label} font-bold tracking-[0.12em] ${TX.muted} uppercase`}>
                     Still to place
                   </p>
                   {/* The eviction rule, stated where the tap that triggers
@@ -595,9 +595,9 @@ export function BandsBoard({
                         full, so it reads as a live consequence rather than
                         a standing instruction. */}
                   {nextOutTeamId ? (
-                    <p className="-mt-1 mb-2 px-0.5 text-[0.75rem] font-semibold text-ink/60">
+                    <p className={`-mt-1 mb-2 px-0.5 ${T.caption} font-semibold ${TX.muted}`}>
                       {band.label} is full. Tapping another club swaps it in for{" "}
-                      <span className="font-extrabold text-ink/80">
+                      <span className={`font-extrabold ${TX.base}`}>
                         {teams.find((t) => t.id === nextOutTeamId)
                           ?.displayName ?? "the highlighted club"}
                       </span>
@@ -626,7 +626,7 @@ export function BandsBoard({
                       tidying itself, not as the list losing their place. */}
                   {demotedFrom < teams.length ? (
                     <>
-                      <p className="mt-3 mb-1.5 px-0.5 text-[0.62rem] font-bold tracking-[0.1em] text-ink/35 uppercase">
+                      <p className={`mt-3 mb-1.5 px-0.5 ${T.label} font-bold tracking-[0.1em] ${TX.decorative} uppercase`}>
                         Already placed &middot; {teams.length - demotedFrom}
                         <span className="ml-1.5 font-semibold tracking-normal normal-case">
                           &mdash; tap one to move it here

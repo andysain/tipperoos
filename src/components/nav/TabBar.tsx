@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useSyncExternalStore } from "react";
 import { TAB_BAR_HEIGHT_CLASS } from "./shell-metrics";
 import { TABS } from "./tabs";
-import { FOCUS } from "@/components/ui/tokens";
+import { FOCUS, TX } from "@/components/ui/tokens";
 
 // Fixed bottom tab bar, used at every breakpoint (docs/adr/0004-app-navigation-shell.md
 // -- no swap to a top nav/sidebar on tablet/desktop). Sits below the picker
@@ -34,7 +34,7 @@ export function TabBar() {
           const Icon = tab.icon;
           const toneClass = active
             ? "text-accent stroke-accent"
-            : "text-ink/60 stroke-ink/60";
+            : `${TX.muted} stroke-ink/60`;
           return (
             <li key={tab.href} className="flex-1">
               <Link

@@ -31,7 +31,7 @@ function RankSlot({
         {/* A peer of the rank numeral, not a footnote. D12's whole argument
             is that this column ANSWERS "where does this player stand"; at
             0.55rem under a blanket opacity it whispered it, at ~2.6:1. */}
-        <span className="text-[0.9rem] font-extrabold uppercase tracking-[0.06em] text-info">
+        <span className={`${T.dense} font-extrabold uppercase tracking-[0.06em] text-info`}>
           Bot
         </span>
       </span>
@@ -40,7 +40,7 @@ function RankSlot({
 
   return (
     <span className="flex w-7 shrink-0 flex-col items-center leading-none">
-      <span className="text-xl font-extrabold tabular-nums text-text">
+      <span className="text-[1.125rem] font-extrabold tabular-nums text-text">
         {row.rank}
       </span>
       {row.movement === null ? (
@@ -168,7 +168,7 @@ export function LeaderboardRowCard({
           <>
             <span className="flex shrink-0 items-baseline gap-1.5">
               <span
-                className={`text-xl leading-none tabular-nums ${
+                className={`text-[1.125rem] leading-none tabular-nums ${
                   row.isBot
                     ? `font-bold ${TX.muted}`
                     : "font-extrabold text-text"
