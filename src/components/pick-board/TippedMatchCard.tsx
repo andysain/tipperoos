@@ -560,7 +560,11 @@ function ChangeButton({ onClick }: { onClick: () => void }) {
     <CardShellBody className="py-3">
       <button
         type="button"
-        className={`flex h-10 w-full items-center justify-center rounded-btn-sm border border-paper-line bg-surface ${T.caption} font-bold tracking-wide ${TX.base} uppercase transition hover:border-accent/60 ${FOCUS}`}
+        // h-11, not h-10: it matches the scoring disclosure's own row
+        // height, so a filed card and a finished card have white bodies of
+        // exactly the same depth (68px) instead of differing by 4px. It
+        // also puts the control back on the 44px touch-target floor.
+        className={`flex h-11 w-full items-center justify-center rounded-btn-sm border border-paper-line bg-surface ${T.caption} font-bold tracking-wide ${TX.base} uppercase transition hover:border-accent/60 ${FOCUS}`}
         onClick={onClick}
       >
         Change
