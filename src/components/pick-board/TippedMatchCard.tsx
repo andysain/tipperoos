@@ -557,7 +557,7 @@ function DigitRow({
  */
 function ChangeButton({ onClick }: { onClick: () => void }) {
   return (
-    <CardShellBody className="py-3">
+    <CardShellBody className="py-2">
       <button
         type="button"
         // h-11, not h-10: it matches the scoring disclosure's own row
@@ -612,7 +612,7 @@ function FinishedFooter({
     <span className={`${T.caption} ${TX.muted}`}>No pick filed</span>
   ) : null;
   return (
-    <CardShellBody className="gap-2 py-3">
+    <CardShellBody className="gap-2 py-2">
       {verdict}
       {points !== null ? (
         <ScoringBreakdown
