@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import { TAB_BAR_HEIGHT_CLASS } from "./shell-metrics";
 import { TABS } from "./tabs";
-import { MoreMenu } from "./MoreMenu";
+import { MoreMenuItems } from "./MoreMenu";
 import { FOCUS, T, TX } from "@/components/ui/tokens";
 
 // Fixed bottom tab bar, used at every breakpoint (docs/adr/0004-app-navigation-shell.md
@@ -14,7 +14,9 @@ import { FOCUS, T, TX } from "@/components/ui/tokens";
 // (docs/adr/0005-app-navigation-shell.md amendment, issue #185) opens a menu
 // rather than navigating -- it replaces the old fixed top-right
 // SwitchPlayerButton/HelpButton, which had no scroll-away and covered page
-// content.
+// content. The menu grows the bar itself upward rather than opening a
+// separate floating panel, so there's one continuous surface, not two
+// things that can look disconnected from each other.
 export function TabBar() {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -30,11 +32,24 @@ export function TabBar() {
 
   return (
     <>
-      {moreOpen ? <MoreMenu onClose={() => setMoreOpen(false)} /> : null}
+      {moreOpen ? (
+        // Invisible click-catcher, not a dimming scrim: nothing else in the
+        // page changes when the bar grows, so nothing else needs dimming --
+        // this only exists to close the menu on an outside tap.
+        <button
+          type="button"
+          aria-label="Close menu"
+          onClick={() => setMoreOpen(false)}
+          className="fixed inset-0 z-[5]"
+        />
+      ) : null}
       <nav
         aria-label="Main"
-        className="fixed inset-x-0 bottom-0 z-10 border-t border-paper-line bg-paper pb-[env(safe-area-inset-bottom)]"
+        className={`fixed inset-x-0 bottom-0 z-10 border-t border-paper-line bg-paper pb-[env(safe-area-inset-bottom)] ${
+          moreOpen ? "rounded-t-card shadow-lg shadow-ink/25" : ""
+        }`}
       >
+        {moreOpen ? <MoreMenuItems onClose={() => setMoreOpen(false)} /> : null}
         <ul className={`flex ${TAB_BAR_HEIGHT_CLASS}`}>
           {TABS.map((tab) => {
             const active = pathname === tab.href;
