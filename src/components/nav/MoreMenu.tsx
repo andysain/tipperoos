@@ -44,8 +44,13 @@ export function MoreMenuItems({ onClose }: { onClose: () => void }) {
       aria-label="More"
       // bg-white against the icon row's bg-paper, plus a heavier border-b,
       // is what separates "an action list" from "navigation" -- a hairline
-      // alone read as one continuous list of five items.
-      className="border-b-2 border-paper-line bg-white p-2"
+      // alone read as one continuous list of five items. rounded-tr-card
+      // nests this panel inside the bar's own rounded top-right corner
+      // (it sits flush against the bar's top and right edges); border-l/t
+      // give its other two edges -- the ones not already bounded by the
+      // bar itself -- a visible outline against the exposed paper-colored
+      // strip beside it.
+      className="rounded-tr-card border-t-2 border-b-2 border-l-2 border-paper-line bg-white p-2"
     >
       {onHelpPage ? (
         // Already on /how-it-works -- a Link to the same page would be a

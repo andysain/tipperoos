@@ -57,7 +57,13 @@ export function TabBar() {
           // since the tab bar's icons spread edge-to-edge while the menu
           // text would otherwise sit pinned to the far-left. Capped at
           // max-w-72 so it doesn't grow arbitrarily wide either.
-          <div className="flex justify-end px-2 pt-2">
+          //
+          // Flush against the nav's own top and right edges -- no padding
+          // gap around it. Padding here would be bg-paper, the exact color
+          // of the page behind the bar, so it would render as invisible
+          // empty space and make the panel look like it's floating
+          // unattached above the tab row instead of growing out of it.
+          <div className="flex justify-end">
             <div className="w-full max-w-72">
               <MoreMenuItems onClose={() => setMoreOpen(false)} />
             </div>
