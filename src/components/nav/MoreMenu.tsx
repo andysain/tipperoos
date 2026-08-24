@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LogOut } from "lucide-react";
+import { HelpCircle, LogOut } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { FOCUS, T } from "@/components/ui/tokens";
@@ -42,7 +42,10 @@ export function MoreMenuItems({ onClose }: { onClose: () => void }) {
     <div
       role="menu"
       aria-label="More"
-      className="border-b border-paper-line p-2"
+      // bg-white against the icon row's bg-paper, plus a heavier border-b,
+      // is what separates "an action list" from "navigation" -- a hairline
+      // alone read as one continuous list of five items.
+      className="border-b-2 border-paper-line bg-white p-2"
     >
       {onHelpPage ? (
         // Already on /how-it-works -- a Link to the same page would be a
@@ -56,10 +59,10 @@ export function MoreMenuItems({ onClose }: { onClose: () => void }) {
             onClose();
             router.back();
           }}
-          className={`flex w-full items-center gap-3 rounded-btn p-3 ${T.body} font-bold text-ink transition hover:bg-white ${FOCUS}`}
+          className={`flex w-full items-center gap-3 rounded-btn p-3 ${T.body} font-bold text-ink transition hover:bg-paper ${FOCUS}`}
         >
-          <span className="flex size-8 items-center justify-center rounded-badge border border-paper-line font-extrabold">
-            ?
+          <span className="flex size-8 items-center justify-center rounded-badge border border-paper-line">
+            <HelpCircle className="size-4 stroke-ink stroke-2" />
           </span>
           Back to previous page
         </button>
@@ -68,10 +71,10 @@ export function MoreMenuItems({ onClose }: { onClose: () => void }) {
           href={{ pathname: "/how-it-works" }}
           role="menuitem"
           onClick={onClose}
-          className={`flex items-center gap-3 rounded-btn p-3 ${T.body} font-bold text-ink hover:bg-white ${FOCUS}`}
+          className={`flex items-center gap-3 rounded-btn p-3 ${T.body} font-bold text-ink hover:bg-paper ${FOCUS}`}
         >
-          <span className="flex size-8 items-center justify-center rounded-badge border border-paper-line font-extrabold">
-            ?
+          <span className="flex size-8 items-center justify-center rounded-badge border border-paper-line">
+            <HelpCircle className="size-4 stroke-ink stroke-2" />
           </span>
           How it works
         </Link>
@@ -81,7 +84,7 @@ export function MoreMenuItems({ onClose }: { onClose: () => void }) {
         role="menuitem"
         onClick={handleSwitchPlayer}
         disabled={pending}
-        className={`flex w-full items-center gap-3 rounded-btn p-3 ${T.body} font-bold text-ink transition hover:bg-white disabled:opacity-50 ${FOCUS}`}
+        className={`flex w-full items-center gap-3 rounded-btn p-3 ${T.body} font-bold text-ink transition hover:bg-paper disabled:opacity-50 ${FOCUS}`}
       >
         <span className="flex size-8 items-center justify-center rounded-badge border border-paper-line">
           <LogOut className="size-4 stroke-ink stroke-2" />

@@ -7,7 +7,7 @@ import { useState, useSyncExternalStore } from "react";
 import { TAB_BAR_HEIGHT_CLASS } from "./shell-metrics";
 import { TABS } from "./tabs";
 import { MoreMenuItems } from "./MoreMenu";
-import { FOCUS, T, TX } from "@/components/ui/tokens";
+import { CARD_SHADOW, FOCUS, T, TX } from "@/components/ui/tokens";
 
 // Fixed bottom tab bar, used at every breakpoint (docs/adr/0004-app-navigation-shell.md
 // -- no swap to a top nav/sidebar on tablet/desktop). The 4th "More" slot
@@ -46,10 +46,23 @@ export function TabBar() {
       <nav
         aria-label="Main"
         className={`fixed inset-x-0 bottom-0 z-10 border-t border-paper-line bg-paper pb-[env(safe-area-inset-bottom)] ${
-          moreOpen ? "rounded-t-card shadow-lg shadow-ink/25" : ""
+          moreOpen ? `rounded-t-card ${CARD_SHADOW}` : ""
         }`}
       >
-        {moreOpen ? <MoreMenuItems onClose={() => setMoreOpen(false)} /> : null}
+        {moreOpen ? (
+          // Anchored to the More tab's own column (the last of the four
+          // flex-1 slots below), not stretched full-width -- at desktop
+          // widths a full-width menu row reads as an unrelated banner
+          // spanning the page, disconnected from the tab that opened it,
+          // since the tab bar's icons spread edge-to-edge while the menu
+          // text would otherwise sit pinned to the far-left. Capped at
+          // max-w-72 so it doesn't grow arbitrarily wide either.
+          <div className="flex justify-end px-2 pt-2">
+            <div className="w-full max-w-72">
+              <MoreMenuItems onClose={() => setMoreOpen(false)} />
+            </div>
+          </div>
+        ) : null}
         <ul className={`flex ${TAB_BAR_HEIGHT_CLASS}`}>
           {TABS.map((tab) => {
             const active = pathname === tab.href;
