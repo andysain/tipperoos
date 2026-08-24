@@ -13,6 +13,12 @@ import { getCurrentSeasonId } from "@/app/_lib/gameweek-access";
 const SYNC_TRIGGER_HEADER = "x-sync-secret";
 const PROVIDER_NAME = "football-data.org";
 const WINDOW_DAYS = 10;
+// A same-day-only lower bound missed any match whose result lands after the
+// last run of the day (the cron stops at 23:59 UTC) or after a gap in runs
+// (e.g. a day nobody dispatched staging) -- the next run's dateFrom had
+// already slid past it, and every later run's window keeps sliding forward,
+// so that match's kickoff/result never gets picked up again.
+const LOOKBACK_DAYS = 2;
 
 function hasValidSyncSecret(request: Request): boolean {
   const expected = process.env.SYNC_TRIGGER_SECRET;
@@ -21,7 +27,9 @@ function hasValidSyncSecret(request: Request): boolean {
 }
 
 function dateRange(now: Date) {
-  const dateFrom = now.toISOString().slice(0, 10);
+  const from = new Date(now);
+  from.setUTCDate(from.getUTCDate() - LOOKBACK_DAYS);
+  const dateFrom = from.toISOString().slice(0, 10);
   const to = new Date(now);
   to.setUTCDate(to.getUTCDate() + WINDOW_DAYS);
   const dateTo = to.toISOString().slice(0, 10);
@@ -171,6 +179,7 @@ export async function POST(request: Request) {
       provider_name: PROVIDER_NAME,
       sync_type: "matches",
       status: "success",
+      matches_updated: updates.length,
       error_message: errorMessage,
     });
   } catch (err) {
