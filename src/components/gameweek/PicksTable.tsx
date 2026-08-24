@@ -102,17 +102,21 @@ export function WeekHeading({
    *  one" on another player's season -- second-person copy on a
    *  third-person surface. */
   owner,
+  /** Overrides "Gameweek {n}" -- e.g. the Pick Board's recap, where the
+   *  gameweek number is redundant with an eyebrow line above it. */
+  label,
 }: {
   gameweek: number;
   dateLabel?: string;
   outcome: WeekOutcome;
   chevron?: boolean;
   owner?: string;
+  label?: string;
 }) {
   return (
     <span className="flex items-baseline justify-between gap-2">
       <span className={`${LABEL} ${TX.muted}`}>
-        Gameweek {gameweek}
+        {label ?? `Gameweek ${gameweek}`}
         {dateLabel ? (
           <span
             className={`ml-2 font-medium normal-case tracking-normal ${TX.decorative}`}
