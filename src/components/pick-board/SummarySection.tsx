@@ -64,7 +64,7 @@ export function SummarySection({
       ) : null}
 
       {ladder.length > 0 ? (
-        <div className={`flex flex-col overflow-hidden py-1 ${CARD}`}>
+        <div className={`flex flex-col overflow-hidden pt-3 pb-1 ${CARD}`}>
           {/* The door names where it goes. "Tipping" only made sense against
               a second (Predict the Table) ladder that was cut. */}
           <Link
