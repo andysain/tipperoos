@@ -7,16 +7,16 @@ import { useState, useSyncExternalStore } from "react";
 import { TAB_BAR_HEIGHT_CLASS } from "./shell-metrics";
 import { TABS } from "./tabs";
 import { MoreMenuItems } from "./MoreMenu";
-import { CARD_SHADOW, FOCUS, T, TX } from "@/components/ui/tokens";
+import { FOCUS, T, TX } from "@/components/ui/tokens";
 
 // Fixed bottom tab bar, used at every breakpoint (docs/adr/0004-app-navigation-shell.md
 // -- no swap to a top nav/sidebar on tablet/desktop). The 4th "More" slot
 // (docs/adr/0005-app-navigation-shell.md amendment, issue #185) opens a menu
 // rather than navigating -- it replaces the old fixed top-right
 // SwitchPlayerButton/HelpButton, which had no scroll-away and covered page
-// content. The menu grows the bar itself upward rather than opening a
-// separate floating panel, so there's one continuous surface, not two
-// things that can look disconnected from each other.
+// content. The menu (MoreMenuItems) is its own small elevated card
+// anchored above the More tab, not a full-width extension of this bar --
+// the bar's own look never changes when it opens.
 export function TabBar() {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -45,29 +45,24 @@ export function TabBar() {
       ) : null}
       <nav
         aria-label="Main"
-        // overflow-hidden when open: the menu panel fills this row exactly
-        // (full width on phone, right-anchored on desktop -- see below), so
-        // clipping it to the bar's own rounded-t-card silhouette is what
-        // makes it read as this bar's shape rather than a second,
-        // separately-rounded box nested inside it.
-        className={`fixed inset-x-0 bottom-0 z-10 overflow-hidden border-t border-paper-line bg-paper pb-[env(safe-area-inset-bottom)] ${
-          moreOpen ? `rounded-t-card ${CARD_SHADOW}` : ""
-        }`}
+        // Never changes shape when the menu opens -- there's nothing here
+        // for a rounded top edge or shadow to attach to that isn't already
+        // owned by the menu panel itself (see below).
+        className="fixed inset-x-0 bottom-0 z-10 border-t border-paper-line bg-paper pb-[env(safe-area-inset-bottom)]"
       >
         {moreOpen ? (
-          // Full width on phone -- the bar itself is already narrow there,
-          // so the panel filling it reads as one continuous card, which is
-          // what mobile review confirmed looks right. Right-anchored and
-          // capped at md:max-w-72 only from tablet width up: that's where a
-          // full-width panel starts reading as an unrelated banner spanning
-          // the page, disconnected from the far-right "More" tab that
-          // opened it. Flush against the bar's own top/right edges -- no
-          // padding gap, which would be bg-paper (the page's own color)
-          // and render as invisible empty space.
-          <div className="flex md:justify-end">
-            <div className="w-full md:max-w-72">
-              <MoreMenuItems onClose={() => setMoreOpen(false)} />
-            </div>
+          // A small elevated card of its own, anchored above the More tab
+          // -- not a full-width extension of the bar. A full-width "the bar
+          // grew" treatment (rounded top edge + shadow spanning the whole
+          // bar) only makes sense if content actually fills that width;
+          // once the panel is sized to its own content (right-anchored,
+          // shrink-wrapped -- see MoreMenu.tsx) rather than stretched, a
+          // full-width bar shape around a narrow panel just reads as an
+          // empty rounded corner with nothing in it. mb-2 gives it real,
+          // deliberate breathing room above the tab row, instead of
+          // padding that happened to be invisible against the page.
+          <div className="flex justify-end px-2">
+            <MoreMenuItems onClose={() => setMoreOpen(false)} />
           </div>
         ) : null}
         <ul className={`flex ${TAB_BAR_HEIGHT_CLASS}`}>

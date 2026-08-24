@@ -4,17 +4,20 @@ import Link from "next/link";
 import { HelpCircle, LogOut } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { FOCUS, T } from "@/components/ui/tokens";
+import { CARD_SHADOW, FOCUS, T } from "@/components/ui/tokens";
 
 // The "More" tab's menu items (docs/adr/0005-app-navigation-shell.md
 // amendment, issue #185). Replaces the old fixed top-right SwitchPlayerButton
 // and HelpButton, which had no scroll-away and covered page content.
 //
-// Rendered directly inside TabBar's own <nav> card, which grows upward to
-// hold this row rather than a separate floating panel opening near it
-// (docs/adr/0005 amendment, "Approach A") -- there's only ever one surface,
-// so there's nothing to look visually disconnected from the tab that opened
-// it.
+// Its own small elevated card (full rounded-card + CARD_SHADOW), anchored
+// above the More tab that opens it -- not a full-width extension of
+// TabBar's <nav>. An earlier version tried to make the whole bar "grow" to
+// hold this row, but that only works if the row fills the bar; once it's
+// sized to its own content instead of stretched, a full-width bar shape
+// around a narrow panel just reads as an empty rounded corner with nothing
+// in it. Being honestly its own card is what actually reads as "menu
+// opened here" at every breakpoint, phone through desktop.
 export function MoreMenuItems({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -42,14 +45,15 @@ export function MoreMenuItems({ onClose }: { onClose: () => void }) {
     <div
       role="menu"
       aria-label="More"
-      // bg-white against the icon row's bg-paper, plus a heavier border-b,
-      // is what separates "an action list" from "navigation" -- a hairline
-      // alone read as one continuous list of five items. No border/rounding
-      // of its own beyond that: TabBar's nav clips this panel to its own
-      // rounded-t-card silhouette (overflow-hidden), so a second, separately
-      // rounded/bordered box here would nest one card inside another rather
-      // than reading as one shape.
-      className="border-b-2 border-paper-line bg-white p-2 md:border-l-2"
+      // inline-flex flex-col: shrink-wraps to the widest menu item's
+      // content instead of a fixed/max width guessed per breakpoint -- a
+      // wide box left visible empty space next to short labels ("How it
+      // works"), and a full-width one on desktop read as an unrelated
+      // banner disconnected from the far-right "More" tab that opened it.
+      // Full rounded-card + CARD_SHADOW + border on every side, mb-2 for
+      // real breathing room above the tab row: this is its own card, not
+      // a slice of the bar underneath it.
+      className={`mb-2 inline-flex flex-col rounded-card border border-paper-line bg-white p-2 ${CARD_SHADOW}`}
     >
       {onHelpPage ? (
         // Already on /how-it-works -- a Link to the same page would be a
