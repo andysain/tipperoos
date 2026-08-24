@@ -14,9 +14,10 @@ import { FOCUS, T, TX } from "@/components/ui/tokens";
 // (docs/adr/0005-app-navigation-shell.md amendment, issue #185) opens a menu
 // rather than navigating -- it replaces the old fixed top-right
 // SwitchPlayerButton/HelpButton, which had no scroll-away and covered page
-// content. The menu (MoreMenuItems) is its own small elevated card
-// anchored above the More tab, not a full-width extension of this bar --
-// the bar's own look never changes when it opens.
+// content. The menu (MoreMenuItems) is a fully independent element, not
+// nested inside this bar's <nav> -- it's positioned near the More tab with
+// its own fixed coordinates, but shares no DOM subtree, layout, or shape
+// with the bar itself.
 export function TabBar() {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -43,28 +44,19 @@ export function TabBar() {
           className="fixed inset-0 z-[5]"
         />
       ) : null}
+      {moreOpen ? (
+        // Not inside <nav> -- a fully independent element, positioned near
+        // the More tab with its own fixed coordinates, sharing nothing
+        // with the tab bar's DOM subtree or layout. It is not part of the
+        // bar in any structural sense, only visually placed near it.
+        <div className="fixed right-3 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30">
+          <MoreMenuItems onClose={() => setMoreOpen(false)} />
+        </div>
+      ) : null}
       <nav
         aria-label="Main"
-        // Never changes shape when the menu opens -- there's nothing here
-        // for a rounded top edge or shadow to attach to that isn't already
-        // owned by the menu panel itself (see below).
         className="fixed inset-x-0 bottom-0 z-10 border-t border-paper-line bg-paper pb-[env(safe-area-inset-bottom)]"
       >
-        {moreOpen ? (
-          // A small elevated card of its own, anchored above the More tab
-          // -- not a full-width extension of the bar. A full-width "the bar
-          // grew" treatment (rounded top edge + shadow spanning the whole
-          // bar) only makes sense if content actually fills that width;
-          // once the panel is sized to its own content (right-anchored,
-          // shrink-wrapped -- see MoreMenu.tsx) rather than stretched, a
-          // full-width bar shape around a narrow panel just reads as an
-          // empty rounded corner with nothing in it. mb-2 gives it real,
-          // deliberate breathing room above the tab row, instead of
-          // padding that happened to be invisible against the page.
-          <div className="flex justify-end px-2">
-            <MoreMenuItems onClose={() => setMoreOpen(false)} />
-          </div>
-        ) : null}
         <ul className={`flex ${TAB_BAR_HEIGHT_CLASS}`}>
           {TABS.map((tab) => {
             const active = pathname === tab.href;

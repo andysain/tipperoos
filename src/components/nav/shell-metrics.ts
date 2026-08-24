@@ -13,9 +13,10 @@ export const TAB_BAR_HEIGHT_REM = "4rem";
 // of truth and call sites hardcode the matching literal class.
 //
 //   z-5  -- invisible click-catchers that sit *below* shell chrome (the
-//           "More" menu's outside-tap closer -- TabBar.tsx grows itself
-//           upward for the menu rather than opening a separate panel, so
-//           there's no scrim to dim and no content above z-10 to reserve)
+//           "More" menu's outside-tap closer -- not a dimming scrim, since
+//           nothing else on the page changes when the menu opens)
 //   z-10 -- persistent shell chrome (TabBar)
 //   z-20 -- overlay scrims/backdrops (future modals)
-//   z-30 -- overlay panels/content (future modals)
+//   z-30 -- overlay panels/content (the "More" menu's card -- an
+//           independent element positioned near the tab bar, not nested
+//           inside it; future modals)
