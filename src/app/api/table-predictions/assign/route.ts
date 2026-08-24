@@ -3,7 +3,7 @@ import { hasCsrfHeader } from "@/app/_lib/csrf";
 import { getSessionPlayerId } from "@/app/_lib/session-cookie";
 import { isBandKey } from "@/lib/table-predictions/rules";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { recomputeCohortForPlayer } from "@/app/_lib/predict-table-recompute-trigger";
+import { scheduleCohortRecomputeForPlayer } from "@/app/_lib/predict-table-recompute-trigger";
 
 interface AssignBody {
   teamId?: unknown;
@@ -84,7 +84,8 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  await recomputeCohortForPlayer(supabase, playerId);
+
+  scheduleCohortRecomputeForPlayer(supabase, playerId);
 
   return NextResponse.json({ ok: true });
 }

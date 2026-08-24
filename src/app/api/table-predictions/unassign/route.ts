@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { hasCsrfHeader } from "@/app/_lib/csrf";
 import { getSessionPlayerId } from "@/app/_lib/session-cookie";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { recomputeCohortForPlayer } from "@/app/_lib/predict-table-recompute-trigger";
+import { scheduleCohortRecomputeForPlayer } from "@/app/_lib/predict-table-recompute-trigger";
 
 interface UnassignBody {
   teamId?: unknown;
@@ -68,7 +68,8 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
-  await recomputeCohortForPlayer(supabase, playerId);
+
+  scheduleCohortRecomputeForPlayer(supabase, playerId);
 
   return NextResponse.json({ ok: true });
 }

@@ -171,32 +171,29 @@ describe("recomputePredictTableCohort", () => {
     // p1: exact match on all 20 teams (placement 100, Band Bonus 85) plus
     // two Bold Calls (Champion and Runners Up, the only two placements p2
     // disagreed on, each earned by 1 of 2 eligible entries -- rare).
-    expect(scoresByPlayer.get("p1")).toMatchObject({
-      total_score: 191,
-      placement_score: 100,
-      band_bonus_score: 85,
-      bold_call_score: 6,
-    });
+    const p1 = scoresByPlayer.get("p1");
+    expect(p1?.total_score).toBe(191);
+    expect(p1?.placement_score).toBe(100);
+    expect(p1?.band_bonus_score).toBe(85);
+    expect(p1?.bold_call_score).toBe(6);
 
     // p2: Champion/Runners Up swapped -- distance 1 on both (2 pts each
     // instead of 5), forfeits both Bands' Bonuses (10 + 10), no Bold Calls
     // (nothing p2 got right was rare -- t3..t20 agree with p1).
-    expect(scoresByPlayer.get("p2")).toMatchObject({
-      total_score: 159,
-      placement_score: 94,
-      band_bonus_score: 65,
-      bold_call_score: 0,
-    });
+    const p2 = scoresByPlayer.get("p2");
+    expect(p2?.total_score).toBe(159);
+    expect(p2?.placement_score).toBe(94);
+    expect(p2?.band_bonus_score).toBe(65);
+    expect(p2?.bold_call_score).toBe(0);
 
     // p3: exact match like p1, but a Late Joiner -- earns the placement
     // and Band Bonus points but zero Bold Calls (excluded from the
     // process entirely, not just from qualifying).
-    expect(scoresByPlayer.get("p3")).toMatchObject({
-      total_score: 185,
-      placement_score: 100,
-      band_bonus_score: 85,
-      bold_call_score: 0,
-    });
+    const p3 = scoresByPlayer.get("p3");
+    expect(p3?.total_score).toBe(185);
+    expect(p3?.placement_score).toBe(100);
+    expect(p3?.band_bonus_score).toBe(85);
+    expect(p3?.bold_call_score).toBe(0);
 
     // p4 (skipped), p5 (never submitted), p6 (no row), p-bot (bot) all
     // stay out of the cohort entirely -- no stored row.

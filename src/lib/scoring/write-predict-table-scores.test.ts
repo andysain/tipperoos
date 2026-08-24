@@ -50,6 +50,8 @@ describe("writePredictTableScores — idempotent upsert target", () => {
 
     expect(calls.length).toBe(1);
     expect(calls[0].onConflict).toBe("player_id");
+    expect(calls[0].rows[0].total_score).toBe(132);
+    expect(calls[0].rows[1].total_score).toBe(90);
     expect(calls[0].rows[0]).toMatchObject({
       player_id: "player-a",
       total_score: 132,
@@ -76,6 +78,10 @@ describe("writePredictTableScores — idempotent upsert target", () => {
       },
     ]);
 
+    expect(calls[0].rows[0].total_score).toBe(143);
+    expect(calls[0].rows[0].placement_score).toBe(100);
+    expect(calls[0].rows[0].band_bonus_score).toBe(30);
+    expect(calls[0].rows[0].bold_call_score).toBe(13);
     expect(calls[0].rows[0]).toMatchObject({
       total_score: 143,
       placement_score: 100,

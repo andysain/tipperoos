@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { hasCsrfHeader } from "@/app/_lib/csrf";
 import { getSessionPlayerId } from "@/app/_lib/session-cookie";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { recomputeCohortForPlayer } from "@/app/_lib/predict-table-recompute-trigger";
+import { scheduleCohortRecomputeForPlayer } from "@/app/_lib/predict-table-recompute-trigger";
 
 // Marks the current band assignment as submitted -- re-submittable any
 // number of times until 31 August (CLAUDE.md). Submit never
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     );
   }
 
-  await recomputeCohortForPlayer(supabase, playerId);
+  scheduleCohortRecomputeForPlayer(supabase, playerId);
 
   return NextResponse.json({ submittedAt: result.submitted_at });
 }
