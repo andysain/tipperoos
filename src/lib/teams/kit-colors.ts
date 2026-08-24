@@ -189,7 +189,13 @@ export function applyContrastFloor(
       contrastRatio(current, ground) < minRatio &&
       steps < CONTRAST_FLOOR_MAX_STEPS
     ) {
-      l = clamp(l + Math.sign(targetL - l) * CONTRAST_FLOOR_STEP, 0, 1);
+      const direction = Math.sign(targetL - l);
+      // Already at the target's own lightness (same h/s/l as `target`) with
+      // contrast still short -- `target` itself can't clear this ground, so
+      // further steps would spin in place without moving. Stop rather than
+      // burn the remaining step budget on a no-op.
+      if (direction === 0) break;
+      l = clamp(l + direction * CONTRAST_FLOOR_STEP, 0, 1);
       current = rgbToHex(hslToRgb(h, s, l));
       steps += 1;
     }

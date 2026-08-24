@@ -18,6 +18,11 @@ function round(n: number, decimals = 2): number {
   return Number(n.toFixed(decimals));
 }
 
+// The card body's actual ground (TippedMatchCard.tsx's white rail,
+// PredictTableFlow's white card) -- distinct from the `PAPER` token, which
+// is off-white and never used as this rail's ground.
+const WHITE = "#ffffff";
+
 describe("relativeLuminance", () => {
   it("is 0 for pure black and 1 for pure white", () => {
     expect(relativeLuminance("#000000")).toBe(0);
@@ -94,9 +99,9 @@ describe("matchBadgeColors", () => {
     // invisible against its own ground, so it still has to clear the
     // contrast floor against ink and white like any other fill.
     const { away } = matchBadgeColors("NOT", "LIV");
-    expect(away.toLowerCase()).not.toBe(INK.toLowerCase());
+    expect(away.toLowerCase()).toBe("#2c92a3");
     expect(contrastRatio(away, INK)).toBeGreaterThanOrEqual(3.0);
-    expect(contrastRatio(away, "#ffffff")).toBeGreaterThanOrEqual(3.0);
+    expect(contrastRatio(away, WHITE)).toBeGreaterThanOrEqual(3.0);
   });
 
   it("uses the fallback kit for an unrecognized short code without throwing", () => {
@@ -110,26 +115,32 @@ describe("matchBadgeColors", () => {
   // issue named, independent of the default-grounds pair above.
   describe("white-only ground (the card body rail's variant)", () => {
     it("HUL clears the white body even though its primary is a pale orange", () => {
-      const { home } = matchBadgeColors("HUL", "MUN", ["#ffffff"]);
-      expect(contrastRatio(home, "#ffffff")).toBeGreaterThanOrEqual(3.0);
+      const { home } = matchBadgeColors("HUL", "MUN", [WHITE]);
+      expect(home.toLowerCase()).toBe("#c87300");
+      expect(contrastRatio(home, WHITE)).toBeGreaterThanOrEqual(3.0);
     });
 
     it("MCI clears the white body even though home and away are the same pale blue", () => {
-      const { home, away } = matchBadgeColors("MCI", "CRY", ["#ffffff"]);
-      expect(contrastRatio(home, "#ffffff")).toBeGreaterThanOrEqual(3.0);
-      expect(contrastRatio(away, "#ffffff")).toBeGreaterThanOrEqual(3.0);
+      const { home, away } = matchBadgeColors("MCI", "CRY", [WHITE]);
+      expect(home.toLowerCase()).toBe("#4b98d5");
+      expect(away.toLowerCase()).toBe("#c4122e");
+      expect(contrastRatio(home, WHITE)).toBeGreaterThanOrEqual(3.0);
+      expect(contrastRatio(away, WHITE)).toBeGreaterThanOrEqual(3.0);
     });
 
     it("Fulham's white primary clears the white body", () => {
-      const { home } = matchBadgeColors("FUL", "TOT", ["#ffffff"]);
-      expect(contrastRatio(home, "#ffffff")).toBeGreaterThanOrEqual(3.0);
+      const { home } = matchBadgeColors("FUL", "TOT", [WHITE]);
+      expect(home.toLowerCase()).toBe("#8f8f8f");
+      expect(contrastRatio(home, WHITE)).toBeGreaterThanOrEqual(3.0);
     });
 
     it("the clash rule still holds under the white-only ground variant", () => {
       // Same pairing as the default-grounds clash test above, just resolved
       // against white only -- flooring each ground independently must not
       // let the two sides converge back onto the same stripe colour.
-      const { home, away } = matchBadgeColors("ARS", "CHE", ["#ffffff"]);
+      const { home, away } = matchBadgeColors("ARS", "CHE", [WHITE]);
+      expect(home.toLowerCase()).toBe("#db0007");
+      expect(away.toLowerCase()).toBe("#034694");
       expect(home.toLowerCase()).not.toBe(away.toLowerCase());
     });
   });
