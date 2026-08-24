@@ -41,7 +41,13 @@ export function MoreMenu({ onClose }: { onClose: () => void }) {
         type="button"
         aria-label="Close menu"
         onClick={onClose}
-        className="fixed inset-0 z-20 bg-ink/40"
+        // Stops above the tab bar rather than covering it (inset-0 would),
+        // so the bar underneath stays genuinely tappable while the menu is
+        // open, not just visually undimmed with taps silently swallowed.
+        className="fixed inset-x-0 top-0 z-20 bg-ink/40"
+        style={{
+          bottom: `calc(${TAB_BAR_HEIGHT_REM} + env(safe-area-inset-bottom))`,
+        }}
       />
       <div
         role="menu"
@@ -51,6 +57,7 @@ export function MoreMenu({ onClose }: { onClose: () => void }) {
           bottom: `calc(${TAB_BAR_HEIGHT_REM} + env(safe-area-inset-bottom))`,
         }}
       >
+        <div className="mx-auto mb-1 h-1 w-10 rounded-badge bg-paper-line" />
         {onHelpPage ? (
           // Already on /how-it-works -- a Link to the same page would be a
           // no-op navigation, so this instead returns to wherever the
