@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/next";
 import { AppShell } from "@/components/nav/AppShell";
 import { TimezoneSync } from "@/components/nav/TimezoneSync";
 import "./globals.css";
@@ -41,6 +42,7 @@ export default function RootLayout({
         <TimezoneSync />
         <AppShell>{children}</AppShell>
         <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   );
