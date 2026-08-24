@@ -107,6 +107,15 @@ export interface TablePredictionStripData {
   championTeam: TablePredictionStripTeam | null;
   bandCounts: Partial<Record<BandKey, number>>;
   leaguePosition: number | null;
+  /**
+   * Issue #157: the stored Predict the Table score, read as a single value
+   * rather than computed here -- computing it per request would mean
+   * reading every eligible player's placements on `/`, the app's most
+   * performance-sensitive route (docs/standards/PERFORMANCE_TESTING_STANDARD.md).
+   * Null before the first standings sync/cohort recompute has ever run for
+   * this player (no row yet), which reads identically to "not yet scored".
+   */
+  score: number | null;
 }
 
 /**
@@ -134,14 +143,25 @@ export async function getTablePredictionStripData(
   supabase: SupabaseClient,
   tablePredictionId: string,
   seasonId: string,
+  playerId: string,
 ): Promise<TablePredictionStripData> {
-  const { data: ranks, error } = await supabase
-    .from("table_prediction_ranks")
-    .select("team_id, band")
-    .eq("table_prediction_id", tablePredictionId);
-  if (error) throw error;
+  const [ranksResult, scoreResult] = await Promise.all([
+    supabase
+      .from("table_prediction_ranks")
+      .select("team_id, band")
+      .eq("table_prediction_id", tablePredictionId),
+    supabase
+      .from("table_prediction_scores")
+      .select("total_score")
+      .eq("player_id", playerId)
+      .order("player_id")
+      .maybeSingle(),
+  ]);
+  if (ranksResult.error) throw ranksResult.error;
+  if (scoreResult.error) throw scoreResult.error;
+  const score = scoreResult.data?.total_score ?? null;
 
-  const rows: { team_id: string; band: string }[] = ranks ?? [];
+  const rows: { team_id: string; band: string }[] = ranksResult.data ?? [];
   const bandCounts: Partial<Record<BandKey, number>> = {};
   for (const row of rows) {
     if (!isBandKey(row.band)) continue;
@@ -150,7 +170,7 @@ export async function getTablePredictionStripData(
 
   const championRows = rows.filter((row) => row.band === "champion");
   if (championRows.length !== 1) {
-    return { championTeam: null, bandCounts, leaguePosition: null };
+    return { championTeam: null, bandCounts, leaguePosition: null, score };
   }
   const championTeamId = championRows[0].team_id;
 
@@ -173,12 +193,15 @@ export async function getTablePredictionStripData(
   if (standingsResult.error) throw standingsResult.error;
 
   const team = teamResult.data;
-  if (!team) return { championTeam: null, bandCounts, leaguePosition: null };
+  if (!team) {
+    return { championTeam: null, bandCounts, leaguePosition: null, score };
+  }
 
   return {
     championTeam: { id: team.id, name: team.name, shortCode: team.short_code },
     bandCounts,
     leaguePosition: standingsResult.data?.position ?? null,
+    score,
   };
 }
 

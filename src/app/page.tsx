@@ -128,11 +128,17 @@ export default async function PickBoardPage() {
     getDatabaseTime(supabase),
     getGameweekOneKickoff(supabase),
     seasonId && tablePrediction
-      ? getTablePredictionStripData(supabase, tablePrediction.id, seasonId)
+      ? getTablePredictionStripData(
+          supabase,
+          tablePrediction.id,
+          seasonId,
+          playerId,
+        )
       : Promise.resolve({
           championTeam: null,
           bandCounts: {},
           leaguePosition: null,
+          score: null,
         }),
   ]);
 
@@ -151,6 +157,7 @@ export default async function PickBoardPage() {
         bandCountsOk: validateBandCounts(tablePredictionStripData.bandCounts)
           .ok,
         leaguePosition: tablePredictionStripData.leaguePosition,
+        score: tablePredictionStripData.score,
       })
     : ({ kind: "hidden" } as const);
 

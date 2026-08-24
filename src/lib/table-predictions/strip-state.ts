@@ -25,11 +25,13 @@ export type TablePredictionStripState =
       kind: "submitted_editable";
       champion: TablePredictionStripTeam;
       bandsUntidy: boolean;
+      score: number | null;
     }
   | {
       kind: "submitted_locked";
       champion: TablePredictionStripTeam;
       leaguePosition: number | null;
+      score: number | null;
     }
   | { kind: "hidden" };
 
@@ -39,6 +41,14 @@ export interface TablePredictionStripInput {
   championTeam: TablePredictionStripTeam | null;
   bandCountsOk: boolean;
   leaguePosition: number | null;
+  /**
+   * Issue #157: the stored Predict the Table score -- computed
+   * continuously through the season (CLAUDE.md), so it's shown in both
+   * submitted states, not gated on `editability.locked` like everything
+   * else that's Champion-adjacent (see the file-level comment). Null
+   * before the first cohort recompute has ever run for this player.
+   */
+  score: number | null;
 }
 
 export function deriveTablePredictionStripState(
@@ -50,6 +60,7 @@ export function deriveTablePredictionStripState(
     championTeam,
     bandCountsOk,
     leaguePosition,
+    score,
   } = input;
 
   // Skipped is final and never reverses (CLAUDE.md's Predict the Table
@@ -74,6 +85,7 @@ export function deriveTablePredictionStripState(
       kind: "submitted_editable",
       champion: championTeam,
       bandsUntidy: !bandCountsOk,
+      score,
     };
   }
 
@@ -81,5 +93,6 @@ export function deriveTablePredictionStripState(
     kind: "submitted_locked",
     champion: championTeam,
     leaguePosition,
+    score,
   };
 }

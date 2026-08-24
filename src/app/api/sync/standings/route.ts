@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { mapStandingsToRows } from "@/lib/standings/map-standings";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { recomputePredictTableCohort } from "@/lib/table-predictions/recompute-cohort";
 
 // Issue #88: standalone standings-fetch route, callable manually now and by
 // #11's GitHub Actions sync workflow once it exists (see #88's decision log,
@@ -94,6 +95,20 @@ export async function POST(request: Request) {
       .from("team_standings")
       .upsert(rows, { onConflict: "team_id,season_id" });
     if (upsertError) throw upsertError;
+
+    // Issue #157: standings are the only input that can move every
+    // player's Predict the Table score at once, so a fresh standings row
+    // set means every competition's cohort needs recomputing. Sequential,
+    // not Promise.all -- this app has exactly one competition today (ADR
+    // 0004), and a sync job has no `/`-style latency budget to protect.
+    const { data: competitionRows, error: competitionsError } = await supabase
+      .from("competitions")
+      .select("id")
+      .order("created_at");
+    if (competitionsError) throw competitionsError;
+    for (const competition of competitionRows ?? []) {
+      await recomputePredictTableCohort(supabase, competition.id);
+    }
 
     const errorMessage =
       unmatchedProviderTeamIds.length > 0

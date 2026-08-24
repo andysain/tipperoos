@@ -4,7 +4,14 @@ import { ClubCodeBadge } from "@/components/ui/ClubCodeBadge";
 import { applyContrastFloor, kitColors } from "@/lib/teams/kit-colors";
 import type { TablePredictionStripState } from "@/lib/table-predictions/strip-state";
 import { ordinal } from "@/lib/format/ordinal";
+import { MAX_PREDICT_TABLE_SCORE } from "@/lib/scoring/predict-table";
 import { FOCUS, T, TX } from "@/components/ui/tokens";
+
+// Card shadow -- see docs/DESIGN_SYSTEM.md "Card anatomy": "Neither shape
+// ever gets a border; depth comes from the shadow alone." Quoted directly
+// from src/components/ui/Card.tsx rather than importing it, since Card.tsx
+// always adds its own p-6 padding and this strip needs its own layout.
+const CARD_SHADOW = "shadow-[0_10px_24px_-12px_rgba(18,60,67,0.28)]";
 
 /**
  * Pick Board's permanent presence for a Player's own Table Prediction
@@ -73,26 +80,43 @@ export function TablePredictionStrip({
     </div>
   );
 
+  const scoreLabel =
+    state.score !== null
+      ? `${state.score} / ${MAX_PREDICT_TABLE_SCORE} pts`
+      : null;
+
   if (state.kind === "submitted_locked") {
     return (
       <Link
         href="/predict-table"
-        className={`flex items-center gap-3 rounded-card border border-paper-line bg-white p-4 transition hover:bg-paper ${FOCUS}`}
+        className={`flex items-center gap-3 rounded-card bg-white p-4 transition hover:bg-paper ${CARD_SHADOW} ${FOCUS}`}
       >
         {championRow}
-        {state.leaguePosition !== null ? (
-          <span className={`shrink-0 ${T.dense} font-bold ${TX.muted}`}>
-            {ordinal(state.leaguePosition)} in the league
-          </span>
-        ) : null}
+        <div className="flex shrink-0 flex-col items-end gap-0.5">
+          {scoreLabel ? (
+            <span className={`${T.dense} font-extrabold ${TX.base}`}>
+              {scoreLabel}
+            </span>
+          ) : null}
+          {state.leaguePosition !== null ? (
+            <span className={`${T.caption} font-bold ${TX.muted}`}>
+              {ordinal(state.leaguePosition)} in the league
+            </span>
+          ) : null}
+        </div>
       </Link>
     );
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-card border border-paper-line bg-white p-4">
+    <div className={`flex flex-col gap-2 rounded-card bg-white p-4 ${CARD_SHADOW}`}>
       <div className="flex items-center gap-3">
         {championRow}
+        {scoreLabel ? (
+          <span className={`shrink-0 ${T.dense} font-extrabold ${TX.base}`}>
+            {scoreLabel}
+          </span>
+        ) : null}
         <Link
           href="/predict-table"
           className={`shrink-0 ${T.caption} font-bold ${TX.base} underline underline-offset-2 ${FOCUS}`}
