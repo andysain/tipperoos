@@ -42,7 +42,6 @@ export function SummarySection({
     <div className="flex flex-col gap-2">
       {recap ? (
         <div className={`flex flex-col gap-1.5 ${INSET} py-3 ${CARD}`}>
-          <span className={`${LABEL} ${TX.decorative}`}>Last week</span>
           <Link
             href={`/gameweek/${String(recap.gameweek)}`}
             aria-label={`Gameweek ${recap.gameweek} results — see everyone's picks`}
@@ -50,6 +49,7 @@ export function SummarySection({
           >
             <WeekHeading
               gameweek={recap.gameweek}
+              label="Last Gameweek"
               outcome={recap.outcome}
               chevron
             />
@@ -64,7 +64,7 @@ export function SummarySection({
       ) : null}
 
       {ladder.length > 0 ? (
-        <div className={`flex flex-col overflow-hidden py-1 ${CARD}`}>
+        <div className={`flex flex-col overflow-hidden pt-3 pb-1 ${CARD}`}>
           {/* The door names where it goes. "Tipping" only made sense against
               a second (Predict the Table) ladder that was cut. */}
           <Link
