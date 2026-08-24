@@ -85,17 +85,53 @@ describe("matchBadgeColors", () => {
     expect(away.toLowerCase()).not.toBe(INK.toLowerCase());
   });
 
-  it("falls back to ink once both the primary and secondary clash with home", () => {
+  it("falls back to ink, then contrast-floors it, once both the primary and secondary clash with home", () => {
     // Nottingham Forest (red) vs Liverpool -- Liverpool only has one
     // sourced color (both stops are the same red), so once the primary
     // clashes, the secondary clashes too by construction, and away must
-    // fall all the way through to ink.
+    // fall all the way through to ink. But `ink` is also one of the
+    // default grounds (the card header) -- left unmodified it would be
+    // invisible against its own ground, so it still has to clear the
+    // contrast floor against ink and white like any other fill.
     const { away } = matchBadgeColors("NOT", "LIV");
-    expect(away.toLowerCase()).toBe(INK.toLowerCase());
+    expect(away.toLowerCase()).not.toBe(INK.toLowerCase());
+    expect(contrastRatio(away, INK)).toBeGreaterThanOrEqual(3.0);
+    expect(contrastRatio(away, "#ffffff")).toBeGreaterThanOrEqual(3.0);
   });
 
   it("uses the fallback kit for an unrecognized short code without throwing", () => {
     expect(() => matchBadgeColors("ZZZ", "YYY")).not.toThrow();
+  });
+
+  // Issue #186: TippedMatchCard.tsx's body rail resolves against a
+  // white-only ground -- a separate call from the default ink+white pair --
+  // so a pale kit that clears ink comfortably still has to clear white on
+  // its own. These pin that per-ground clearance for the two clubs the
+  // issue named, independent of the default-grounds pair above.
+  describe("white-only ground (the card body rail's variant)", () => {
+    it("HUL clears the white body even though its primary is a pale orange", () => {
+      const { home } = matchBadgeColors("HUL", "MUN", ["#ffffff"]);
+      expect(contrastRatio(home, "#ffffff")).toBeGreaterThanOrEqual(3.0);
+    });
+
+    it("MCI clears the white body even though home and away are the same pale blue", () => {
+      const { home, away } = matchBadgeColors("MCI", "CRY", ["#ffffff"]);
+      expect(contrastRatio(home, "#ffffff")).toBeGreaterThanOrEqual(3.0);
+      expect(contrastRatio(away, "#ffffff")).toBeGreaterThanOrEqual(3.0);
+    });
+
+    it("Fulham's white primary clears the white body", () => {
+      const { home } = matchBadgeColors("FUL", "TOT", ["#ffffff"]);
+      expect(contrastRatio(home, "#ffffff")).toBeGreaterThanOrEqual(3.0);
+    });
+
+    it("the clash rule still holds under the white-only ground variant", () => {
+      // Same pairing as the default-grounds clash test above, just resolved
+      // against white only -- flooring each ground independently must not
+      // let the two sides converge back onto the same stripe colour.
+      const { home, away } = matchBadgeColors("ARS", "CHE", ["#ffffff"]);
+      expect(home.toLowerCase()).not.toBe(away.toLowerCase());
+    });
   });
 });
 
