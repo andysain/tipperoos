@@ -45,26 +45,27 @@ export function TabBar() {
       ) : null}
       <nav
         aria-label="Main"
-        className={`fixed inset-x-0 bottom-0 z-10 border-t border-paper-line bg-paper pb-[env(safe-area-inset-bottom)] ${
+        // overflow-hidden when open: the menu panel fills this row exactly
+        // (full width on phone, right-anchored on desktop -- see below), so
+        // clipping it to the bar's own rounded-t-card silhouette is what
+        // makes it read as this bar's shape rather than a second,
+        // separately-rounded box nested inside it.
+        className={`fixed inset-x-0 bottom-0 z-10 overflow-hidden border-t border-paper-line bg-paper pb-[env(safe-area-inset-bottom)] ${
           moreOpen ? `rounded-t-card ${CARD_SHADOW}` : ""
         }`}
       >
         {moreOpen ? (
-          // Anchored to the More tab's own column (the last of the four
-          // flex-1 slots below), not stretched full-width -- at desktop
-          // widths a full-width menu row reads as an unrelated banner
-          // spanning the page, disconnected from the tab that opened it,
-          // since the tab bar's icons spread edge-to-edge while the menu
-          // text would otherwise sit pinned to the far-left. Capped at
-          // max-w-72 so it doesn't grow arbitrarily wide either.
-          //
-          // Flush against the nav's own top and right edges -- no padding
-          // gap around it. Padding here would be bg-paper, the exact color
-          // of the page behind the bar, so it would render as invisible
-          // empty space and make the panel look like it's floating
-          // unattached above the tab row instead of growing out of it.
-          <div className="flex justify-end">
-            <div className="w-full max-w-72">
+          // Full width on phone -- the bar itself is already narrow there,
+          // so the panel filling it reads as one continuous card, which is
+          // what mobile review confirmed looks right. Right-anchored and
+          // capped at md:max-w-72 only from tablet width up: that's where a
+          // full-width panel starts reading as an unrelated banner spanning
+          // the page, disconnected from the far-right "More" tab that
+          // opened it. Flush against the bar's own top/right edges -- no
+          // padding gap, which would be bg-paper (the page's own color)
+          // and render as invisible empty space.
+          <div className="flex md:justify-end">
+            <div className="w-full md:max-w-72">
               <MoreMenuItems onClose={() => setMoreOpen(false)} />
             </div>
           </div>
