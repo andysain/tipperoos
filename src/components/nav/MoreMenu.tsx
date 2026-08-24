@@ -7,11 +7,14 @@ import { useState } from "react";
 import { FOCUS, T } from "@/components/ui/tokens";
 import { TAB_BAR_HEIGHT_REM } from "./shell-metrics";
 
-// The "More" tab's bottom-sheet menu (docs/adr/0005-app-navigation-shell.md
+// The "More" tab's popover menu (docs/adr/0005-app-navigation-shell.md
 // amendment, issue #185). Replaces the old fixed top-right SwitchPlayerButton
 // and HelpButton, which had no scroll-away and covered page content. Backdrop
 // at z-20, panel at z-30 -- the overlay tiers shell-metrics.ts already
-// reserves for exactly this kind of surface.
+// reserves for exactly this kind of surface. Anchored over the tab's own
+// slot (right-3, same width class as the tab bar's flex-1 quarter) rather
+// than spanning full width, so it reads as that tab opening rather than an
+// unrelated sheet sliding up from the bottom.
 export function MoreMenu({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -52,12 +55,14 @@ export function MoreMenu({ onClose }: { onClose: () => void }) {
       <div
         role="menu"
         aria-label="More"
-        className="fixed inset-x-0 z-30 rounded-t-card border border-b-0 border-paper-line bg-paper p-2 shadow-lg shadow-ink/25"
+        // Flush against the tab bar's top edge (no gap/shadow seam), so the
+        // panel reads as an extension of the "More" tab rather than a
+        // detached sheet.
+        className="fixed right-3 z-30 w-56 rounded-t-card border border-b-0 border-paper-line bg-paper p-2"
         style={{
           bottom: `calc(${TAB_BAR_HEIGHT_REM} + env(safe-area-inset-bottom))`,
         }}
       >
-        <div className="mx-auto mb-1 h-1 w-10 rounded-badge bg-paper-line" />
         {onHelpPage ? (
           // Already on /how-it-works -- a Link to the same page would be a
           // no-op navigation, so this instead returns to wherever the
