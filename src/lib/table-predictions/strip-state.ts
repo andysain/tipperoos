@@ -7,9 +7,12 @@
 // `locked: false` unconditionally for a Late Joiner (issue #156's decision
 // log), so gating the Champion's visibility on `locked` would hide a Late
 // Joiner's own Champion from them permanently. `editability.editable`
-// independently controls only which of the two "submitted" variants renders
-// (and therefore the untidy-Bands warning), never whether the Champion shows
-// at all.
+// independently controls only the untidy-Bands warning (issue #157's UI
+// pass: only actionable pre-lock, since the Bands are already locked in
+// once submitted_locked), never whether the Champion/position/score show
+// at all -- those are live and continuous regardless of lock status
+// (CLAUDE.md: "computed continuously through the season"), so both
+// submitted states carry the same leaguePosition/score fields.
 
 import type { TablePredictionEditability } from "./rules";
 
@@ -25,6 +28,7 @@ export type TablePredictionStripState =
       kind: "submitted_editable";
       champion: TablePredictionStripTeam;
       bandsUntidy: boolean;
+      leaguePosition: number | null;
       score: number | null;
     }
   | {
@@ -85,6 +89,7 @@ export function deriveTablePredictionStripState(
       kind: "submitted_editable",
       champion: championTeam,
       bandsUntidy: !bandCountsOk,
+      leaguePosition,
       score,
     };
   }

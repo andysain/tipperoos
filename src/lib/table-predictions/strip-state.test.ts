@@ -109,6 +109,7 @@ describe("deriveTablePredictionStripState", () => {
       kind: "submitted_editable",
       champion: CHAMPION,
       bandsUntidy: false,
+      leaguePosition: 1,
       score: 132,
     });
   });
@@ -126,6 +127,7 @@ describe("deriveTablePredictionStripState", () => {
       kind: "submitted_editable",
       champion: CHAMPION,
       bandsUntidy: true,
+      leaguePosition: 1,
       score: 90,
     });
   });
@@ -143,6 +145,25 @@ describe("deriveTablePredictionStripState", () => {
       kind: "submitted_editable",
       champion: CHAMPION,
       bandsUntidy: false,
+      leaguePosition: 1,
+      score: null,
+    });
+  });
+
+  it("degrades to a null league position in the editable state too (day one -- no standings yet)", () => {
+    const result = deriveTablePredictionStripState({
+      prediction: { submittedAt: "2026-08-01T00:00:00Z", skipped: false },
+      editability: editable,
+      championTeam: CHAMPION,
+      bandCountsOk: true,
+      leaguePosition: null,
+      score: null,
+    });
+    expect(result).toEqual({
+      kind: "submitted_editable",
+      champion: CHAMPION,
+      bandsUntidy: false,
+      leaguePosition: null,
       score: null,
     });
   });
@@ -248,6 +269,7 @@ describe("deriveTablePredictionStripState", () => {
       kind: "submitted_editable",
       champion: CHAMPION,
       bandsUntidy: false,
+      leaguePosition: 7,
       score: null,
     });
   });
