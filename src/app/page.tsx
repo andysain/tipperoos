@@ -77,9 +77,15 @@ export default async function PickBoardPage() {
   // in that wave -- which a same-wave peer can't supply. Resolving it one
   // hop earlier keeps the total round-trip count unchanged (still 3 hops)
   // while making that id available in time.
-  const [seasonId, tablePrediction] = await Promise.all([
+  // `gameweekOneKickoff` is resolved here rather than in the wave below so
+  // it can be passed into `getTablePredictionStripData` (a peer in that
+  // wave can't supply it) for the Late-Joiner-aware rank -- same "resolve
+  // one hop earlier so an id/input is ready in time" move as
+  // `tablePrediction` itself. Hop-neutral: this Promise.all already awaited.
+  const [seasonId, tablePrediction, gameweekOneKickoff] = await Promise.all([
     getCurrentSeasonId(supabase),
     getTablePredictionRecord(supabase, playerId),
+    getGameweekOneKickoff(supabase),
   ]);
   const gameweekNumber = seasonId
     ? await resolveCurrentGameweekForCompetition(
@@ -92,54 +98,50 @@ export default async function PickBoardPage() {
   const previousGameweekNumber =
     gameweekNumber !== null ? gameweekNumber - 1 : null;
 
-  const [
-    gameweek,
-    recap,
-    ladder,
-    databaseTime,
-    gameweekOneKickoff,
-    tablePredictionStripData,
-  ] = await Promise.all([
-    seasonId && gameweekNumber !== null
-      ? loadPickBoardGameweek(
-          supabase,
-          competitionId,
-          playerId,
-          now,
-          seasonId,
-          gameweekNumber,
-        )
-      : Promise.resolve(null),
-    seasonId && previousGameweekNumber !== null
-      ? loadRecap(
-          supabase,
-          competitionId,
-          seasonId,
-          playerId,
-          previousGameweekNumber,
-          now,
-          timeZone,
-        )
-      : Promise.resolve(null),
-    seasonId
-      ? loadLadder(supabase, competitionId, seasonId, playerId)
-      : Promise.resolve([]),
-    getDatabaseTime(supabase),
-    getGameweekOneKickoff(supabase),
-    seasonId && tablePrediction
-      ? getTablePredictionStripData(
-          supabase,
-          tablePrediction.id,
-          seasonId,
-          playerId,
-        )
-      : Promise.resolve({
-          championTeam: null,
-          bandCounts: {},
-          leaguePosition: null,
-          score: null,
-        }),
-  ]);
+  const [gameweek, recap, ladder, databaseTime, tablePredictionStripData] =
+    await Promise.all([
+      seasonId && gameweekNumber !== null
+        ? loadPickBoardGameweek(
+            supabase,
+            competitionId,
+            playerId,
+            now,
+            seasonId,
+            gameweekNumber,
+          )
+        : Promise.resolve(null),
+      seasonId && previousGameweekNumber !== null
+        ? loadRecap(
+            supabase,
+            competitionId,
+            seasonId,
+            playerId,
+            previousGameweekNumber,
+            now,
+            timeZone,
+          )
+        : Promise.resolve(null),
+      seasonId
+        ? loadLadder(supabase, competitionId, seasonId, playerId)
+        : Promise.resolve([]),
+      getDatabaseTime(supabase),
+      seasonId && tablePrediction
+        ? getTablePredictionStripData(
+            supabase,
+            tablePrediction.id,
+            seasonId,
+            playerId,
+            competitionId,
+            gameweekOneKickoff,
+          )
+        : Promise.resolve({
+            championTeam: null,
+            bandCounts: {},
+            leaguePosition: null,
+            score: null,
+            rank: null,
+          }),
+    ]);
 
   // Fails closed (hidden) if the DB clock couldn't be read -- same "don't
   // show a stale/unconfirmed state" posture the old prompt took by
@@ -157,6 +159,7 @@ export default async function PickBoardPage() {
           .ok,
         leaguePosition: tablePredictionStripData.leaguePosition,
         score: tablePredictionStripData.score,
+        rank: tablePredictionStripData.rank,
       })
     : ({ kind: "hidden" } as const);
 

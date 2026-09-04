@@ -4,8 +4,10 @@ import {
   type BandKey,
   getTablePredictionEditability,
   isBandKey,
+  isLateJoiner,
   type TablePredictionEditability,
 } from "@/lib/table-predictions/rules";
+import { rankScores } from "@/lib/leaderboard/rank";
 import type { TablePredictionStripTeam } from "@/lib/table-predictions/strip-state";
 
 export async function getDatabaseTime(
@@ -116,6 +118,15 @@ export interface TablePredictionStripData {
    * this player (no row yet), which reads identically to "not yet scored".
    */
   score: number | null;
+  /**
+   * Issue #157 follow-up: this player's current standing within the
+   * competition's Predict the Table board -- the same skip-rank over
+   * non-Late-Joiners that the Leaderboard's Predict the Table segment
+   * shows (src/lib/leaderboard/table-board.ts), so the two never disagree.
+   * Null when the player has no score row yet, or is a Late Joiner (who is
+   * unranked on that board by design, per docs/adr/0012 D13).
+   */
+  rank: number | null;
 }
 
 /**
@@ -134,32 +145,79 @@ export interface TablePredictionStripData {
  * parallel wave instead of forcing a second one -- see issue #156's
  * decision log.
  *
- * Two sequential round trips internally (ranks, then team+standings) once
- * the Champion is known -- same shape as `loadPickBoardGameweek`'s own
- * internal sequencing; this whole function is still just one peer in the
- * caller's outer `Promise.all`.
+ * Two sequential round trips internally (ranks + cohort scores, then
+ * team+standings) once the Champion is known -- same shape as
+ * `loadPickBoardGameweek`'s own internal sequencing; this whole function is
+ * still just one peer in the caller's outer `Promise.all`.
+ *
+ * The cohort-scores read pulls every non-Bot player's `total_score` in the
+ * competition (scoped via an inner join on `players`, since
+ * `table_prediction_scores` carries no `competition_id`) rather than just
+ * this player's row -- it's the same handful of rows the Leaderboard
+ * already reads, and it's what lets the Strip show a *rank* that agrees
+ * with that board. `gameweekOneKickoff` is caller-resolved for the same
+ * reason as `seasonId` (the caller already has it in hand for the
+ * editability check).
  */
 export async function getTablePredictionStripData(
   supabase: SupabaseClient,
   tablePredictionId: string,
   seasonId: string,
   playerId: string,
+  competitionId: string,
+  gameweekOneKickoff: Date | null,
 ): Promise<TablePredictionStripData> {
-  const [ranksResult, scoreResult] = await Promise.all([
+  const [ranksResult, cohortResult] = await Promise.all([
     supabase
       .from("table_prediction_ranks")
       .select("team_id, band")
       .eq("table_prediction_id", tablePredictionId),
     supabase
       .from("table_prediction_scores")
-      .select("total_score")
-      .eq("player_id", playerId)
-      .order("player_id")
-      .maybeSingle(),
+      .select(
+        "player_id, total_score, players!inner(competition_id, is_bot, joined_at)",
+      )
+      .eq("players.competition_id", competitionId)
+      .eq("players.is_bot", false)
+      .order("player_id"),
   ]);
   if (ranksResult.error) throw ranksResult.error;
-  if (scoreResult.error) throw scoreResult.error;
-  const score = scoreResult.data?.total_score ?? null;
+  if (cohortResult.error) throw cohortResult.error;
+
+  const cohort = (cohortResult.data ?? []) as unknown as {
+    player_id: string;
+    total_score: number;
+    players: { joined_at: string };
+  }[];
+  const viewerCohortRow = cohort.find((row) => row.player_id === playerId);
+  const score = viewerCohortRow?.total_score ?? null;
+
+  // Same skip-rank over non-Late-Joiners the Leaderboard's Predict the
+  // Table segment uses (buildTableLeaderboard). A Late Joiner is unranked
+  // there by design, so the Strip shows them no rank either.
+  const viewerIsLateJoiner = viewerCohortRow
+    ? isLateJoiner(
+        new Date(viewerCohortRow.players.joined_at),
+        gameweekOneKickoff,
+      )
+    : false;
+  const rank =
+    viewerCohortRow && !viewerIsLateJoiner
+      ? (rankScores(
+          cohort
+            .filter(
+              (row) =>
+                !isLateJoiner(
+                  new Date(row.players.joined_at),
+                  gameweekOneKickoff,
+                ),
+            )
+            .map((row) => ({
+              playerId: row.player_id,
+              points: row.total_score,
+            })),
+        ).find((row) => row.playerId === playerId)?.rank ?? null)
+      : null;
 
   const rows: { team_id: string; band: string }[] = ranksResult.data ?? [];
   const bandCounts: Partial<Record<BandKey, number>> = {};
@@ -170,7 +228,13 @@ export async function getTablePredictionStripData(
 
   const championRows = rows.filter((row) => row.band === "champion");
   if (championRows.length !== 1) {
-    return { championTeam: null, bandCounts, leaguePosition: null, score };
+    return {
+      championTeam: null,
+      bandCounts,
+      leaguePosition: null,
+      score,
+      rank,
+    };
   }
   const championTeamId = championRows[0].team_id;
 
@@ -194,7 +258,13 @@ export async function getTablePredictionStripData(
 
   const team = teamResult.data;
   if (!team) {
-    return { championTeam: null, bandCounts, leaguePosition: null, score };
+    return {
+      championTeam: null,
+      bandCounts,
+      leaguePosition: null,
+      score,
+      rank,
+    };
   }
 
   return {
@@ -202,6 +272,7 @@ export async function getTablePredictionStripData(
     bandCounts,
     leaguePosition: standingsResult.data?.position ?? null,
     score,
+    rank,
   };
 }
 

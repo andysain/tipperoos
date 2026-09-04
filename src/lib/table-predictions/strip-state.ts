@@ -30,12 +30,14 @@ export type TablePredictionStripState =
       bandsUntidy: boolean;
       leaguePosition: number | null;
       score: number | null;
+      rank: number | null;
     }
   | {
       kind: "submitted_locked";
       champion: TablePredictionStripTeam;
       leaguePosition: number | null;
       score: number | null;
+      rank: number | null;
     }
   | { kind: "hidden" };
 
@@ -53,6 +55,13 @@ export interface TablePredictionStripInput {
    * before the first cohort recompute has ever run for this player.
    */
   score: number | null;
+  /**
+   * This player's standing on the competition's Predict the Table board --
+   * the same skip-rank the Leaderboard's Predict the Table segment shows.
+   * Null when unscored, or for a Late Joiner (unranked there by design).
+   * Carried in both submitted states for the same reason as `score`.
+   */
+  rank: number | null;
 }
 
 export function deriveTablePredictionStripState(
@@ -65,6 +74,7 @@ export function deriveTablePredictionStripState(
     bandCountsOk,
     leaguePosition,
     score,
+    rank,
   } = input;
 
   // Skipped is final and never reverses (CLAUDE.md's Predict the Table
@@ -91,6 +101,7 @@ export function deriveTablePredictionStripState(
       bandsUntidy: !bandCountsOk,
       leaguePosition,
       score,
+      rank,
     };
   }
 
@@ -99,5 +110,6 @@ export function deriveTablePredictionStripState(
     champion: championTeam,
     leaguePosition,
     score,
+    rank,
   };
 }
