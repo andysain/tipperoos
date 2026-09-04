@@ -49,7 +49,7 @@ export interface LeaderboardRow {
   displayName: string;
   emoji: string | null;
   isBot: boolean;
-  /** Dense rank over humans only; null for a bot (D12). */
+  /** Skip ("standard") rank over humans only; null for a bot (D12). */
   rank: number | null;
   /** Places climbed since the previous gameweek; null when unknowable (D2). */
   movement: number | null;
@@ -89,7 +89,7 @@ export function countGameweeksPlayed(
   ).length;
 }
 
-/** Dense rank over humans only, keyed by player id. Bots are absent. */
+/** Skip ("standard") rank over humans only, keyed by player id. Bots are absent. */
 function humanRanks(
   entries: readonly { playerId: string; isBot: boolean; points: number }[],
 ): Map<string, number> {
