@@ -1,9 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSessionPlayerId } from "@/app/_lib/session-cookie";
-import {
-  getCurrentSeasonId,
-  resolveCurrentGameweekForCompetition,
-} from "@/app/_lib/gameweek-access";
+import { getCurrentSeasonId } from "@/app/_lib/gameweek-access";
 import { loadLeaderboard } from "@/app/_lib/leaderboard-access";
 import { loadTableLeaderboard } from "@/app/_lib/table-leaderboard-access";
 import { resolveCompetitionId } from "@/lib/competitions/scope";
@@ -107,9 +104,9 @@ function TableSegment({
     <>
       {rows.some((row) => row.isLateJoiner) ? (
         <p className={`${T.caption} ${TX.muted}`}>
-          A Late Joiner&apos;s score counts, but they can&apos;t win this
-          title — joining after Gameweek 1 is an information advantage this
-          board doesn&apos;t rank.
+          A Late Joiner&apos;s score counts, but they can&apos;t win this title
+          — joining after Gameweek 1 is an information advantage this board
+          doesn&apos;t rank.
         </p>
       ) : null}
 
@@ -154,23 +151,9 @@ export default async function LeaderboardPage({
   }
 
   const seasonId = await getCurrentSeasonId(supabase);
-  const gameweekNumber = seasonId
-    ? await resolveCurrentGameweekForCompetition(
-        supabase,
-        competitionId,
-        new Date(),
-        seasonId,
-      )
-    : null;
 
   const view = seasonId
-    ? await loadLeaderboard(
-        supabase,
-        competitionId,
-        seasonId,
-        playerId,
-        gameweekNumber !== null ? gameweekNumber - 1 : null,
-      )
+    ? await loadLeaderboard(supabase, competitionId, seasonId, playerId)
     : null;
 
   return (

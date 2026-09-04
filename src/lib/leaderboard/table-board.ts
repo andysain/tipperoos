@@ -1,6 +1,6 @@
 // Pure composition for the leaderboard's Predict the Table segment (issue
 // #171) -- docs/adr/0012-leaderboard-view.md D13. Mirrors board.ts's shape
-// (dense rank over an eligible subset, kept free of `server-only` and any
+// (rank over an eligible subset, kept free of `server-only` and any
 // Supabase type so it's golden-value testable on its own numbers per
 // docs/standards/TESTING_STANDARD.md §1a); the DB read lives in
 // src/app/_lib/table-leaderboard-access.ts.
@@ -33,7 +33,7 @@ export interface TableLeaderboardRow {
   displayName: string;
   emoji: string | null;
   isLateJoiner: boolean;
-  /** Dense rank over non-Late-Joiners only; null for a Late Joiner (D13). */
+  /** Skip ("standard") rank over non-Late-Joiners only; null for a Late Joiner (D13). */
   rank: number | null;
   totalScore: number;
   placementScore: number;
