@@ -1,151 +1,88 @@
-# Build order — Minimum Launch, Gameweek 1 (2026-08-21)
+# Build order — where the season actually is
 
-Working checklist for the **Minimum Launch — Gameweek 1** milestone. Not committed; scratch file.
+Working checklist. Rewritten 2026-09-04 after an audit against the GitHub issue list; the launch-wave structure it used to carry is now history and lives in §1.
 
-Launch is defined as: _a player logs in, lands on the Pick Board, sees gameweek 1's two auto-selected Tipped Matches, and files a scoreline that a server-side lock enforces._ Source of truth for scope is `BUILD_PLAN.md` decision 42; the design decisions are `docs/adr/0006-auto-selected-tipped-matches.md` and `docs/adr/0007-home-surface-and-pick-entry.md`.
-
-```
-#87 ──> #15 ──> #16          critical path (4 deep)
-              └> #90
-#18 ──> #19 ──> #89 ──┘
-#86 ──────────────────┘
-#88 (migration, standalone)
-#11 (sync cadence — see gap below)
-```
+Launch happened. Gameweek 1 opened 2026-08-21, and the **Minimum Launch — Gameweek 1** milestone is fully closed — all 20 issues. What follows is the live backlog, ordered.
 
 ---
 
-## Per-issue workflow (every item below)
+## 1. History — what launch and the weeks after it delivered
 
-Per `AGENTS.md`:
+Kept short deliberately. The issues themselves hold the detail, and `BUILD_PLAN.md` holds the sequencing reasoning.
+
+**Launch (milestone closed).** Sync workflow and `sync_log` (#11, #12) · Match 1 and Match 2 auto-selection (#18, #19) · Tipped Match card and pick route (#15) · server-side pre-kickoff lock (#16) · Pick Board (#90) · current-gameweek resolver (#86) · kickoff formatting (#87) · standings store (#88) · gameweek 1 seed (#89) · card primitives and cross-screen chrome (#106, #107, #108) · in-app help (#125) · login and Predict the Table polish (#126–#132).
+
+**After launch.** Scoring engine (#21) and its scripted simulation (#22) · standings snapshot (#23) · sync wired to scoring (#166) · per-gameweek selection runner (#92) · bot picks (#35) · leaderboard (#24) · Match Centre and the hidden-until-lock rule (#91, #17) · design-system sweep and its follow-ons (#184, #185, #186) · Predict the Table Band capture and scoring (#115–#118), the Table Prediction Strip (#156), its live score (#157), and the leaderboard segment (#171).
+
+**Defects found and fixed in flight.** `seasons.is_current` defaulting true, 500ing every route (#174) · the unbounded `scoresForCompetition` query against Supabase's 1,000-row cap (#176, #182) · session cookie with no `maxAge`, logging mobile players out (#196) · leaderboard rank arrows stuck on `–` (#202) · dense-to-standard rank tie-break (#204).
+
+**Performance.** One investigation, not three fixes. Server-side round trips came down (Pick Board ~11 serial → ~6; `/predict-table` 3 serial stages → one 5-way parallel wave; `/api/picks`, `table-predictions/*` parallelized or collapsed to single RPCs), and Vercel moved to the APAC region. But a real-device Chrome trace found the dominant cause wasn't server-side at all: every tap paid a ~230ms double-tap-zoom disambiguation delay because no `touch-action` was declared anywhere. `touch-action: manipulation` on `body` took INP from ~280ms to ~80ms on a real device. Detail in `docs/standards/PERFORMANCE_TESTING_STANDARD.md` §4.
+
+---
+
+## 2. Open backlog — every open issue, ordered
+
+Ten open issues. Ordered by what actually costs something today, not by milestone.
+
+### Correctness gaps — nothing else should jump these
+
+- [ ] **#33 — Postponement-void handling.** The Skipped Slot and Voided Match card states are still undrawn (`docs/adr/0007` → _Deferred_). A postponed tipped match today has no defined behaviour on the Pick Board, and the rule it needs to implement is the one point of unprompted agreement across every analysis of this rebuild — a post-lock postponement voids, a pre-lock one skips the slot. Live risk for the rest of the season.
+
+- [ ] **#36 — Player-facing forced-PIN-reset route and screen.** `pin_reset_required` is in the schema and `/api/auth/login` returns it, but `src/app/login/page.tsx:169` deliberately ignores it — the comment says the flow isn't built and the old dead-end warning was removed. There is no set-new-PIN route under `src/app/api/auth/`. **Setting the flag today does nothing at all.** Rescoped 2026-09-04 to the player-facing half only; the admin-side write is #201. Doesn't depend on the admin UI — the flag can be set by SQL to test it — so it can go first, and should.
+
+### Admin UI — Phase 1 of `docs/admin-ui-spec.md`
+
+Spec merged in #198. Phases 2–5 (sync page, player details and roles, competition code rotation, settings) are specced but unfiled; file them when Phase 1 lands, not before.
+
+- [ ] **#199 — Admin access gate + `/admin` shell.** `requireAdmin()`, 404-not-403 for non-admins, More-menu entry. **In flight** — PR #208 on `admin-access-gate-admin-shell`.
+- [ ] **#200 — Roster table + health strip.** Read-only. Blocked on #199. This is what makes a silently-failed sync visible at all; today that's only discoverable by querying `sync_log` by hand.
+- [ ] **#201 — Admin reset PIN + clear lockout.** Blocked on #199, #200 and, for the flow to mean anything, #36. Touches `src/lib/auth/**` → CODEOWNERS approval required.
+
+### Infrastructure the spec assumes and we haven't built
+
+- [ ] **#13 — pg_cron health-check watchdog.** `CLAUDE.md` → Stack specifies it as the secondary check that a successful sync happened recently, alerting the admin if not. `status: ready`, never scheduled. Overlaps #200's health strip: the strip tells you when you look, the watchdog tells you when you don't. Decide whether both are wanted before building the second one.
+- [ ] **#39 — Weekly backup export.** `CLAUDE.md` → Stack calls this a rolling data safety net for the season, not a pre-launch one-off. It doesn't exist. Distinct from the admin-export tooling that `docs/admin-ui-spec.md` D7 rules out — this is a scheduled job, not a UI.
+
+### Deferred by decision, 2026-09-04
+
+- [ ] **#28 / #29 / #30 — Transactional email + the two sends.** **Andy is delaying this for the time being.** Noted because `CLAUDE.md` calls the post-result push the single highest-leverage retention lever in the product, so this is a deliberate deferral to revisit, not a quiet drop. One consequence worth holding: with no email, a player who can't get in has no channel to be reached on, which is part of why #36 matters.
+
+### Needs a decision, not code
+
+- [ ] **#31 — Match-result edit audit trail.** #14 (admin override UI for results and kickoff times) was closed as not planned on 2026-09-04 — match-result correction stays a development-team database action per `CLAUDE.md` → Identity and auth and D2 of `docs/admin-ui-spec.md`. That leaves this issue without its trigger. `match_result_audit` exists in the schema and nothing writes to it. Either rescope to capturing hand-made corrections (which `CLAUDE.md` promises are visible on the pick reveal), or close it and let the table sit unused. Not picked yet.
+
+---
+
+## 3. Wanted, no issue filed
+
+Concrete enough to file whenever there's appetite:
+
+- **Type-ahead login search** — replace the full player list with a filtered dropdown of close matches only, never the whole roster. Balances usability for younger players against exposing an enumerable name list as the group grows. **M**. Note this is load-bearing for `docs/admin-ui-spec.md` §6.2: disabling a player is enforced server-side at login precisely because absence from the roster list is presentation, not enforcement.
+- **Pick Board card text reorder** — match and pick metadata up top in line with the `OPEN` chip, score prediction on its own line, so the key element isn't sharing space.
+- **Score input needs two taps** before the number pad appears. **XS**.
+
+Genuinely undecided — don't file these as issues yet:
+
+- **Score input redesign** (buttons vs. free text), which must also resolve the "single digit on 5+" case: multi-digit entry above the valid range currently fails with a vague error instead of being prevented or explained. **M**.
+- **Post-lock Predict the Table visibility** — mirror the weekly pick reveal so other players' full tables become visible after lock, alongside a comparison against actual standings.
+
+---
+
+## 4. Deferred deliberately
+
+Offline/retry states for the filing stamp · the ambient countdown treatment · remembering the `5+` row per player · the last-place Picker mechanic (#20, closed `not planned` — reopen to revive; its `gameweeks` columns are retained as reserved space) · Superadmin role · WhatsApp · admin-side match-result and kickoff editing (#14, closed `not planned` 2026-09-04).
+
+---
+
+## Per-issue workflow
+
+Per `AGENTS.md`, unchanged:
 
 1. `git fetch && git rebase origin/main`, one worktree per issue, branch from `origin/main`.
-2. Re-run the **current-state check** (`docs/standards/ISSUE_STANDARD.md` §4) before writing code — several of these issues already have partial implementations upstream.
+2. Re-run the **current-state check** (`docs/standards/ISSUE_STANDARD.md` §4) before writing code. This audit found two issues whose bodies had drifted from the code — assume yours has too.
 3. Tests per `docs/standards/TESTING_STANDARD.md` §1; golden values where the issue says so.
 4. Validation sequence, then **open the Preview URL and exercise the flow yourself**.
 5. PR with a plain-language **TL;DR** first line, then `gh pr merge --auto --squash`.
 6. Delete the worktree and branch the moment the PR merges.
 
-Anything touching `src/lib/**` needs your explicit approval before merge (CODEOWNERS) — in this set that's **#16**, and likely **#18**/**#19**/**#86** depending on where the pure logic lands.
-
----
-
-## Wave 1 — four in parallel, all `status: ready`
-
-- [x] **#88 — Team league-position store + standings fetch**
-
-  _Only migration in the set. Run it alone so nothing races it in `supabase/migrations/**`._
-  **Migration discipline (`CLAUDE.md` → Stack):** apply to staging → confirm → apply to production → only then merge the branch that depends on it.
-
-- [x] **#87 — Kickoff and countdown display formatting (Sydney)**
-
-  _Head of the critical path. #15 cannot start without it._
-
-- [x] **#86 — Shared current-gameweek resolver**
-
-  _No dependents until #90._
-
-- [x] **#18 — Match 1: Top Matchup auto-selection rule**
-
-  _Head of the selection chain. Pure logic; positions are an input, so it does not wait on #88._
-
-## Wave 2 — two in parallel
-
-- [x] **#19 — Match 2: uniform-random rule** (after #18)
-- [x] **#15 — Tipped Match card + pick save/edit route** (after #87)
-
-  _Decide optimistic-vs-awaited filing deliberately here — the deferred offline/retry states constrain this route's contract, so reversing it later means changing the signature._
-
-## Wave 3 — two in parallel
-
-- [x] **#16 — Server-side 5-minute pre-kickoff lock** (after #15)
-
-  _The one launch item that must be **correct**, not merely present. The predicate `isMatchLocked` already exists in `src/lib/competitions/scope.ts` (#80) — reuse it; this issue owes enforcement on the **write** path._
-
-- [x] **#89 — Gameweek 1 Tipped Match seed script** (after #18, #19)
-
-## Wave 4 — one
-
-- [x] **#90 — Pick Board route (`/`)** (after #86, #87, #15)
-
-  _Also needs #89 in practice: no gameweek exists to render or to exercise on Preview until the seed script has run._
-  _Includes the login redirect — login currently dead-ends into `/predict-table`._
-
----
-
-## Open gap to resolve before wave 1
-
-- [x] **#11 — GitHub Actions sync workflow.** Already `launch-critical` but sitting in _Fixtures &amp; Results Sync_, not the launch milestone. Two reasons it belongs in wave 1:
-  - #88's standings fetch is written as "wired into the existing sync cadence" — and that cadence does not exist yet.
-  - Kickoff times drive lock times, so a rescheduled gameweek-1 fixture with no sync locks at the wrong moment.
-
-  **Decision needed:** move #11 into the launch milestone and build it in wave 1, or ship #88 as a route the seed script invokes manually for day one (works, but leaves kickoff drift unhandled).
-
----
-
-## Predict the Table deadline
-
-- [x] **#26 — Predict the Table capture UI.** The table is editable through the end of 31 August 2026 in Australia/Sydney, then locks for on-time Players. Late Joiners remain unrestricted. **Run as an independent track, not after the picks work.**
-
-## Pre-kickoff, not tracked as issues
-
-- [x] Run the #89 seed script against **production**, not only staging.
-- [x] Confirm production and staging schemas match (no drift from #88's migration).
-- [x] Walk the deployed Production URL end to end as a real player: enter competition code → sign up → file both picks → re-edit one → confirm the other players' picks are not visible anywhere.
-- [x] Confirm at least one other household can log in on their own device.
-
----
-
-## After launch, in order
-
-- [x] **#21 — Additive scoring engine.** Within days, not weeks: gameweek 1's results land 21–23 August and the Pick Board shows no points, rank or last-week strip until this runs.
-- [x] **#23 — Per-gameweek standings snapshot.** Lights up rank and the last-week strip on `/`.
-- [x] **#92 — Per-gameweek selection runner.** Hard deadline of gameweek 2, roughly 28 August.
-- [x] **#35 — Bot picks** (Random, 1-1, Median).
-- [x] **#24 — Leaderboard view.**
-- [x] **#91 — Match Centre** (+ **#17** visibility rule). Built on `feat/match-centre`: `/gameweek/[n]` (the pick reveal) and `/picks/[playerId]` (the picks record), plus the Pick Board summary and the leaderboard/match-card defect fixes the work surfaced. Design in `docs/adr/0013-match-centre-tense-and-axes.md`; the throwaway design prototype is on `prototype/match-centre-design`. Merged 2026-08-23 (PR #187) after a Preview walk; both routes 404 until a gameweek locks, so that check waited for gameweek 1's first lock. Two states shipped unseen — the leaderboard's movement arrows and its points-per-week figure, which need a completed, scored gameweek to render at all.
-  - Deferred out of it, filed: ~~**#184** (app-wide design-system sweep)~~ — merged 2026-08-23 (PR #188); **#185** (fixed chrome overlapping content), **#186** (kit colours on white grounds) still open.
-- [ ] **#33 — Postponement-void handling**, plus the Skipped Slot and Voided Match card states, which are still undrawn (`docs/adr/0007-home-surface-and-pick-entry.md` → _Deferred_).
-- [ ] **#28 / #29 / #30 — Transactional email + the two sends.** `CLAUDE.md` calls the post-result push the highest-leverage retention lever in the product; don't let it drift behind the reminder.
-
-## Still deferred, deliberately
-
-Offline/retry states for the filing stamp · the ambient countdown treatment · remembering the `5+` row per player · the last-place Picker mechanic (#20, closed — reopen to revive) · Superadmin role · WhatsApp.
-
-# TO DO
-
-Sizes are rough t-shirt estimates (XS ≈ &lt;1hr, S ≈ half day, M ≈ 1–2 days, L ≈ 3+ days), not commitments.
-
-- [x] PRE Launch
-
-  _Bar for PRE: either blocks a player from cleanly completing signup → pick filing → Predict the Table capture before gameweek 1 lock, or is cheap enough that deferring it buys nothing._
-  - [x] General
-    - [x] **#125 — In-app help: scoring + mechanics explainer** — **M**
-    - [x] **User Better team names than the full full names**
-  - [x] Login / Onboarding
-    - [x] When logging in remove the "**Welcome back, Test2345!** You're logged in. Let's Go" screen. Have it just go straight to the home page
-    - [x] **#126 — Login/signup polish: mask PIN on login, hide email input** — **XS** (bundles the PIN-mask and email-hide items)
-    - [x] **#127 — Make emoji selection mandatory + add random-pick button** — **S** (`cut-if-behind`: the full emoji-library tier)
-  - [x] Pick Board
-    - [x] **#128 — Pick Board: show calendar date alongside kickoff time** — **S**
-    - [x] **#156 — Table Prediction Strip** — **S/M**. Replaces the onboarding-only prompt with a permanent mini-card carrying the player's own Champion pick and that club's current league position, so Predict the Table doesn't vanish from home once the deadline passes. Champion gates on `submitted_at`, not on the deadline (a Late Joiner never locks). Renders nothing for a skipped table, or one whose Champion Band doesn't hold exactly one team. Shape settled by prototype — branch `prototype/table-prediction-strip`, verdict on the issue.
-  - [x] Predict the Table
-    - [x] new predict the table input approach
-    - [x] **#129 — Fix "locked in" confirmation to a fixed modal** — **S**
-    - [x] **#130 — Band-by-Band guidance (next-prompt + progress tracker)** — **M**
-    - [x] **#131 — Placed-team X marker + tap-to-swap interaction** — **M** (bundles the X-marker and swap items)
-    - [x] **#132 — Extend lock deadline to 31 August** — **S**
-
-- [ ] POST Launch
-  - [x] Performance
-    - [x] Investigate shared server-side root cause behind slow login, slow screen loads/saves, and the laggy "grey card → full contrast" team-add commit on Predict the Table — treat as one investigation, not three separate fixes. Fix root cause only; no optimistic-UI masking. — **M** (investigation), follow-on fix size TBD by finding - partly resolved by having vercel moved to apac region. Investigation and remediation plan live in `docs/standards/PERFORMANCE_TESTING_STANDARD.md` §4. `table-predictions/assign`/`unassign`/`submit` already collapsed to single RPCs (pre-existing migration); scrypt now non-blocking + competition-code lookup cached; Pick Board (`src/app/page.tsx`) season/gameweek resolution deduped and last-week summary moved into the parallel wave (~11 serial round trips → ~6); `/api/picks` membership check + kickoff-time lookup parallelized (filtered query instead of a full gameweeks scan); `table-predictions/skip`'s two independent reads parallelized; `/predict-table` collapsed from 3 serial stages to a single 5-way parallel wave plus one dependent tail query. A real-device Chrome trace of the Pick Board found the actual dominant cause was not server-side at all: every tap paid a ~230ms browser double-tap-zoom disambiguation delay (`GestureTapUnconfirmed` -&gt; `GestureTap`) because no `touch-action` was declared anywhere in the app. Fixed with `touch-action: manipulation` on `body` — **confirmed on a real device**: INP dropped from ~280ms to ~80ms, matching localhost.
-  - [ ] Login / Onboarding
-    - [ ] Replace the full player list on login with type-ahead search: as the player types, show a small filtered dropdown of close/partial matches only — never the full roster — balances usability for younger players against not exposing an enumerable name list as the group scales past ~5 — **M**
-  - [ ] Pick Board
-    - [ ] Reorder text on card. so that the match/pick meta data is up top in line with the `OPEN` chip. and the score prediction has its own line (idea is that this is the key item so it should maximise the space on the card not have to share it
-    - [ ] Fix score input requiring two taps before the number pad/cursor appears — **XS**
-    - [x] Reorder Match 1 / Match 2 by kickoff time (chronological), Top Pick as tiebreak only — supersedes the current fixed Match-1-first ordering in `docs/adr/0007` — **S**
-    - [ ] Decide on redesigning the score input (buttons vs. free text) — must resolve the "single digit on 5+" case too: multi-digit entry above the valid range currently fails with a vague error instead of being prevented or clearly explained — open design question, not committed — **M**
-  - [ ] Predict the Table
-    - [ ] **#157 — Live Table Prediction Score on the Strip** — **M**. Surfaces the continuously-computed score (`CLAUDE.md` → Predict the Table) in #156's card as points plus a meter. Precomputed on the standings sync, not per request — Bold Call rarity needs the whole cohort, so it can't be scored per player on `/`. **Unblocked 2026-08-24**: #156 is closed, so this is `status: ready`. Blocks #171 (the leaderboard's Predict the Table segment), which has no trustworthy numbers until it lands.
-    - [ ] _Future direction, not committed:_ after lock, mirror the weekly pick visibility rule — other players' full Table predictions become visible, plus a comparison against actual current standings
+Anything touching `src/lib/**` or `.github/workflows/**` needs Andy's explicit approval before merge (CODEOWNERS). In the current backlog that's **#201**, and likely **#33** depending on where the void logic lands.
