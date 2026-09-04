@@ -121,6 +121,11 @@ Table submissions (submitted / skipped / outstanding).
 > Phase 1 note: the `disabled` sub-count ships with Phase 3 (the `disabled_at`
 > column, §9, does not exist before then). "Outstanding" is over non-bot players —
 > those with neither a `submitted_at` nor an `is_skipped` prediction row.
+>
+> The current-gameweek entry also carries a tip breakdown over non-bot players —
+> **no tips / one tip / both tips** for this gameweek's tipped matches (a
+> Skipped-Slot week has one tipped match, so it shows **no tips / tipped**). Same
+> count-not-scoreline rule as §6.1's roster column (D3).
 
 Nothing on this page is a button.
 
