@@ -15,12 +15,13 @@ import { FOCUS, LABEL, T, TX } from "@/components/ui/tokens";
 // logged-out request gets notFound() -- 404, not 403, not a login redirect.
 export const dynamic = "force-dynamic";
 
-// The health strip links here as `?filter=needs-attention` when a player is
-// locked out; the roster's own chips use their own keys. Both resolve to
-// the same initial chip.
+// The Overview links here with `?filter=not-tipped` (from the Snapshot
+// card) and `?filter=needs-attention` (from the health strip's locked-out
+// row). Both resolve to a starting chip.
 const FILTER_PARAM: Record<string, RosterFilter> = {
   "needs-attention": "attention",
   attention: "attention",
+  "not-tipped": "not-tipped",
   humans: "humans",
   bots: "bots",
   all: "all",

@@ -1,10 +1,7 @@
 import "server-only";
 import type { Route } from "next";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {
-  decomposeCountdown,
-  formatKickoffInTimeZone,
-} from "@/lib/dates/kickoff-format";
+import { decomposeCountdown } from "@/lib/dates/kickoff-format";
 import {
   MATCH_SYNC_THRESHOLDS,
   SEASON_GAMEWEEK_COUNT,
@@ -38,11 +35,26 @@ export interface HealthSignal {
   key: HealthSignalKey;
   label: string;
   state: HealthState;
-  /** One plain-language line under the label. */
+  /** One plain-language line under the label -- the current fact. */
   detail: string;
+  /**
+   * What a human should do about it when the state isn't green (spec §7.1:
+   * "the page says what a human would need to do about it"). Null when the
+   * signal is green.
+   */
+  guidance: string | null;
   /** Where a red row jumps to, or null when no such section exists yet. */
   href: Route | null;
 }
+
+// What to do about each signal in Phase 1, where there is no run-now button
+// (§7.2) and no /admin/sync page. Deliberately blunt about the honest
+// answer -- most of this self-heals or is a development-team concern.
+const SYNC_GUIDANCE =
+  "Runs automatically every ~15 min on match days. A long gap is a development-team check.";
+const SELECTION_GUIDANCE =
+  "Selected automatically on the next sync — blocked only if the sync itself is failing.";
+const LOCKOUT_GUIDANCE = "Lockouts clear on their own after 15 minutes.";
 
 export interface AdminHealth {
   signals: HealthSignal[];
@@ -69,6 +81,24 @@ function formatAge(fromMs: number, toMs: number): string {
   if (hours > 0) return `${hours}h ${minutes}m`;
   if (minutes > 0) return `${minutes}m`;
   return "just now";
+}
+
+/**
+ * A terse admin timestamp, e.g. "Mon 24 Aug, 21:07" -- 24-hour, no
+ * "(Fri night)" overnight helper. That helper is a player-facing courtesy
+ * (docs/adr/0007); an operator wants the raw stamp, so this does not reuse
+ * `formatKickoffInTimeZone`.
+ */
+function formatStamp(iso: string, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(new Date(iso));
 }
 
 async function loadRecentSyncRows(
@@ -103,11 +133,7 @@ function buildSyncSignal(
     detail = "No successful sync on record.";
   } else {
     const age = formatAge(lastSuccessAt.getTime(), now.getTime());
-    const absolute = formatKickoffInTimeZone(lastSuccess!.run_at, timeZone);
-    detail =
-      state === "green"
-        ? `Last success ${age} ago (${absolute}).`
-        : `Last success was ${age} ago (${absolute}) — overdue.`;
+    detail = `Last success ${age} ago · ${formatStamp(lastSuccess!.run_at, timeZone)}`;
   }
 
   const mostRecent = rows[0];
@@ -115,10 +141,17 @@ function buildSyncSignal(
     const reason = mostRecent.error_message
       ? truncate(mostRecent.error_message)
       : "no error message recorded";
-    detail += ` Latest run failed: ${reason}`;
+    detail += `. Latest run failed: ${reason}`;
   }
 
-  return { key, label, state, detail, href: null };
+  return {
+    key,
+    label,
+    state,
+    detail,
+    guidance: state === "green" ? null : SYNC_GUIDANCE,
+    href: null,
+  };
 }
 
 async function loadNextGameweekSignal(
@@ -141,6 +174,7 @@ async function loadNextGameweekSignal(
       label: "Next gameweek selected",
       state: "green",
       detail: "No season is running, so nothing is waiting to be selected.",
+      guidance: null,
       href: null,
     };
   }
@@ -194,11 +228,7 @@ async function loadNextGameweekSignal(
   } else if (firstFixtureIso === null) {
     detail = `Gameweek ${nextNumber} isn't selected yet — its fixtures haven't synced.`;
   } else {
-    const when = `first kick-off ${formatKickoffInTimeZone(firstFixtureIso, timeZone)}`;
-    detail =
-      state === "red"
-        ? `Gameweek ${nextNumber} still isn't selected — ${when}.`
-        : `Gameweek ${nextNumber} isn't selected yet — ${when}.`;
+    detail = `Gameweek ${nextNumber} isn't selected yet — first kick-off ${formatStamp(firstFixtureIso, timeZone)}.`;
   }
 
   return {
@@ -206,6 +236,7 @@ async function loadNextGameweekSignal(
     label: "Next gameweek selected",
     state,
     detail,
+    guidance: state === "green" ? null : SELECTION_GUIDANCE,
     href: null,
   };
 }
@@ -238,6 +269,7 @@ async function loadLockedOutSignal(
       lockedCount === 0
         ? "No players are locked out."
         : `${lockedCount} ${lockedCount === 1 ? "player is" : "players are"} locked out right now.`,
+    guidance: state === "green" ? null : LOCKOUT_GUIDANCE,
     href:
       state === "red"
         ? ("/admin/players?filter=needs-attention" as Route)

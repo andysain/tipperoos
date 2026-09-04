@@ -1,12 +1,11 @@
+import type { Route } from "next";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ChevronRight } from "lucide-react";
 import { requireAdmin } from "@/app/_lib/admin-access";
 import { loadAdminHealth } from "@/app/_lib/admin-health-access";
-import {
-  loadAdminIndexCounts,
-  type GameweekPickBuckets,
-} from "@/app/_lib/admin-index-access";
+import { loadAdminIndexCounts } from "@/app/_lib/admin-index-access";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
   DEFAULT_TIME_ZONE,
@@ -23,31 +22,34 @@ export const dynamic = "force-dynamic";
 
 const CARD = `flex flex-col gap-3 rounded-card border border-paper-line bg-white p-4 ${CARD_SHADOW}`;
 
-function Stat({ term, value }: { term: string; value: number | string }) {
+/** One headline number. All three sit at the same size so none reads as
+ *  "the big one" -- the gameweek number and a player count are peers. When
+ *  `href` is set the value is a link (an arrow, not colour, is the cue --
+ *  DESIGN_SYSTEM.md keeps colour off values). */
+function HeadlineStat({
+  term,
+  value,
+  href,
+}: {
+  term: string;
+  value: number | string;
+  href?: Route;
+}) {
+  const numeral = `${T.score} font-extrabold ${TX.base}`;
   return (
     <div className="flex flex-col gap-1">
       <dt className={`${T.caption} ${TX.muted}`}>{term}</dt>
-      <dd className={`${T.score} font-extrabold ${TX.base}`}>{value}</dd>
+      <dd className={numeral}>
+        {href ? (
+          <Link href={href} className={`${FOCUS} rounded-btn-sm`}>
+            {value} <span aria-hidden="true">→</span>
+          </Link>
+        ) : (
+          value
+        )}
+      </dd>
     </div>
   );
-}
-
-function gameweekTipStats(
-  picks: GameweekPickBuckets,
-): { term: string; value: number }[] {
-  if (picks.tippedMatchCount >= 2) {
-    return [
-      { term: "No tips", value: picks.noTips },
-      { term: "One tip", value: picks.oneTip },
-      { term: "Both tips", value: picks.allTips },
-    ];
-  }
-  // A Skipped-Slot week has a single tipped match -- a player either filed it
-  // or didn't, so "one tip" can't happen.
-  return [
-    { term: "No tips", value: picks.noTips },
-    { term: "Tipped", value: picks.allTips },
-  ];
 }
 
 export default async function AdminIndexPage() {
@@ -78,9 +80,13 @@ export default async function AdminIndexPage() {
   );
 
   const { submitted, skipped, outstanding } = counts.tablePredictions;
-  const gwStats = counts.currentGameweekPicks
-    ? gameweekTipStats(counts.currentGameweekPicks)
-    : null;
+  const picks = counts.currentGameweekPicks;
+  const humansTotal = counts.playersTotal - counts.botsTotal;
+
+  // "Not tipped" == people with zero picks this gameweek -- the reminder
+  // list. Null means there's no current gameweek, so the stat is inert.
+  const notTipped = picks ? picks.noTips : null;
+  const partlyTipped = picks ? picks.oneTip : 0;
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 bg-paper p-4 pb-10 md:p-6 lg:p-8">
@@ -91,60 +97,43 @@ export default async function AdminIndexPage() {
 
       <HealthStrip health={health} />
 
-      <section className="flex flex-col gap-3">
-        <div className={CARD}>
-          <p className={`${LABEL} ${TX.muted}`}>Players</p>
-          <p className={`${T.score} font-extrabold ${TX.base}`}>
-            {counts.playersTotal}
-          </p>
-          <p className={`${T.caption} ${TX.muted}`}>
-            {counts.botsTotal} {counts.botsTotal === 1 ? "bot" : "bots"}
-          </p>
-        </div>
+      <section className={CARD}>
+        <p className={`${LABEL} ${TX.muted}`}>Snapshot</p>
 
-        <div className={CARD}>
-          <div className="flex items-baseline justify-between gap-3">
-            <p className={`${LABEL} ${TX.muted}`}>Current gameweek</p>
-            <p className={`${T.score} font-extrabold ${TX.base}`}>
-              {counts.currentGameweek === null
-                ? "None yet"
-                : counts.currentGameweek}
-            </p>
-          </div>
-          {gwStats ? (
-            <dl
-              className={`grid gap-3 ${gwStats.length === 3 ? "grid-cols-3" : "grid-cols-2"}`}
-            >
-              {gwStats.map((s) => (
-                <Stat key={s.term} term={s.term} value={s.value} />
-              ))}
-            </dl>
-          ) : null}
-        </div>
+        <dl className="grid grid-cols-3 gap-3">
+          <HeadlineStat term="Players" value={counts.playersTotal} />
+          <HeadlineStat term="Gameweek" value={counts.currentGameweek ?? "—"} />
+          <HeadlineStat
+            term="Not tipped"
+            value={notTipped ?? "—"}
+            href={
+              notTipped && notTipped > 0
+                ? ("/admin/players?filter=not-tipped" as Route)
+                : undefined
+            }
+          />
+        </dl>
 
-        <div className={CARD}>
-          <p className={`${LABEL} ${TX.muted}`}>Predict the Table</p>
-          <dl className="grid grid-cols-3 gap-3">
-            <Stat term="Submitted" value={submitted} />
-            <Stat term="Skipped" value={skipped} />
-            <Stat term="Outstanding" value={outstanding} />
-          </dl>
-        </div>
+        <p className={`${T.caption} ${TX.muted}`}>
+          {counts.botsTotal} {counts.botsTotal === 1 ? "bot" : "bots"} ·{" "}
+          {humansTotal} {humansTotal === 1 ? "person" : "people"}
+          {partlyTipped > 0 ? ` · ${partlyTipped} part-tipped` : ""}
+        </p>
+        <p className={`${T.caption} ${TX.muted}`}>
+          Predict the Table · {submitted} submitted · {skipped} skipped ·{" "}
+          {outstanding} outstanding
+        </p>
       </section>
 
-      <nav className="flex flex-col gap-2">
-        <Link
-          href={{ pathname: "/admin/players" }}
-          className={`flex items-center justify-between rounded-card border border-paper-line bg-white p-4 ${CARD_SHADOW} ${FOCUS}`}
-        >
-          <span className={`${T.dense} font-bold ${TX.base}`}>
-            Players &amp; access
-          </span>
-          <span className={`${T.caption} ${TX.muted}`}>
-            {counts.playersTotal} in this competition →
-          </span>
-        </Link>
-      </nav>
+      <Link
+        href={{ pathname: "/admin/players" }}
+        className={`flex items-center justify-between gap-2 rounded-card border border-paper-line bg-white px-4 py-3 ${FOCUS}`}
+      >
+        <span className={`${T.dense} font-bold ${TX.base}`}>
+          Players &amp; access
+        </span>
+        <ChevronRight className={`size-4 ${TX.muted}`} aria-hidden="true" />
+      </Link>
     </main>
   );
 }

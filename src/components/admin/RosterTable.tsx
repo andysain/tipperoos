@@ -5,31 +5,42 @@ import type { RosterPlayer } from "@/app/_lib/admin-roster-access";
 import { formatCountdown } from "@/lib/dates/kickoff-format";
 import {
   matchesRosterFilter,
+  playerIsNotTipped,
+  playerNeedsAttention,
+  sortRoster,
   type RosterFilter,
+  type RosterSort,
 } from "@/components/admin/roster-filter";
 import { EmojiChip } from "@/components/ui/PlayerChip";
 import { CARD_SHADOW, FOCUS, MICRO_LABEL, T, TX } from "@/components/ui/tokens";
 
 // The /admin/players roster (docs/admin-ui-spec.md §6.1). Read-only in this
-// issue -- tapping a row opens nothing yet; the detail panel and its
-// actions are Phase 3, so a row is a plain non-interactive card.
+// issue -- a row is a plain non-interactive card; the detail panel and its
+// actions are Phase 3.
 //
 // A card list, not a reflowing <table>: the realistic use is a parent on a
-// phone mid-Saturday (spec §11), and every other list in this app
-// (leaderboard, reveal) is built the same way. The one client-side concern
-// is the filter chips and the minute-ticking lockout countdown.
+// phone mid-Saturday (spec §11). Scannability comes from ink WEIGHT, not
+// colour (docs/DESIGN_SYSTEM.md -> "Those use ink weight, not colour"): the
+// join date is faint, the two things an admin acts on -- an unfiled pick
+// and a missing email -- are the darkest, boldest text on the row, so a
+// player who needs chasing stands out of a wall of settled rows.
 //
 // The `Disabled` badge and its filter chip are intentionally absent:
-// `players.disabled_at` does not exist until the Phase 3 migration (issue
-// decision 1). The chip set is All / Humans / Bots / Needs attention.
+// `players.disabled_at` does not exist until the Phase 3 migration.
 
 export type { RosterFilter };
 
-const FILTERS: { key: RosterFilter; label: string }[] = [
+const FILTERS: { key: RosterFilter; label: string; counted?: boolean }[] = [
   { key: "all", label: "All" },
   { key: "humans", label: "Humans" },
   { key: "bots", label: "Bots" },
-  { key: "attention", label: "Needs attention" },
+  { key: "not-tipped", label: "Not tipped", counted: true },
+  { key: "attention", label: "Needs attention", counted: true },
+];
+
+const SORTS: { key: RosterSort; label: string }[] = [
+  { key: "name", label: "Name" },
+  { key: "newest", label: "Newest" },
 ];
 
 function picksLabel(
@@ -37,7 +48,7 @@ function picksLabel(
   tippedMatchCount: number | null,
 ): string {
   if (count === null || tippedMatchCount === null) return "—";
-  if (count === 0) return "none";
+  if (count === 0) return "no picks";
   return `${count} of ${tippedMatchCount}`;
 }
 
@@ -60,7 +71,8 @@ function lockClockLabel(iso: string, timeZone: string): string {
   }).format(new Date(iso));
 }
 
-function Badge({ children }: { children: React.ReactNode }) {
+/** Structural identity (Admin, Bot) -- filled. */
+function IdBadge({ children }: { children: React.ReactNode }) {
   return (
     <span
       className={`shrink-0 rounded-badge bg-info px-1.5 py-0.5 ${MICRO_LABEL} text-on-ink`}
@@ -70,11 +82,37 @@ function Badge({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Informational only (Late joiner) -- outline, quieter than an IdBadge. */
+function NoteBadge({ children }: { children: React.ReactNode }) {
+  return (
+    <span
+      className={`shrink-0 rounded-badge border border-text-decorative px-1.5 py-0.5 ${MICRO_LABEL} ${TX.muted}`}
+    >
+      {children}
+    </span>
+  );
+}
+
+/** A caution state (lockout, PIN reset) -- warning fill (DESIGN_SYSTEM.md). */
 function Marker({ children }: { children: React.ReactNode }) {
   return (
     <span
       className={`shrink-0 rounded-badge bg-warning px-1.5 py-0.5 ${MICRO_LABEL} text-ink`}
     >
+      {children}
+    </span>
+  );
+}
+
+function MetaBit({
+  children,
+  actionable,
+}: {
+  children: React.ReactNode;
+  actionable?: boolean;
+}) {
+  return (
+    <span className={actionable ? `font-semibold ${TX.base}` : TX.decorative}>
       {children}
     </span>
   );
@@ -91,31 +129,31 @@ function PlayerCard({
   timeZone: string;
   nowMs: number;
 }) {
+  const notTipped = playerIsNotTipped(player);
+  const picks = picksLabel(player.currentGameweekPickCount, tippedMatchCount);
+
   return (
     <li
-      className={`flex flex-col gap-2 rounded-card border border-paper-line bg-white p-3.5 ${CARD_SHADOW}`}
+      className={`flex flex-col gap-1.5 rounded-card border border-paper-line bg-white p-3 ${CARD_SHADOW}`}
     >
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <EmojiChip emoji={player.emoji} size="sm" muted={player.isBot} />
         <span className={`${T.dense} font-extrabold ${TX.base}`}>
           {player.displayName}
         </span>
-        {player.isAdmin ? <Badge>Admin</Badge> : null}
-        {player.isBot ? <Badge>Bot</Badge> : null}
-        {player.isLateJoiner ? <Badge>Late joiner</Badge> : null}
+        {player.isAdmin ? <IdBadge>Admin</IdBadge> : null}
+        {player.isBot ? <IdBadge>Bot</IdBadge> : null}
+        {player.isLateJoiner ? <NoteBadge>Late joiner</NoteBadge> : null}
       </div>
 
-      <div
-        className={`flex flex-wrap gap-x-3 gap-y-0.5 ${T.caption} ${TX.muted}`}
-      >
-        <span>Joined {joinedLabel(player.joinedAt, timeZone)}</span>
-        <span>
-          Picks:{" "}
-          <span className={TX.base}>
-            {picksLabel(player.currentGameweekPickCount, tippedMatchCount)}
-          </span>
-        </span>
-        <span>{player.hasEmail ? "Email on file" : "No email"}</span>
+      <div className={`flex flex-wrap gap-x-2.5 gap-y-0.5 ${T.caption}`}>
+        <MetaBit>Joined {joinedLabel(player.joinedAt, timeZone)}</MetaBit>
+        {player.isBot ? null : (
+          <MetaBit actionable={notTipped}>{picks}</MetaBit>
+        )}
+        <MetaBit actionable={!player.hasEmail}>
+          {player.hasEmail ? "email on file" : "no email"}
+        </MetaBit>
       </div>
 
       {player.lockedUntil !== null || player.pinResetRequired ? (
@@ -145,6 +183,7 @@ export function RosterTable({
   initialFilter?: RosterFilter;
 }) {
   const [filter, setFilter] = useState<RosterFilter>(initialFilter);
+  const [sort, setSort] = useState<RosterSort>("name");
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   useEffect(() => {
@@ -152,9 +191,21 @@ export function RosterTable({
     return () => clearInterval(id);
   }, []);
 
+  const counts = useMemo(
+    () => ({
+      "not-tipped": players.filter(playerIsNotTipped).length,
+      attention: players.filter(playerNeedsAttention).length,
+    }),
+    [players],
+  );
+
   const visible = useMemo(
-    () => players.filter((p) => matchesRosterFilter(p, filter)),
-    [players, filter],
+    () =>
+      sortRoster(
+        players.filter((p) => matchesRosterFilter(p, filter)),
+        sort,
+      ),
+    [players, filter, sort],
   );
 
   return (
@@ -162,6 +213,9 @@ export function RosterTable({
       <div className="flex flex-wrap gap-1 self-start rounded-btn bg-paper-line/40 p-1">
         {FILTERS.map((option) => {
           const active = option.key === filter;
+          const count = option.counted
+            ? counts[option.key as "not-tipped" | "attention"]
+            : null;
           return (
             <button
               key={option.key}
@@ -173,9 +227,31 @@ export function RosterTable({
               }`}
             >
               {option.label}
+              {count !== null && count > 0 ? (
+                <span className="ml-1 tabular-nums">{count}</span>
+              ) : null}
             </button>
           );
         })}
+      </div>
+
+      <div
+        className={`flex items-center gap-2 self-start ${T.caption} ${TX.muted}`}
+      >
+        <span className={MICRO_LABEL}>Sort</span>
+        {SORTS.map((option) => (
+          <button
+            key={option.key}
+            type="button"
+            aria-pressed={option.key === sort}
+            onClick={() => setSort(option.key)}
+            className={`rounded-btn-sm px-1.5 py-0.5 font-bold transition ${FOCUS} ${
+              option.key === sort ? TX.base : "text-text-decorative"
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
       </div>
 
       {visible.length === 0 ? (
