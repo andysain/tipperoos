@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { HelpCircle, LogOut } from "lucide-react";
+import { HelpCircle, LogOut, Wrench } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { CARD_SHADOW, FOCUS, T } from "@/components/ui/tokens";
@@ -18,7 +18,17 @@ import { CARD_SHADOW, FOCUS, T } from "@/components/ui/tokens";
 // around a narrow panel just reads as an empty rounded corner with nothing
 // in it. Being honestly its own card is what actually reads as "menu
 // opened here" at every breakpoint, phone through desktop.
-export function MoreMenuItems({ onClose }: { onClose: () => void }) {
+// `isAdmin` is a render-only hint threaded from the root layout
+// (docs/admin-ui-spec.md §4 rule 5) -- it decides whether the "Competition
+// admin" entry shows, and grants nothing. `/admin` itself is gated
+// server-side by requireAdmin(), which 404s a non-admin regardless.
+export function MoreMenuItems({
+  isAdmin = false,
+  onClose,
+}: {
+  isAdmin?: boolean;
+  onClose: () => void;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const onHelpPage = pathname === "/how-it-works";
@@ -37,7 +47,13 @@ export function MoreMenuItems({ onClose }: { onClose: () => void }) {
       // tree unmounts, which is what destroys any in-progress client state
       // (e.g. Predict the Table's picker selection) for a shared-device
       // switch -- no explicit reset plumbing needed.
+      //
+      // router.refresh() so the root layout drops the just-cleared
+      // session's `isAdmin` -- App Router doesn't re-render layouts on a
+      // soft navigation, so without this the "Competition admin" entry
+      // would linger for the next player (issue #199).
       router.push("/login");
+      router.refresh();
     }
   }
 
@@ -55,6 +71,19 @@ export function MoreMenuItems({ onClose }: { onClose: () => void }) {
       // a slice of the bar underneath it.
       className={`mb-2 inline-flex flex-col rounded-card border border-paper-line bg-white p-2 ${CARD_SHADOW}`}
     >
+      {isAdmin ? (
+        <Link
+          href={{ pathname: "/admin" }}
+          role="menuitem"
+          onClick={onClose}
+          className={`flex items-center gap-3 rounded-btn p-3 ${T.body} font-bold text-ink hover:bg-paper ${FOCUS}`}
+        >
+          <span className="flex size-8 items-center justify-center rounded-badge border border-paper-line">
+            <Wrench className="size-4 stroke-ink stroke-2" />
+          </span>
+          Competition admin
+        </Link>
+      ) : null}
       {onHelpPage ? (
         // Already on /how-it-works -- a Link to the same page would be a
         // no-op navigation, so this instead returns to wherever the player

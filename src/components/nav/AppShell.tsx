@@ -8,7 +8,13 @@ import { TabBar } from "./TabBar";
 // Reserves content space once, at the shell level, rather than each page
 // retrofitting its own viewport math (docs/adr/0004-app-navigation-shell.md).
 // Login is the only excluded route -- pre-auth, nothing to navigate to yet.
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({
+  children,
+  isAdmin = false,
+}: {
+  children: ReactNode;
+  isAdmin?: boolean;
+}) {
   const pathname = usePathname();
   const showChrome = pathname !== "/login";
 
@@ -26,7 +32,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       >
         {children}
       </div>
-      <TabBar />
+      <TabBar isAdmin={isAdmin} />
     </div>
   );
 }
