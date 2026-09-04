@@ -132,29 +132,49 @@ export interface LeaderboardView {
 }
 
 /**
- * Serial Supabase depth 3 on this route: seasonId -> current gameweek
- * number (needs seasonId) -> this one parallel wave. Matches the Pick
- * Board's shape (docs/standards/PERFORMANCE_TESTING_STANDARD.md §4.1).
+ * Serial Supabase depth 2 on this route: (scores, scored gameweeks) in one
+ * parallel wave, then previous-season-totals once the last scored gameweek
+ * number is known.
+ *
+ * Movement's "previous gameweek" is deliberately **the gameweek before the
+ * last SCORED one** -- not `resolveCurrentGameweekForCompetition() - 1`,
+ * which is the Pick Board's "next gameweek open for picking" and rolls over
+ * to the next number the moment the last one finishes, before it has any
+ * results of its own. In that gap (last gameweek fully scored, next one
+ * selected but not yet kicked off), current-1 lands ON the last scored
+ * gameweek instead of before it, so live rank gets diffed against itself --
+ * movement reads 0 for everyone until the next gameweek is scored, which is
+ * exactly the "compare against the most recent snapshot" failure ADR 0012
+ * D2 says not to build (issue #199). Deriving "previous" from the scored
+ * history instead keeps it correct on both sides of that gap.
  */
 export async function loadLeaderboard(
   supabase: SupabaseClient,
   competitionId: string,
   seasonId: string,
   viewerId: string,
-  previousGameweekNumber: number | null,
 ): Promise<LeaderboardView> {
-  const [scores, previousSeasonTotals, scoredGameweeks] = await Promise.all([
+  const [scores, scoredGameweeks] = await Promise.all([
     scoresForCompetition(supabase, competitionId, seasonId),
+    loadScoredGameweeks(supabase, competitionId, seasonId),
+  ]);
+
+  const lastScoredNumber = scoredGameweeks.reduce<number | null>(
+    (max, gw) => (max === null || gw.number > max ? gw.number : max),
+    null,
+  );
+  const previousGameweekNumber =
+    lastScoredNumber !== null ? lastScoredNumber - 1 : null;
+
+  const previousSeasonTotals =
     previousGameweekNumber !== null
-      ? loadPreviousSeasonTotals(
+      ? await loadPreviousSeasonTotals(
           supabase,
           competitionId,
           seasonId,
           previousGameweekNumber,
         )
-      : Promise.resolve([]),
-    loadScoredGameweeks(supabase, competitionId, seasonId),
-  ]);
+      : [];
 
   return {
     rows: buildLeaderboard({
