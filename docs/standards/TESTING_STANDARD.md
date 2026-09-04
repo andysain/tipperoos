@@ -37,7 +37,10 @@ mechanically enforces (`scripts/ci/critical-module-guard.mjs`, runs on every
 PR touching `src/lib/**`):
 
 1. Any changed `src/lib/**/*.ts` implementation file has a corresponding
-   `*.test.ts` change in the same diff.
+   `*.test.ts` change in the same diff. A change whose added/removed lines
+   are all blank or comments (`//`, `/* */`, `*`-prefixed) is exempt — it
+   can't encode a scoring bug, so a paired golden-value test change would be
+   noise.
 2. That test file contains at least 6 literal-value assertions
    (`.toBe(<number>)` / `.toEqual(<number>)`) — not just "a test exists
    somewhere," a table of named scenarios with specific expected numbers,
