@@ -1,11 +1,19 @@
+import { cookies } from "next/headers";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/app/_lib/admin-access";
+import { loadAdminHealth } from "@/app/_lib/admin-health-access";
 import {
   loadAdminIndexCounts,
   type GameweekPickBuckets,
 } from "@/app/_lib/admin-index-access";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { CARD_SHADOW, LABEL, T, TX } from "@/components/ui/tokens";
+import {
+  DEFAULT_TIME_ZONE,
+  TIMEZONE_COOKIE_NAME,
+} from "@/components/nav/timezone-cookie";
+import { HealthStrip } from "@/components/admin/HealthStrip";
+import { CARD_SHADOW, FOCUS, LABEL, T, TX } from "@/components/ui/tokens";
 
 // Gated behind requireAdmin(): a non-admin session and a logged-out visitor
 // both get notFound() -- 404, not 403, not a login redirect (spec §4 rule 1,
@@ -49,7 +57,25 @@ export default async function AdminIndexPage() {
   }
 
   const supabase = createServerSupabaseClient();
+  const cookieStore = await cookies();
+  const timeZone =
+    cookieStore.get(TIMEZONE_COOKIE_NAME)?.value ?? DEFAULT_TIME_ZONE;
+
+  // The counts row resolves the season id and current gameweek; the health
+  // strip reuses both rather than re-fetching them (its remaining reads --
+  // two sync_log lookups, the next-gameweek pair, the locked-out count --
+  // then run in one wave). The two loaders are sequential because the
+  // second genuinely needs the first's output
+  // (docs/standards/PERFORMANCE_TESTING_STANDARD.md §7).
   const counts = await loadAdminIndexCounts(supabase, admin.competitionId);
+  const health = await loadAdminHealth(
+    supabase,
+    admin.competitionId,
+    counts.seasonId,
+    counts.currentGameweek,
+    new Date(),
+    timeZone,
+  );
 
   const { submitted, skipped, outstanding } = counts.tablePredictions;
   const gwStats = counts.currentGameweekPicks
@@ -62,6 +88,8 @@ export default async function AdminIndexPage() {
         <p className={`${LABEL} ${TX.muted}`}>Competition admin</p>
         <h1 className={`${T.h1} font-extrabold ${TX.base}`}>Overview</h1>
       </header>
+
+      <HealthStrip health={health} />
 
       <section className="flex flex-col gap-3">
         <div className={CARD}>
@@ -103,6 +131,20 @@ export default async function AdminIndexPage() {
           </dl>
         </div>
       </section>
+
+      <nav className="flex flex-col gap-2">
+        <Link
+          href={{ pathname: "/admin/players" }}
+          className={`flex items-center justify-between rounded-card border border-paper-line bg-white p-4 ${CARD_SHADOW} ${FOCUS}`}
+        >
+          <span className={`${T.dense} font-bold ${TX.base}`}>
+            Players &amp; access
+          </span>
+          <span className={`${T.caption} ${TX.muted}`}>
+            {counts.playersTotal} in this competition →
+          </span>
+        </Link>
+      </nav>
     </main>
   );
 }

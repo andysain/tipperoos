@@ -70,6 +70,36 @@ export async function getCurrentSeasonId(
  * front) skip a redundant `seasons` round trip by passing it straight
  * through.
  */
+/**
+ * The non-null Tipped Match fixture ids for one gameweek in a competition
+ * (0, 1 with a Skipped Slot, or 2). Shared by the /admin index counts and
+ * the /admin/players roster, which both need "how many of this gameweek's
+ * two matches did each player tip" and were resolving the `gameweeks` row
+ * the same way -- so a change to that resolution lives in one place.
+ */
+export async function loadTippedMatchIdsForGameweek(
+  supabase: SupabaseClient,
+  competitionId: string,
+  seasonId: string,
+  gameweekNumber: number,
+): Promise<string[]> {
+  const { data: gameweek, error } = await supabase
+    .from("gameweeks")
+    .select("match_1_id, match_2_id")
+    .eq("season_id", seasonId)
+    .eq("competition_id", competitionId)
+    .eq("number", gameweekNumber)
+    .order("number", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!gameweek) return [];
+
+  return [gameweek.match_1_id, gameweek.match_2_id].filter(
+    (id): id is string => id !== null,
+  );
+}
+
 export async function resolveCurrentGameweekForCompetition(
   supabase: SupabaseClient,
   competitionId: string,
