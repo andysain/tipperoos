@@ -154,9 +154,12 @@ const CONTRAST_FLOOR_MAX_STEPS = 20;
  * luminance to a ground it's drawn on is mixed toward `paper` or `ink`,
  * hue preserved, until it clears that ground -- lightness-only movement in
  * HSL space is what "hue preserved" means (an RGB lerp would drift hue).
- * Direction follows which ground is failing: a kit darker than a light
- * ground needs pushing toward `ink` (darker still, more separation); a kit
- * lighter than a dark ground needs pushing toward `paper`.
+ * Direction follows which ground is failing, not the kit's own starting
+ * luminance: the anchor is whichever of `ink`/`paper` sits farther in
+ * luminance from that ground, since that's the one that can actually buy
+ * separation -- a kit that's already darker than a light ground still needs
+ * pushing toward `ink`, not toward `paper` (which is itself near-white and
+ * would only narrow the gap further).
  */
 export function applyContrastFloor(
   hex: string,
@@ -171,8 +174,12 @@ export function applyContrastFloor(
     // relative to it -- recomputing per-step oscillates near the crossover
     // point (where the two luminances are close and contrast bottoms out at
     // ~1), stepping back and forth without ever escaping the dip.
+    const groundLum = relativeLuminance(ground);
     const target =
-      relativeLuminance(current) < relativeLuminance(ground) ? PAPER : INK;
+      Math.abs(groundLum - relativeLuminance(INK)) >
+      Math.abs(groundLum - relativeLuminance(PAPER))
+        ? INK
+        : PAPER;
     const { h, s } = rgbToHsl(hexToRgb(current));
     const targetL = rgbToHsl(hexToRgb(target)).l;
     let l = rgbToHsl(hexToRgb(current)).l;
@@ -182,7 +189,13 @@ export function applyContrastFloor(
       contrastRatio(current, ground) < minRatio &&
       steps < CONTRAST_FLOOR_MAX_STEPS
     ) {
-      l = clamp(l + Math.sign(targetL - l) * CONTRAST_FLOOR_STEP, 0, 1);
+      const direction = Math.sign(targetL - l);
+      // Already at the target's own lightness (same h/s/l as `target`) with
+      // contrast still short -- `target` itself can't clear this ground, so
+      // further steps would spin in place without moving. Stop rather than
+      // burn the remaining step budget on a no-op.
+      if (direction === 0) break;
+      l = clamp(l + direction * CONTRAST_FLOOR_STEP, 0, 1);
       current = rgbToHex(hslToRgb(h, s, l));
       steps += 1;
     }
