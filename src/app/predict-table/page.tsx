@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-import { getSessionPlayerId } from "@/app/_lib/session-cookie";
+import { loadActivePlayer } from "@/app/_lib/session-player";
 import {
   getGameweekOneKickoff,
   getDatabaseTime,
@@ -18,10 +17,8 @@ import { PredictTableFlow } from "./PredictTableFlow";
 export const dynamic = "force-dynamic";
 
 export default async function PredictTablePage() {
-  const playerId = await getSessionPlayerId();
-  if (!playerId) {
-    redirect("/login");
-  }
+  // Forced-reset gate first (issue #36).
+  const { playerId } = await loadActivePlayer();
 
   const supabase = createServerSupabaseClient();
 

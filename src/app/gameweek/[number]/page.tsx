@@ -1,15 +1,14 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { getSessionPlayerId } from "@/app/_lib/session-cookie";
+import { loadActivePlayer } from "@/app/_lib/session-player";
 import {
   getCurrentSeasonId,
   resolveCurrentGameweekForCompetition,
 } from "@/app/_lib/gameweek-access";
 import { loadGameweekReveal } from "@/app/_lib/gameweek-reveal-access";
 import { loadGameweekStrip } from "@/app/_lib/gameweek-strip-access";
-import { resolveCompetitionId } from "@/lib/competitions/scope";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { RevealCard } from "@/components/gameweek/RevealCard";
 import { GameweekStrip } from "@/components/gameweek/GameweekStrip";
@@ -34,12 +33,11 @@ export default async function GameweekPage({
   const gameweekNumber = Number(number);
   if (!Number.isInteger(gameweekNumber) || gameweekNumber < 1) notFound();
 
-  const playerId = await getSessionPlayerId();
-  if (!playerId) redirect("/login");
+  // Forced-reset gate (issue #36); also yields competitionId, replacing the
+  // separate resolveCompetitionId round trip this page used to make.
+  const { playerId, competitionId } = await loadActivePlayer();
 
   const supabase = createServerSupabaseClient();
-  const competitionId = await resolveCompetitionId(supabase, playerId);
-  if (!competitionId) redirect("/login");
 
   const seasonId = await getCurrentSeasonId(supabase);
   if (!seasonId) notFound();

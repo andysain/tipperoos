@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-import { getSessionPlayerId } from "@/app/_lib/session-cookie";
+import { loadActivePlayer } from "@/app/_lib/session-player";
 import {
   BOLD_CALL_BONUS,
   MAX_BOLD_CALLS,
@@ -40,7 +39,9 @@ function ExampleRows() {
 }
 
 export default async function HowItWorksPage() {
-  if (!(await getSessionPlayerId())) redirect("/login");
+  // Gated like every other authenticated page -- a forced-reset player is
+  // sent to /reset-pin here too, no exception list (issue #36).
+  await loadActivePlayer();
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 bg-paper p-4 pb-10 md:p-6 lg:p-8">

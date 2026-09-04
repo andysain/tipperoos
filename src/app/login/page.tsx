@@ -164,16 +164,21 @@ function LoginFlow() {
         return;
       }
 
-      // Straight to the Pick Board -- no success interstitial. The session
-      // cookie is already set by this response, so `/` resolves the player
-      // without another round trip. (pin_reset_required is intentionally
-      // not surfaced here: the forced-PIN-reset flow isn't built yet, and
-      // this screen used to be a dead-end warning with no way forward.)
+      // A player flagged for a forced PIN reset (issue #36) goes straight to
+      // /reset-pin. loadActivePlayer() would bounce them there from `/`
+      // anyway -- this just skips the extra hop. Everyone else lands on the
+      // Pick Board, no success interstitial (the session cookie is already
+      // set by this response).
       //
-      // router.refresh() as well: the root layout computes `isAdmin` for
-      // the More menu, and App Router doesn't re-render layouts on a soft
-      // navigation -- without this the menu carries the previous session's
-      // admin state onto a shared device (issue #199).
+      // router.refresh() in both cases: the root layout computes `isAdmin`
+      // for the More menu, and App Router doesn't re-render layouts on a
+      // soft navigation -- without this the menu carries the previous
+      // session's admin state onto a shared device (issue #199).
+      if (data.pinResetRequired) {
+        router.push("/reset-pin");
+        router.refresh();
+        return;
+      }
       router.push("/");
       router.refresh();
     } catch {

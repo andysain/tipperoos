@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { redirect } from "next/navigation";
-import { getSessionPlayerId } from "@/app/_lib/session-cookie";
+import { loadActivePlayer } from "@/app/_lib/session-player";
 import {
   getCurrentSeasonId,
   resolveCurrentGameweekForCompetition,
@@ -46,10 +46,9 @@ export const dynamic = "force-dynamic";
 // to this session's player -- see that file's own doc comment for the
 // security property this route depends on.
 export default async function PickBoardPage() {
-  const playerId = await getSessionPlayerId();
-  if (!playerId) {
-    redirect("/login");
-  }
+  // Forced-reset gate first (issue #36) -- redirects a logged-out or
+  // pin_reset_required session before any page work.
+  const { playerId } = await loadActivePlayer();
 
   const supabase = createServerSupabaseClient();
   const player = await getPlayerForTablePrediction(supabase, playerId);

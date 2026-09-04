@@ -1,11 +1,10 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
-import { getSessionPlayerId } from "@/app/_lib/session-cookie";
+import { loadActivePlayer } from "@/app/_lib/session-player";
 import { getCurrentSeasonId } from "@/app/_lib/gameweek-access";
 import { loadPicksRecord } from "@/app/_lib/picks-record-access";
-import { resolveCompetitionId } from "@/lib/competitions/scope";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { EmojiChip } from "@/components/ui/PlayerChip";
 import {
@@ -34,12 +33,11 @@ export default async function PicksRecordPage({
 }) {
   const { playerId } = await params;
 
-  const viewerId = await getSessionPlayerId();
-  if (!viewerId) redirect("/login");
+  // Forced-reset gate (issue #36); also yields competitionId, replacing the
+  // separate resolveCompetitionId round trip this page used to make.
+  const { playerId: viewerId, competitionId } = await loadActivePlayer();
 
   const supabase = createServerSupabaseClient();
-  const competitionId = await resolveCompetitionId(supabase, viewerId);
-  if (!competitionId) redirect("/login");
 
   const seasonId = await getCurrentSeasonId(supabase);
   if (!seasonId) notFound();

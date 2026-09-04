@@ -1,9 +1,7 @@
-import { redirect } from "next/navigation";
-import { getSessionPlayerId } from "@/app/_lib/session-cookie";
+import { loadActivePlayer } from "@/app/_lib/session-player";
 import { getCurrentSeasonId } from "@/app/_lib/gameweek-access";
 import { loadLeaderboard } from "@/app/_lib/leaderboard-access";
 import { loadTableLeaderboard } from "@/app/_lib/table-leaderboard-access";
-import { resolveCompetitionId } from "@/lib/competitions/scope";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { LeaderboardList } from "@/components/leaderboard/LeaderboardList";
 import { TableLeaderboardList } from "@/components/leaderboard/TableLeaderboardList";
@@ -124,16 +122,11 @@ export default async function LeaderboardPage({
 }: {
   searchParams: Promise<{ segment?: string }>;
 }) {
-  const playerId = await getSessionPlayerId();
-  if (!playerId) {
-    redirect("/login");
-  }
+  // Forced-reset gate (issue #36); also yields competitionId, replacing the
+  // separate resolveCompetitionId round trip this page used to make.
+  const { playerId, competitionId } = await loadActivePlayer();
 
   const supabase = createServerSupabaseClient();
-  const competitionId = await resolveCompetitionId(supabase, playerId);
-  if (!competitionId) {
-    redirect("/login");
-  }
 
   const { segment } = await searchParams;
   const isTableSegment = segment === "table";
