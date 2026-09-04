@@ -60,11 +60,7 @@ function isCommentOrWhitespaceOnly(file) {
   if (changedLines.length === 0) return false;
   return changedLines.every(
     (l) =>
-      l === "" ||
-      l.startsWith("//") ||
-      l.startsWith("*") ||
-      l.startsWith("/*") ||
-      l.startsWith("/**"),
+      l === "" || l.startsWith("//") || l.startsWith("*") || l.startsWith("/*"),
   );
 }
 
