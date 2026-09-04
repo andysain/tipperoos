@@ -34,8 +34,8 @@ Ten open issues. Ordered by what actually costs something today, not by mileston
 
 Spec merged in #198. Phases 2–5 (sync page, player details and roles, competition code rotation, settings) are specced but unfiled; file them when Phase 1 lands, not before.
 
-- [ ] **#199 — Admin access gate + `/admin` shell.** `requireAdmin()`, 404-not-403 for non-admins, More-menu entry. **In flight** — PR #208 on `admin-access-gate-admin-shell`.
-- [ ] **#200 — Roster table + health strip.** Read-only. Blocked on #199. This is what makes a silently-failed sync visible at all; today that's only discoverable by querying `sync_log` by hand.
+- [x] **#199 — Admin access gate + `/admin` shell.** `requireAdmin()`, 404-not-403 for non-admins, More-menu entry. Merged (PR #208).
+- [ ] **#200 — Roster table + health strip.** Read-only. #199 has merged. This is what makes a silently-failed sync visible at all; today that's only discoverable by querying `sync_log` by hand.
 - [ ] **#201 — Admin reset PIN + clear lockout.** Blocked on #199, #200 and, for the flow to mean anything, #36. Touches `src/lib/auth/**` → CODEOWNERS approval required.
 
 ### Infrastructure the spec assumes and we haven't built

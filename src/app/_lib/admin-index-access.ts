@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   getCurrentSeasonId,
+  loadTippedMatchIdsForGameweek,
   resolveCurrentGameweekForCompetition,
 } from "@/app/_lib/gameweek-access";
 
@@ -32,6 +33,13 @@ export interface GameweekPickBuckets {
 export interface AdminIndexCounts {
   playersTotal: number;
   botsTotal: number;
+  /**
+   * The current season's id, or null before a season is seeded. Returned so
+   * the caller (the /admin page) can hand it straight to the health strip's
+   * loader instead of resolving `seasons` a second time in the same request
+   * (docs/standards/PERFORMANCE_TESTING_STANDARD.md §4.1).
+   */
+  seasonId: string | null;
   /** Null before gameweek 1 is seeded (no season, or no tipped match yet). */
   currentGameweek: number | null;
   /** Null when there's no current gameweek, or it has no tipped matches. */
@@ -117,20 +125,11 @@ async function loadCurrentGameweekPicks(
   gameweekNumber: number,
   humanPlayerIds: string[],
 ): Promise<GameweekPickBuckets | null> {
-  const { data: gameweek, error } = await supabase
-    .from("gameweeks")
-    .select("match_1_id, match_2_id")
-    .eq("season_id", seasonId)
-    .eq("competition_id", competitionId)
-    .eq("number", gameweekNumber)
-    .order("number", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw error;
-  if (!gameweek) return null;
-
-  const tippedMatchIds = [gameweek.match_1_id, gameweek.match_2_id].filter(
-    (id): id is string => id !== null,
+  const tippedMatchIds = await loadTippedMatchIdsForGameweek(
+    supabase,
+    competitionId,
+    seasonId,
+    gameweekNumber,
   );
   if (tippedMatchIds.length === 0) return null;
 
@@ -214,6 +213,7 @@ export async function loadAdminIndexCounts(
   return {
     playersTotal,
     botsTotal,
+    seasonId,
     currentGameweek,
     currentGameweekPicks,
     tablePredictions,

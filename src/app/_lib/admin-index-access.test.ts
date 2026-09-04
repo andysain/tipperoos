@@ -66,11 +66,7 @@ describe("bucketGameweekPicks", () => {
   });
 
   it("never reports oneTip for a single-tipped-match (Skipped Slot) week", () => {
-    const buckets = bucketGameweekPicks(
-      ["a", "b"],
-      [{ player_id: "a" }],
-      1,
-    );
+    const buckets = bucketGameweekPicks(["a", "b"], [{ player_id: "a" }], 1);
     expect(buckets).toEqual({
       tippedMatchCount: 1,
       noTips: 1,
@@ -134,8 +130,8 @@ function builder(result: Result) {
 
 function client(byTable: Record<string, Result>) {
   return {
-    from: vi.fn(
-      (table: string) => builder(byTable[table] ?? { data: [], error: null }),
+    from: vi.fn((table: string) =>
+      builder(byTable[table] ?? { data: [], error: null }),
     ),
   } as never;
 }
@@ -170,6 +166,7 @@ describe("loadAdminIndexCounts", () => {
 
     expect(counts.playersTotal).toBe(5);
     expect(counts.botsTotal).toBe(2);
+    expect(counts.seasonId).toBeNull();
     expect(counts.currentGameweek).toBeNull();
     expect(counts.currentGameweekPicks).toBeNull();
     expect(counts.tablePredictions).toEqual({
