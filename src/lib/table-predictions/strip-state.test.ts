@@ -29,6 +29,7 @@ describe("deriveTablePredictionStripState", () => {
       bandCountsOk: false,
       leaguePosition: null,
       score: null,
+      rank: null,
     });
     expect(result).toEqual({ kind: "not_submitted" });
   });
@@ -41,6 +42,7 @@ describe("deriveTablePredictionStripState", () => {
       bandCountsOk: false,
       leaguePosition: null,
       score: null,
+      rank: null,
     });
     expect(result).toEqual({ kind: "hidden" });
   });
@@ -53,6 +55,7 @@ describe("deriveTablePredictionStripState", () => {
       bandCountsOk: false,
       leaguePosition: null,
       score: null,
+      rank: null,
     });
     expect(result).toEqual({ kind: "hidden" });
   });
@@ -65,6 +68,7 @@ describe("deriveTablePredictionStripState", () => {
       bandCountsOk: false,
       leaguePosition: null,
       score: null,
+      rank: null,
     });
     expect(result).toEqual({ kind: "not_submitted" });
   });
@@ -77,6 +81,7 @@ describe("deriveTablePredictionStripState", () => {
       bandCountsOk: true,
       leaguePosition: 3,
       score: null,
+      rank: null,
     });
     expect(result).toEqual({ kind: "hidden" });
   });
@@ -92,6 +97,7 @@ describe("deriveTablePredictionStripState", () => {
       bandCountsOk: false,
       leaguePosition: null,
       score: null,
+      rank: null,
     });
     expect(result).toEqual({ kind: "hidden" });
   });
@@ -104,6 +110,7 @@ describe("deriveTablePredictionStripState", () => {
       bandCountsOk: true,
       leaguePosition: 1,
       score: 132,
+      rank: 3,
     });
     expect(result).toEqual({
       kind: "submitted_editable",
@@ -111,6 +118,7 @@ describe("deriveTablePredictionStripState", () => {
       bandsUntidy: false,
       leaguePosition: 1,
       score: 132,
+      rank: 3,
     });
   });
 
@@ -122,6 +130,7 @@ describe("deriveTablePredictionStripState", () => {
       bandCountsOk: false,
       leaguePosition: 1,
       score: 90,
+      rank: 7,
     });
     expect(result).toEqual({
       kind: "submitted_editable",
@@ -129,10 +138,11 @@ describe("deriveTablePredictionStripState", () => {
       bandsUntidy: true,
       leaguePosition: 1,
       score: 90,
+      rank: 7,
     });
   });
 
-  it("passes through a null score when no cohort recompute has run yet", () => {
+  it("passes through a null score and null rank when no cohort recompute has run yet", () => {
     const result = deriveTablePredictionStripState({
       prediction: { submittedAt: "2026-08-01T00:00:00Z", skipped: false },
       editability: editable,
@@ -140,6 +150,7 @@ describe("deriveTablePredictionStripState", () => {
       bandCountsOk: true,
       leaguePosition: 1,
       score: null,
+      rank: null,
     });
     expect(result).toEqual({
       kind: "submitted_editable",
@@ -147,6 +158,7 @@ describe("deriveTablePredictionStripState", () => {
       bandsUntidy: false,
       leaguePosition: 1,
       score: null,
+      rank: null,
     });
   });
 
@@ -158,6 +170,7 @@ describe("deriveTablePredictionStripState", () => {
       bandCountsOk: true,
       leaguePosition: null,
       score: null,
+      rank: null,
     });
     expect(result).toEqual({
       kind: "submitted_editable",
@@ -165,10 +178,11 @@ describe("deriveTablePredictionStripState", () => {
       bandsUntidy: false,
       leaguePosition: null,
       score: null,
+      rank: null,
     });
   });
 
-  it("shows Champion + league position, no edit affordance, once locked", () => {
+  it("shows Champion + league position + rank, no edit affordance, once locked", () => {
     const result = deriveTablePredictionStripState({
       prediction: { submittedAt: "2026-08-01T00:00:00Z", skipped: false },
       editability: locked,
@@ -176,15 +190,37 @@ describe("deriveTablePredictionStripState", () => {
       bandCountsOk: true,
       leaguePosition: 4,
       score: 150,
+      rank: 1,
     });
     expect(result).toEqual({
       kind: "submitted_locked",
       champion: CHAMPION,
       leaguePosition: 4,
       score: 150,
+      rank: 1,
     });
     if (result.kind !== "submitted_locked") throw new Error("expected locked");
     expect(result.leaguePosition).toBe(4);
+  });
+
+  it("passes a null rank through the locked state for a Late Joiner (unranked by design)", () => {
+    const result = deriveTablePredictionStripState({
+      prediction: { submittedAt: "2026-09-15T00:00:00Z", skipped: false },
+      editability: lateJoinerEditable,
+      championTeam: CHAMPION,
+      bandCountsOk: true,
+      leaguePosition: 7,
+      score: 40,
+      rank: null,
+    });
+    expect(result).toEqual({
+      kind: "submitted_editable",
+      champion: CHAMPION,
+      bandsUntidy: false,
+      leaguePosition: 7,
+      score: 40,
+      rank: null,
+    });
   });
 
   describe("leaguePosition passthrough for a locked, submitted Champion", () => {
@@ -200,6 +236,7 @@ describe("deriveTablePredictionStripState", () => {
         bandCountsOk: true,
         leaguePosition,
         score: 100,
+        rank: 5,
       });
     }
 
@@ -247,12 +284,14 @@ describe("deriveTablePredictionStripState", () => {
       bandCountsOk: true,
       leaguePosition: null,
       score: 100,
+      rank: 2,
     });
     expect(result).toEqual({
       kind: "submitted_locked",
       champion: CHAMPION,
       leaguePosition: null,
       score: 100,
+      rank: 2,
     });
   });
 
@@ -264,6 +303,7 @@ describe("deriveTablePredictionStripState", () => {
       bandCountsOk: true,
       leaguePosition: 7,
       score: null,
+      rank: null,
     });
     expect(result).toEqual({
       kind: "submitted_editable",
@@ -271,6 +311,7 @@ describe("deriveTablePredictionStripState", () => {
       bandsUntidy: false,
       leaguePosition: 7,
       score: null,
+      rank: null,
     });
   });
 
@@ -282,6 +323,7 @@ describe("deriveTablePredictionStripState", () => {
       bandCountsOk: false,
       leaguePosition: null,
       score: null,
+      rank: null,
     });
     expect(result).toEqual({ kind: "not_submitted" });
   });

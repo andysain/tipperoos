@@ -18,8 +18,9 @@ import { FOCUS, T, TX, CARD_SHADOW } from "@/components/ui/tokens";
  * No verdict styling on the Champion or its stats in any state (no
  * success/danger colouring, no tick/cross) -- the Champion is a pick the
  * Player can no longer change once locked, and per issue #157's UI pass
- * this now extends to the live position/score figures too, which move
- * both up and down all season and are never a "correct/incorrect" verdict.
+ * this now extends to the live club-position / competition-rank / score
+ * figures too, which move both up and down all season and are never a
+ * "correct/incorrect" verdict.
  *
  * Card grammar (issue #157): a bare label+chevron header, matching
  * LEADERBOARD's shape, not LAST GAMEWEEK's -- both this card and the
@@ -46,14 +47,16 @@ export function TablePredictionStrip({
         <span className={`${T.dense} font-bold`}>
           Your next step: predict the table!
         </span>
-        <span className={`${T.dense} font-extrabold underline underline-offset-2`}>
+        <span
+          className={`${T.dense} font-extrabold underline underline-offset-2`}
+        >
           Go now
         </span>
       </Link>
     );
   }
 
-  const { champion, leaguePosition, score } = state;
+  const { champion, leaguePosition, score, rank } = state;
   // Same single contrast-floored primary kit colour as the capture flow's
   // own club-identity rail (predict-table/shared.tsx's teamFill()) --
   // matching it here rather than the two-tone matchBadgeColors() stripe
@@ -72,10 +75,15 @@ export function TablePredictionStrip({
       className={`flex flex-col gap-2.5 rounded-card bg-white p-4 transition hover:bg-paper ${CARD_SHADOW} ${FOCUS}`}
     >
       <div className="flex items-center justify-between">
-        <span className={`${T.label} font-bold uppercase tracking-[0.08em] ${TX.muted}`}>
+        <span
+          className={`${T.label} font-bold uppercase tracking-[0.08em] ${TX.muted}`}
+        >
           Predict the Table
         </span>
-        <ChevronRight className="size-3.5 shrink-0 stroke-text-muted" aria-hidden />
+        <ChevronRight
+          className="size-3.5 shrink-0 stroke-text-muted"
+          aria-hidden
+        />
       </div>
 
       <div className="flex items-center gap-3">
@@ -85,22 +93,34 @@ export function TablePredictionStrip({
           style={{ background: fill }}
         />
         <div className="flex min-w-0 flex-col gap-0.5">
-          <span className={`${T.label} font-bold ${TX.decorative}`}>Champion</span>
+          <span className={`${T.label} font-bold ${TX.decorative}`}>
+            Champion
+          </span>
           <div className="flex items-center gap-2">
             <ClubCodeBadge shortCode={champion.shortCode} fill={fill} />
-            <span className={`${T.dense} font-bold ${TX.base}`}>{champion.name}</span>
+            <span className={`${T.dense} font-bold ${TX.base}`}>
+              {champion.name}
+              {leaguePosition !== null ? (
+                <span className={`font-semibold ${TX.muted}`}>
+                  {" "}
+                  ({ordinal(leaguePosition)})
+                </span>
+              ) : null}
+            </span>
           </div>
         </div>
 
-        {leaguePosition !== null || scoreLabel !== null ? (
+        {rank !== null || scoreLabel !== null ? (
           <div className="ml-auto flex shrink-0 flex-col items-end gap-0.5">
-            {leaguePosition !== null ? (
+            {rank !== null ? (
               <span className={`${T.body} font-extrabold ${TX.base}`}>
-                {ordinal(leaguePosition)}
+                {ordinal(rank)}
               </span>
             ) : null}
             {scoreLabel ? (
-              <span className={`${T.caption} font-bold ${TX.muted}`}>{scoreLabel}</span>
+              <span className={`${T.caption} font-bold ${TX.muted}`}>
+                {scoreLabel}
+              </span>
             ) : null}
           </div>
         ) : null}
