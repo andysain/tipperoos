@@ -8,8 +8,8 @@ import {
 // Golden values hand-derived per issue #23's decision log:
 // - gameweek_score sums a player's `scores` rows for exactly this gameweek's
 //   matches; season_total sums every gameweek 1..N's matches (D1/D2).
-// - season_standing is dense rank on season_total descending, rank 1 = best
-//   (D3, CONTEXT.md's "Season Standing" entry).
+// - season_standing is standard ("skip") competition rank on season_total
+//   descending, rank 1 = best (D3, CONTEXT.md's "Season Standing" entry).
 // - A Late Joiner (no score rows at all) still appears at 0, ranked (D3,
 //   CLAUDE.md "Late joiners": no special-case beyond "no picks exist").
 // - A Bot is folded in exactly like any other player (D3, CONTEXT.md "Player").
@@ -94,7 +94,7 @@ describe("computeGameweekStandings", () => {
     expect(bob.seasonStanding).toBe(1);
   });
 
-  it("ranks season_standing dense, rank 1 = best, ties sharing a place", () => {
+  it("ranks season_standing with skip ranking, rank 1 = best, ties sharing a place", () => {
     const seasonRows: StandingsScoreRow[] = [
       { playerId: "alice", points: 20 },
       { playerId: "bot-bob", points: 20 },
@@ -110,10 +110,11 @@ describe("computeGameweekStandings", () => {
     expect(result.find((r) => r.playerId === "bot-bob")?.seasonStanding).toBe(
       1,
     );
-    // Late Larry is on 0, strictly behind the tied leaders -- dense rank 2, not 3.
+    // Late Larry is on 0, strictly behind the tied leaders -- skip ranking:
+    // two players tied at 1st, so the next distinct value is rank 3.
     expect(
       result.find((r) => r.playerId === "late-larry")?.seasonStanding,
-    ).toBe(2);
+    ).toBe(3);
   });
 
   it("recomputes from the current row set only -- a corrected result replaces, never accumulates", () => {
@@ -203,15 +204,16 @@ describe("computeGameweekStandings -- full pipeline from picks and match results
     expect(bob.gameweekScore).toBe(7);
     expect(bob.seasonTotal).toBe(7);
 
-    // Alice and Bot Bob are tied on 7 -- dense rank 1 for both.
+    // Alice and Bot Bob are tied on 7 -- rank 1 for both.
     expect(alice.seasonStanding).toBe(1);
     expect(bob.seasonStanding).toBe(1);
 
     // Late Larry never picked either match: no `scores` rows, 0 points,
-    // still ranked (dense rank 2, strictly behind the tied leaders).
+    // still ranked (skip ranking: two tied at 1st, so rank 3, strictly
+    // behind the tied leaders).
     const larry = result.find((r) => r.playerId === "late-larry")!;
     expect(larry.gameweekScore).toBe(0);
     expect(larry.seasonTotal).toBe(0);
-    expect(larry.seasonStanding).toBe(2);
+    expect(larry.seasonStanding).toBe(3);
   });
 });

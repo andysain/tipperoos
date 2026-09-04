@@ -4,9 +4,11 @@ import { buildLeaderboard, countGameweeksPlayed } from "./board";
 // Golden values hand-derived from CLAUDE.md and
 // docs/adr/0012-leaderboard-view.md:
 //
-// - D12: rank is dense over HUMANS ONLY (bots carry no rank), ties share a
-//   place with no skipped numbers -- so 62 / 58(bot) / 57 / 57 / 51 ranks
-//   as 1 / null / 2 / 2 / 3, NOT 1 / null / 3 / 3 / 5.
+// - D12: rank is computed over HUMANS ONLY (bots carry no rank), with
+//   standard ("skip") competition ranking: a tie shares a place, and the
+//   next distinct value's rank accounts for every tied player above it --
+//   so 62 / 58(bot) / 57 / 57 / 51 ranks as 1 / null / 2 / 2 / 4, NOT
+//   1 / null / 2 / 2 / 3 (issue #204).
 // - D2: movement is this live humans-only rank minus the same humans-only
 //   rank recomputed from the PREVIOUS gameweek's stored season_total.
 //   Positive = climbed. A player absent from that snapshot shows null.
@@ -88,9 +90,10 @@ describe("buildLeaderboard ranking", () => {
     expect(rows.find((r) => r.playerId === "medianbot")!.rank).toBeNull();
   });
 
-  it("shares a place on a tie and does not skip the next number", () => {
+  it("shares a place on a tie, and the next distinct value skips ahead by the tie count", () => {
     expect(rows.find((r) => r.playerId === "marcus")!.rank).toBe(2);
-    expect(rows.find((r) => r.playerId === "priya")!.rank).toBe(3);
+    // andy and marcus are tied 2nd, so the next distinct value is 4th.
+    expect(rows.find((r) => r.playerId === "priya")!.rank).toBe(4);
   });
 
   it("orders the board by points, bots included in position", () => {

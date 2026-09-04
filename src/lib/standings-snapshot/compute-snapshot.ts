@@ -12,9 +12,10 @@
  *
  * gameweek_score sums a player's `scores` rows for exactly this gameweek's
  * two Tipped Matches; season_total sums every gameweek 1..N's matches in the
- * same competition+season (D1/D2). season_standing is dense rank on
- * season_total, rank 1 = best (D3, CONTEXT.md's "Season Standing" entry) --
- * reusing rankScores rather than reimplementing tie-break logic.
+ * same competition+season (D1/D2). season_standing is standard ("skip")
+ * competition rank on season_total, rank 1 = best (D3, CONTEXT.md's
+ * "Season Standing" entry) -- reusing rankScores rather than reimplementing
+ * tie-break logic.
  */
 
 import { rankScores } from "@/lib/leaderboard/rank";

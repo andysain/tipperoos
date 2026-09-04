@@ -7,7 +7,7 @@
 // Three rules from the ADR are implemented here rather than in the route,
 // because each is a place a plausible-looking mistake costs correctness:
 //
-//   D12  Rank is dense over HUMANS ONLY. Bots keep their position in the
+//   D12  Rank is computed over HUMANS ONLY. Bots keep their position in the
 //        list by points but carry no rank, so the player sitting behind a
 //        bot is 2nd, not 3rd.
 //   D2   Movement is the live humans-only rank minus the same humans-only

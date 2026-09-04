@@ -4,11 +4,12 @@
 // assignment, kept separate and pure so it's golden-value testable on its
 // own numbers (docs/standards/TESTING_STANDARD.md section 1a).
 //
-// Tie-break: dense/standard competition ranking -- tied players share a
-// place and the next distinct point value takes the next rank with no gap
-// (1, 1, 3, not 1, 1, 3 skipped to 4-style "1, 1, 4"... i.e. no skipped
-// numbers at all). No CLAUDE.md rule specifies this; it's the plain-language
-// default "leaderboard" already implies. See issue #90's decision log.
+// Tie-break: standard ("skip"/"1224") competition ranking -- tied players
+// share a place, and the next distinct point value's rank accounts for
+// every player already ranked above it (1, 1, 3, not 1, 1, 2). This
+// reversed an earlier dense-rank default (see issue #90's original decision
+// log) -- see issue #204: this is the convention a football table already
+// uses, and the one most people mean by "leaderboard rank."
 
 export interface ScoreInput {
   playerId: string;
@@ -22,17 +23,16 @@ export interface RankedScore extends ScoreInput {
 export function rankScores(scores: readonly ScoreInput[]): RankedScore[] {
   const sorted = [...scores].sort((a, b) => b.points - a.points);
 
-  const rankByPoints = new Map<number, number>();
-  let nextRank = 1;
-  for (const { points } of sorted) {
-    if (!rankByPoints.has(points)) {
-      rankByPoints.set(points, nextRank);
-      nextRank += 1;
+  // Skip ranking: a player's rank is their 1-based position in the sorted
+  // list, except a tie reuses the rank of the first player with the same
+  // points -- so the next distinct value's rank is its own position,
+  // accounting for every tied player above it (two tied at 3rd -> next
+  // distinct is 5th, not 4th).
+  let rankForCurrentValue = 1;
+  return sorted.map((row, index) => {
+    if (index === 0 || sorted[index - 1].points !== row.points) {
+      rankForCurrentValue = index + 1;
     }
-  }
-
-  return sorted.map((row) => ({
-    ...row,
-    rank: rankByPoints.get(row.points)!,
-  }));
+    return { ...row, rank: rankForCurrentValue };
+  });
 }
