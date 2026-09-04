@@ -92,11 +92,13 @@ export function TablePredictionStrip({
           </div>
         </div>
 
-        {leaguePosition !== null ? (
+        {leaguePosition !== null || scoreLabel !== null ? (
           <div className="ml-auto flex shrink-0 flex-col items-end gap-0.5">
-            <span className={`${T.body} font-extrabold ${TX.base}`}>
-              {ordinal(leaguePosition)}
-            </span>
+            {leaguePosition !== null ? (
+              <span className={`${T.body} font-extrabold ${TX.base}`}>
+                {ordinal(leaguePosition)}
+              </span>
+            ) : null}
             {scoreLabel ? (
               <span className={`${T.caption} font-bold ${TX.muted}`}>{scoreLabel}</span>
             ) : null}
