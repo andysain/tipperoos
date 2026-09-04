@@ -118,6 +118,12 @@ Amber is the band between. Every red row links to the section that explains it.
 **Counts row:** players (of which bots, disabled), current gameweek number, Predict the
 Table submissions (submitted / skipped / outstanding).
 
+> The `disabled` sub-count ships with Phase 3 — the `disabled_at` column (§9) does
+> not exist until then. Phase 1's counts row is _players (of which bots)_ + current
+> gameweek + Predict the Table. "Outstanding" is over non-bot players (bots never
+> onboard through Predict the Table): players with neither a `submitted_at` nor an
+> `is_skipped` prediction row.
+
 Nothing on this page is a button.
 
 ---

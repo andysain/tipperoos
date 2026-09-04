@@ -18,7 +18,7 @@ import { FOCUS, T, TX } from "@/components/ui/tokens";
 // nested inside this bar's <nav> -- it's positioned near the More tab with
 // its own fixed coordinates, but shares no DOM subtree, layout, or shape
 // with the bar itself.
-export function TabBar() {
+export function TabBar({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
   const needsTablePrediction = useSyncExternalStore(
@@ -50,7 +50,10 @@ export function TabBar() {
         // with the tab bar's DOM subtree or layout. It is not part of the
         // bar in any structural sense, only visually placed near it.
         <div className="fixed right-3 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30">
-          <MoreMenuItems onClose={() => setMoreOpen(false)} />
+          <MoreMenuItems
+            isAdmin={isAdmin}
+            onClose={() => setMoreOpen(false)}
+          />
         </div>
       ) : null}
       <nav
