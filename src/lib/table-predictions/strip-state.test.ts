@@ -28,6 +28,7 @@ describe("deriveTablePredictionStripState", () => {
       championTeam: null,
       bandCountsOk: false,
       leaguePosition: null,
+      score: null,
     });
     expect(result).toEqual({ kind: "not_submitted" });
   });
@@ -39,6 +40,7 @@ describe("deriveTablePredictionStripState", () => {
       championTeam: null,
       bandCountsOk: false,
       leaguePosition: null,
+      score: null,
     });
     expect(result).toEqual({ kind: "hidden" });
   });
@@ -50,6 +52,7 @@ describe("deriveTablePredictionStripState", () => {
       championTeam: null,
       bandCountsOk: false,
       leaguePosition: null,
+      score: null,
     });
     expect(result).toEqual({ kind: "hidden" });
   });
@@ -61,6 +64,7 @@ describe("deriveTablePredictionStripState", () => {
       championTeam: null,
       bandCountsOk: false,
       leaguePosition: null,
+      score: null,
     });
     expect(result).toEqual({ kind: "not_submitted" });
   });
@@ -72,6 +76,7 @@ describe("deriveTablePredictionStripState", () => {
       championTeam: null,
       bandCountsOk: true,
       leaguePosition: 3,
+      score: null,
     });
     expect(result).toEqual({ kind: "hidden" });
   });
@@ -86,6 +91,7 @@ describe("deriveTablePredictionStripState", () => {
       championTeam: null,
       bandCountsOk: false,
       leaguePosition: null,
+      score: null,
     });
     expect(result).toEqual({ kind: "hidden" });
   });
@@ -97,11 +103,14 @@ describe("deriveTablePredictionStripState", () => {
       championTeam: CHAMPION,
       bandCountsOk: true,
       leaguePosition: 1,
+      score: 132,
     });
     expect(result).toEqual({
       kind: "submitted_editable",
       champion: CHAMPION,
       bandsUntidy: false,
+      leaguePosition: 1,
+      score: 132,
     });
   });
 
@@ -112,11 +121,50 @@ describe("deriveTablePredictionStripState", () => {
       championTeam: CHAMPION,
       bandCountsOk: false,
       leaguePosition: 1,
+      score: 90,
     });
     expect(result).toEqual({
       kind: "submitted_editable",
       champion: CHAMPION,
       bandsUntidy: true,
+      leaguePosition: 1,
+      score: 90,
+    });
+  });
+
+  it("passes through a null score when no cohort recompute has run yet", () => {
+    const result = deriveTablePredictionStripState({
+      prediction: { submittedAt: "2026-08-01T00:00:00Z", skipped: false },
+      editability: editable,
+      championTeam: CHAMPION,
+      bandCountsOk: true,
+      leaguePosition: 1,
+      score: null,
+    });
+    expect(result).toEqual({
+      kind: "submitted_editable",
+      champion: CHAMPION,
+      bandsUntidy: false,
+      leaguePosition: 1,
+      score: null,
+    });
+  });
+
+  it("degrades to a null league position in the editable state too (day one -- no standings yet)", () => {
+    const result = deriveTablePredictionStripState({
+      prediction: { submittedAt: "2026-08-01T00:00:00Z", skipped: false },
+      editability: editable,
+      championTeam: CHAMPION,
+      bandCountsOk: true,
+      leaguePosition: null,
+      score: null,
+    });
+    expect(result).toEqual({
+      kind: "submitted_editable",
+      champion: CHAMPION,
+      bandsUntidy: false,
+      leaguePosition: null,
+      score: null,
     });
   });
 
@@ -127,11 +175,13 @@ describe("deriveTablePredictionStripState", () => {
       championTeam: CHAMPION,
       bandCountsOk: true,
       leaguePosition: 4,
+      score: 150,
     });
     expect(result).toEqual({
       kind: "submitted_locked",
       champion: CHAMPION,
       leaguePosition: 4,
+      score: 150,
     });
     if (result.kind !== "submitted_locked") throw new Error("expected locked");
     expect(result.leaguePosition).toBe(4);
@@ -149,6 +199,7 @@ describe("deriveTablePredictionStripState", () => {
         championTeam: CHAMPION,
         bandCountsOk: true,
         leaguePosition,
+        score: 100,
       });
     }
 
@@ -195,11 +246,13 @@ describe("deriveTablePredictionStripState", () => {
       championTeam: CHAMPION,
       bandCountsOk: true,
       leaguePosition: null,
+      score: 100,
     });
     expect(result).toEqual({
       kind: "submitted_locked",
       champion: CHAMPION,
       leaguePosition: null,
+      score: 100,
     });
   });
 
@@ -210,11 +263,14 @@ describe("deriveTablePredictionStripState", () => {
       championTeam: CHAMPION,
       bandCountsOk: true,
       leaguePosition: 7,
+      score: null,
     });
     expect(result).toEqual({
       kind: "submitted_editable",
       champion: CHAMPION,
       bandsUntidy: false,
+      leaguePosition: 7,
+      score: null,
     });
   });
 
@@ -225,6 +281,7 @@ describe("deriveTablePredictionStripState", () => {
       championTeam: null,
       bandCountsOk: false,
       leaguePosition: null,
+      score: null,
     });
     expect(result).toEqual({ kind: "not_submitted" });
   });

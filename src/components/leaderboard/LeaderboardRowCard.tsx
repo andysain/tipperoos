@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import type { Route } from "next";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import type { LeaderboardRow } from "@/lib/leaderboard/board";
 import { EmojiChip } from "@/components/ui/PlayerChip";
 import { T, TX, MICRO_LABEL, FOCUS, INSET } from "@/components/ui/tokens";
 
@@ -11,20 +11,51 @@ import { T, TX, MICRO_LABEL, FOCUS, INSET } from "@/components/ui/tokens";
 // table and a proportional-bar ladder. Closed height is one line per
 // column -- D11 makes density a requirement, not polish, because a board
 // whose job is comparing players fails if it only shows six of them.
+//
+// Issue #171 generalised this from a Season-segment-only component to a
+// shared shape both segments render through -- D13's "reuse the row,
+// diverge in exactly three places" instruction, applied by having each
+// segment adapt its own row type into `LeaderboardCardRow` rather than the
+// card knowing about either segment's fields directly. `ineligibleLabel`
+// replaces the old `isBot`-specific branch (the Season board's Bot and the
+// Table board's Late Joiner render identically: no rank numeral, the
+// reserved column carrying a short label, the muted row treatment).
+
+export interface LeaderboardCardRow {
+  playerId: string;
+  displayName: string;
+  emoji: string | null;
+  isViewer: boolean;
+  /** Dense rank over the eligible subset; null when ineligible for it. */
+  rank: number | null;
+  /** Short reserved-column label when `rank` is null (e.g. "Bot", "Late"). */
+  ineligibleLabel: string | null;
+  /** Places climbed since last week; null when unknowable or not tracked. */
+  movement: number | null;
+  /** The headline points figure, pre-formatted (e.g. "18" or "152/200"). */
+  pointsDisplay: string;
+  /** Muted trailing note next to the points figure, e.g. "3.2/wk". */
+  pointsSuffix: string | null;
+  /** Season board mutes a Bot's own points figure; Table board never does. */
+  mutePoints: boolean;
+  panelStats: readonly { value: string; label: string }[];
+  panelLink: { href: Route; label: string } | null;
+}
 
 function RankSlot({
   row,
   anyMovement,
 }: {
-  row: LeaderboardRow;
+  row: LeaderboardCardRow;
   /** Does ANY row have movement? In the first scored gameweek nobody does,
    *  because there is no previous snapshot to compare against — so "1st wk"
    *  is true of the whole board and marks nothing. It only means something
    *  once it distinguishes one player from the rest. */
   anyMovement: boolean;
 }) {
-  // A Bot has no rank (D12). The reserved column carries BOT instead of
-  // sitting empty, which also means the name line needs no "Bot" chip.
+  // Ineligible for rank (a Bot on the Season board, a Late Joiner on the
+  // Table board) -- the reserved column carries its label instead of
+  // sitting empty, which also means the name line needs no extra chip.
   if (row.rank === null) {
     return (
       <span className="flex w-7 shrink-0 items-center justify-center">
@@ -32,7 +63,7 @@ function RankSlot({
             is that this column ANSWERS "where does this player stand"; at
             0.55rem under a blanket opacity it whispered it, at ~2.6:1. */}
         <span className={`${T.dense} font-extrabold uppercase tracking-[0.06em] text-info`}>
-          Bot
+          {row.ineligibleLabel}
         </span>
       </span>
     );
@@ -99,7 +130,7 @@ export function LeaderboardRowCard({
   open,
   onToggle,
 }: {
-  row: LeaderboardRow;
+  row: LeaderboardCardRow;
   scored: boolean;
   anyMovement: boolean;
   /** Owned by the list, not the row. Per-row state let every panel open at
@@ -139,10 +170,11 @@ export function LeaderboardRowCard({
           <span className="w-1 shrink-0" />
         )}
 
-        {/* The chip's fill is never state (DESIGN_SYSTEM.md -> Icons), so a
-            bot is MUTED rather than tinted -- info belongs on the BOT label,
-            not on top of an identity the player chose. */}
-        <EmojiChip emoji={row.emoji} muted={row.isBot} />
+        {/* The chip's fill is never state (DESIGN_SYSTEM.md -> Icons), so an
+            ineligible row is MUTED rather than tinted -- info belongs on the
+            reserved-column label, not on top of an identity the player
+            chose. */}
+        <EmojiChip emoji={row.emoji} muted={row.ineligibleLabel !== null} />
 
         <span className="flex min-w-0 flex-1 items-center gap-1.5">
           <span className={`truncate ${T.dense} font-bold text-text`}>
@@ -169,18 +201,18 @@ export function LeaderboardRowCard({
             <span className="flex shrink-0 items-baseline gap-1.5">
               <span
                 className={`${T.body} leading-none tabular-nums ${
-                  row.isBot
+                  row.mutePoints
                     ? `font-bold ${TX.muted}`
                     : "font-extrabold text-text"
                 }`}
               >
-                {row.points}
+                {row.pointsDisplay}
               </span>
-              {row.pointsPerGameweek !== null ? (
+              {row.pointsSuffix !== null ? (
                 <span
                   className={`${T.label} leading-none tabular-nums ${TX.muted}`}
                 >
-                  {row.pointsPerGameweek.toFixed(1)}/wk
+                  {row.pointsSuffix}
                 </span>
               ) : null}
             </span>
@@ -205,37 +237,27 @@ export function LeaderboardRowCard({
       </button>
 
       {open && scored ? (
-        // "Exact score", not "Spot on": the app had four names for one
-        // concept. "Right result" already matches MATCH_SCORING_TERMS[0], so
-        // the others conform to the engine's vocabulary rather than inventing
-        // panel-local words. Both counts carry their denominator -- a bare
-        // count reads as a second ranking, and a Late Joiner's 5 means
-        // something different from an on-time player's 5 (D10).
         <div
           id={panelId}
           className={`flex flex-col gap-2 border-t border-paper-line ${INSET} py-2.5`}
         >
           <div className="flex gap-1.5">
-            <Stat
-              value={`${row.exactTips} of ${row.matchesScored}`}
-              label="Exact score"
-            />
-            <Stat
-              value={`${row.correctResults} of ${row.matchesScored}`}
-              label="Right result"
-            />
-            <Stat value={String(row.gameweeksPlayed)} label="Weeks" />
+            {row.panelStats.map((stat) => (
+              <Stat key={stat.label} value={stat.value} label={stat.label} />
+            ))}
           </div>
-          {/* The player axis's entry point (ADR 0013 D7): a fourth quiet
-              object in the panel, not the loudest thing on a page whose
-              subject is the ranking. */}
-          <Link
-            href={`/picks/${row.playerId}`}
-            className={`flex min-h-11 items-center justify-between rounded-btn bg-paper px-3 ${T.caption} font-bold text-text ${FOCUS}`}
-          >
-            See {row.isViewer ? "your" : `${row.displayName}'s`} picks
-            <ChevronRight className="size-4 stroke-text-muted" aria-hidden />
-          </Link>
+          {row.panelLink ? (
+            // The player axis's entry point (ADR 0013 D7): a fourth quiet
+            // object in the panel, not the loudest thing on a page whose
+            // subject is the ranking.
+            <Link
+              href={row.panelLink.href}
+              className={`flex min-h-11 items-center justify-between rounded-btn bg-paper px-3 ${T.caption} font-bold text-text ${FOCUS}`}
+            >
+              {row.panelLink.label}
+              <ChevronRight className="size-4 stroke-text-muted" aria-hidden />
+            </Link>
+          ) : null}
         </div>
       ) : null}
     </li>

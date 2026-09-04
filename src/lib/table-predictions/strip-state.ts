@@ -7,9 +7,12 @@
 // `locked: false` unconditionally for a Late Joiner (issue #156's decision
 // log), so gating the Champion's visibility on `locked` would hide a Late
 // Joiner's own Champion from them permanently. `editability.editable`
-// independently controls only which of the two "submitted" variants renders
-// (and therefore the untidy-Bands warning), never whether the Champion shows
-// at all.
+// independently controls only the untidy-Bands warning (issue #157's UI
+// pass: only actionable pre-lock, since the Bands are already locked in
+// once submitted_locked), never whether the Champion/position/score show
+// at all -- those are live and continuous regardless of lock status
+// (CLAUDE.md: "computed continuously through the season"), so both
+// submitted states carry the same leaguePosition/score fields.
 
 import type { TablePredictionEditability } from "./rules";
 
@@ -25,11 +28,14 @@ export type TablePredictionStripState =
       kind: "submitted_editable";
       champion: TablePredictionStripTeam;
       bandsUntidy: boolean;
+      leaguePosition: number | null;
+      score: number | null;
     }
   | {
       kind: "submitted_locked";
       champion: TablePredictionStripTeam;
       leaguePosition: number | null;
+      score: number | null;
     }
   | { kind: "hidden" };
 
@@ -39,6 +45,14 @@ export interface TablePredictionStripInput {
   championTeam: TablePredictionStripTeam | null;
   bandCountsOk: boolean;
   leaguePosition: number | null;
+  /**
+   * Issue #157: the stored Predict the Table score -- computed
+   * continuously through the season (CLAUDE.md), so it's shown in both
+   * submitted states, not gated on `editability.locked` like everything
+   * else that's Champion-adjacent (see the file-level comment). Null
+   * before the first cohort recompute has ever run for this player.
+   */
+  score: number | null;
 }
 
 export function deriveTablePredictionStripState(
@@ -50,6 +64,7 @@ export function deriveTablePredictionStripState(
     championTeam,
     bandCountsOk,
     leaguePosition,
+    score,
   } = input;
 
   // Skipped is final and never reverses (CLAUDE.md's Predict the Table
@@ -74,6 +89,8 @@ export function deriveTablePredictionStripState(
       kind: "submitted_editable",
       champion: championTeam,
       bandsUntidy: !bandCountsOk,
+      leaguePosition,
+      score,
     };
   }
 
@@ -81,5 +98,6 @@ export function deriveTablePredictionStripState(
     kind: "submitted_locked",
     champion: championTeam,
     leaguePosition,
+    score,
   };
 }
