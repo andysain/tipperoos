@@ -36,8 +36,14 @@ export default async function RootLayout({
 }>) {
   // Render-only: decides whether the More menu shows the "Competition admin"
   // entry. The server-side requireAdmin() on /admin is the actual gate --
-  // this boolean grants nothing (spec §4 rule 5). Wrapped in React cache(),
-  // so the /admin page's own requireAdmin() call reuses this lookup.
+  // this boolean grants nothing (spec §4 rule 5).
+  //
+  // Cost: one `players` lookup per request, here in the layout. It's
+  // cache()-wrapped, so /admin's own requireAdmin() reuses it rather than
+  // paying twice; and layout and page are RSC siblings, so this await runs
+  // concurrently with each page's own loaders rather than adding to their
+  // round-trip depth (PERFORMANCE_TESTING_STANDARD.md §1/§4). Accepted for a
+  // ~20-player app; revisit if the roster or traffic grows.
   const isAdmin = await getSessionIsAdmin();
 
   return (

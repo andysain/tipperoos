@@ -46,9 +46,6 @@ export default async function AdminIndexPage() {
       <header className="flex flex-col gap-2">
         <p className={`${LABEL} ${TX.muted}`}>Competition admin</p>
         <h1 className={`${T.h1} font-extrabold ${TX.base}`}>Overview</h1>
-        <p className={`max-w-[52ch] ${T.body} ${TX.muted}`}>
-          The state of this competition, the way the app understands it.
-        </p>
       </header>
 
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">

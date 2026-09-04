@@ -33,31 +33,39 @@ export async function loadAdminIndexCounts(
   supabase: SupabaseClient,
   competitionId: string,
 ): Promise<AdminIndexCounts> {
-  const { data: players, error: playersError } = await supabase
-    .from("players")
-    .select("id, is_bot")
-    .eq("competition_id", competitionId)
-    .order("id", { ascending: true });
-  if (playersError) throw playersError;
+  // The three reads are independent -- one wave, not a chain
+  // (PERFORMANCE_TESTING_STANDARD.md §4 item 1). Only the gameweek resolve
+  // below depends on the season id.
+  const [playersResult, predictionsResult, seasonId] = await Promise.all([
+    supabase
+      .from("players")
+      .select("id, is_bot")
+      .eq("competition_id", competitionId)
+      .order("id", { ascending: true }),
+    // table_predictions has no competition_id -- scope via an inner join on
+    // players, and drop bots (Predict the Table is human onboarding).
+    supabase
+      .from("table_predictions")
+      .select(
+        "player_id, is_skipped, submitted_at, players!inner(competition_id, is_bot)",
+      )
+      .eq("players.competition_id", competitionId)
+      .eq("players.is_bot", false)
+      .order("player_id", { ascending: true }),
+    getCurrentSeasonId(supabase),
+  ]);
 
-  const roster = players ?? [];
+  if (playersResult.error) throw playersResult.error;
+  if (predictionsResult.error) throw predictionsResult.error;
+
+  const roster = playersResult.data ?? [];
   const playersTotal = roster.length;
   const botsTotal = roster.filter((p) => p.is_bot === true).length;
   const humanCount = playersTotal - botsTotal;
 
-  // table_predictions has no competition_id -- scope via an inner join on
-  // players, and drop bots (Predict the Table is human onboarding).
-  const { data: predictions, error: predictionsError } = await supabase
-    .from("table_predictions")
-    .select("is_skipped, submitted_at, players!inner(competition_id, is_bot)")
-    .eq("players.competition_id", competitionId)
-    .eq("players.is_bot", false)
-    .order("player_id", { ascending: true });
-  if (predictionsError) throw predictionsError;
-
   let submitted = 0;
   let skipped = 0;
-  for (const row of predictions ?? []) {
+  for (const row of predictionsResult.data ?? []) {
     if (row.is_skipped === true) {
       skipped += 1;
     } else if (row.submitted_at !== null) {
@@ -68,7 +76,6 @@ export async function loadAdminIndexCounts(
   }
   const outstanding = Math.max(0, humanCount - submitted - skipped);
 
-  const seasonId = await getCurrentSeasonId(supabase);
   const currentGameweek = seasonId
     ? await resolveCurrentGameweekForCompetition(
         supabase,
