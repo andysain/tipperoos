@@ -12,11 +12,12 @@ import {
   type RosterSort,
 } from "@/components/admin/roster-filter";
 import { EmojiChip } from "@/components/ui/PlayerChip";
+import { PlayerCardActions } from "@/components/admin/PlayerCardActions";
 import { CARD_SHADOW, FOCUS, MICRO_LABEL, T, TX } from "@/components/ui/tokens";
 
-// The /admin/players roster (docs/admin-ui-spec.md §6.1). Read-only in this
-// issue -- a row is a plain non-interactive card; the detail panel and its
-// actions are Phase 3.
+// The /admin/players roster (docs/admin-ui-spec.md §6.1). Each human row
+// carries the two Phase 1 actions -- Clear lockout and Reset PIN (§6.2,
+// issue #201); the full detail panel is still Phase 3.
 //
 // A card list, not a reflowing <table>: the realistic use is a parent on a
 // phone mid-Saturday (spec §11). Scannability comes from ink WEIGHT, not
@@ -167,6 +168,14 @@ function PlayerCard({
           {player.pinResetRequired ? <Marker>PIN reset pending</Marker> : null}
         </div>
       ) : null}
+
+      {player.isBot ? null : (
+        <PlayerCardActions
+          playerId={player.id}
+          displayName={player.displayName}
+          isLocked={player.lockedUntil !== null}
+        />
+      )}
     </li>
   );
 }
