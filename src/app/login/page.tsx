@@ -169,7 +169,13 @@ function LoginFlow() {
       // without another round trip. (pin_reset_required is intentionally
       // not surfaced here: the forced-PIN-reset flow isn't built yet, and
       // this screen used to be a dead-end warning with no way forward.)
+      //
+      // router.refresh() as well: the root layout computes `isAdmin` for
+      // the More menu, and App Router doesn't re-render layouts on a soft
+      // navigation -- without this the menu carries the previous session's
+      // admin state onto a shared device (issue #199).
       router.push("/");
+      router.refresh();
     } catch {
       setPinError(
         "Couldn't reach Tipperoos. Check your connection and try again.",
@@ -230,7 +236,11 @@ function LoginFlow() {
       }
 
       window.localStorage.setItem(TABLE_PREDICTION_NUDGE_KEY, "true");
+      // See handlePinComplete: refresh so the root layout re-derives the
+      // session (a brand-new player is never admin, but the previous
+      // session on a shared device may have been).
       router.push("/");
+      router.refresh();
     } catch {
       setJoinError(
         "Couldn't reach Tipperoos. Check your connection and try again.",

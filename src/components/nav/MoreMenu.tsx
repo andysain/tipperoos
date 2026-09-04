@@ -47,7 +47,13 @@ export function MoreMenuItems({
       // tree unmounts, which is what destroys any in-progress client state
       // (e.g. Predict the Table's picker selection) for a shared-device
       // switch -- no explicit reset plumbing needed.
+      //
+      // router.refresh() so the root layout drops the just-cleared
+      // session's `isAdmin` -- App Router doesn't re-render layouts on a
+      // soft navigation, so without this the "Competition admin" entry
+      // would linger for the next player (issue #199).
       router.push("/login");
+      router.refresh();
     }
   }
 
