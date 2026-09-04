@@ -43,6 +43,31 @@ function changedFiles() {
   }
 }
 
+// A change that only touches comments or blank lines can't encode a scoring
+// bug, so it doesn't need a paired golden-value test change. We inspect the
+// added/removed lines of the file's own diff: if every one of them is blank,
+// a `//` line comment, or a single-line/`*`-prefixed block-comment line, the
+// change is non-behavioral. Known limitation (same spirit as the test-first
+// check below): a contrived diff that only moves a `*/` could re-scope a
+// block comment to expose code without that code appearing in the diff -- the
+// CODEOWNERS human gate on src/lib/** is the backstop for that.
+function isCommentOrWhitespaceOnly(file) {
+  const diff = run(`git diff -U0 ${BASE_REF}...HEAD -- "${file}"`);
+  const changedLines = diff
+    .split("\n")
+    .filter((l) => /^[+-]/.test(l) && !/^(\+\+\+|---) /.test(l))
+    .map((l) => l.slice(1).trim());
+  if (changedLines.length === 0) return false;
+  return changedLines.every(
+    (l) =>
+      l === "" ||
+      l.startsWith("//") ||
+      l.startsWith("*") ||
+      l.startsWith("/*") ||
+      l.startsWith("/**"),
+  );
+}
+
 function firstCommitTouching(file) {
   const log = run(
     `git log --reverse --format=%H ${BASE_REF}..HEAD -- "${file}"`,
@@ -74,6 +99,13 @@ let failed = false;
 for (const implFile of implFiles) {
   const testFile = implFile.replace(/\.ts$/, ".test.ts");
   console.log(`\nChecking ${implFile} -> ${testFile}`);
+
+  if (isCommentOrWhitespaceOnly(implFile)) {
+    console.log(
+      "  OK: comment/whitespace-only change, no paired test change required.",
+    );
+    continue;
+  }
 
   if (!files.includes(testFile)) {
     console.error(
