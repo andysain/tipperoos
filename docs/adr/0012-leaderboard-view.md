@@ -7,7 +7,7 @@ Issue #24 ("Leaderboard view") carried three sentences of scope — "sum of scor
 Most of the leaderboard's data layer already exists and is not re-derived here:
 
 - `scoresForCompetition` (`src/lib/competitions/scope.ts`) — the sanctioned competition- **and** season-scoped read of `match_id`-keyed score rows (issue #71). Returns one row per player including players with no score rows at 0, carrying `displayName`, `emoji`, `isBot`, `joinedAt`, `points`, `matchesScored`.
-- `rankScores` (`src/lib/leaderboard/rank.ts`) — dense ranking, ties share a place with no skipped numbers.
+- `rankScores` (`src/lib/leaderboard/rank.ts`) — standard ("skip") competition ranking, ties share a place and the next distinct value's rank accounts for every tied player above it (e.g. two tied 3rd, next is 5th). Reversed from an initial dense-rank default (no skipped numbers) on 2026-09-04, issue #204: dense reads as wrong against a standard football table, which people already expect this to imitate.
 - `standings_snapshots` (`supabase/migrations/20260801045416_schema_v1.sql`) — `gameweek_score`, `season_total`, `season_standing` per `(gameweek_id, player_id)`. The compute and write path is `src/lib/standings-snapshot/` (#23), and **#166 wired it to the match-result sync**, so this populates in production on the normal sync cadence rather than only under test.
 - `src/lib/bots/` (#35) — bot pick generation for all three types, so Bots carry real scores from their first scored gameweek. D12 is therefore load-bearing from day one, not a rule waiting for data.
 - `resolveCurrentGameweekForCompetition` (`src/app/_lib/gameweek-access.ts`) and the previous-gameweek pattern the Pick Board's last-week strip already uses.
@@ -31,6 +31,8 @@ The **displayed rank and points are computed live** from `scoresForCompetition` 
 **Movement** (`▲2` / `▼1` / `—`) is that live rank compared against the player's `season_standing` in the **previous gameweek's** snapshot — the same previous-gameweek resolution `LastWeekStrip` already uses, not "the most recent snapshot that exists". Comparing against the most recent snapshot would read `0` for the entire post-gameweek period, which is the exact window a player is most likely to open the leaderboard. Comparing against last week's means the arrow moves as results land, which is what "since last week" should mean.
 
 A player with no previous-gameweek snapshot (they joined since) shows no arrow, not a `▲` from nothing. **See D12** for how the previous rank is derived — not by reading `season_standing`, which is computed on a different basis.
+
+**Amendment 2026-09-04 (issue #202):** "the same previous-gameweek resolution `LastWeekStrip` already uses" turned out to be the bug, not the fix — `LastWeekStrip`'s resolution is the Pick Board's _next gameweek open for picking_ minus 1, which rolls over to N+1 the moment gameweek N finishes, before N+1 has any results. In the gap between "N fully scored" and "N+1 kicked off", `(N+1) - 1 = N`: exactly the last scored gameweek, so live rank ended up diffed against its own snapshot — the "compare against the most recent snapshot" failure this section names two paragraphs up, reached by a different path. The implementation now derives "previous" from the last gameweek that actually has a `standings_snapshots` row (the already-fetched scored-gameweek list), not from the Pick Board's current-gameweek concept.
 
 ### D3 — Points per gameweek played counts **gameweeks since joining**
 

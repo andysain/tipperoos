@@ -13,7 +13,7 @@ const p = (playerId: string, points: number, isBot = false): LadderInput => ({
 });
 
 // Literal golden values for the ranks themselves, per TESTING_STANDARD.md
-// 1a.2. Dense ranking with bots excluded BEFORE ranking is the property
+// 1a.2. Skip ranking with bots excluded BEFORE ranking is the property
 // docs/adr/0012 D12 turns on, and asserting only row order would pass on a
 // ladder that numbered them wrongly.
 describe("buildLadder ranks", () => {
@@ -30,11 +30,12 @@ describe("buildLadder ranks", () => {
     expect(l[1].rank).toBe(2);
   });
 
-  // Dense ranking: a tie shares a place and the NEXT place is not skipped.
-  it("does not skip a place after a tie", () => {
+  // Skip ranking: a tie shares a place, and the next distinct value's rank
+  // accounts for both tied players above it (rank 3, not rank 2).
+  it("skips ahead by the tie count after a tie", () => {
     const l = buildLadder([p("a", 20), p("me", 20), p("c", 10)], "me");
     expect(l[1].rank).toBe(1);
-    expect(l[2].rank).toBe(2);
+    expect(l[2].rank).toBe(3);
   });
 
   it("windows to exactly three rows in a long field", () => {
@@ -90,10 +91,11 @@ describe("buildLadder", () => {
     expect(ladder.map((r) => r.playerId)).toEqual(["a", "me"]);
   });
 
-  // Dense ranking: a tie shares a place and the next place is not skipped.
+  // Skip ranking: a tie shares a place, and the next distinct value's rank
+  // accounts for both tied players above it (rank 3, not rank 2).
   it("gives tied players the same rank", () => {
     const ladder = buildLadder([p("a", 20), p("me", 20), p("c", 10)], "me");
-    expect(ladder.map((r) => r.rank)).toEqual([1, 1, 2]);
+    expect(ladder.map((r) => r.rank)).toEqual([1, 1, 3]);
   });
 
   it("is empty when the competition is all bots", () => {

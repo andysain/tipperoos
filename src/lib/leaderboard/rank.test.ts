@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { rankScores, type ScoreInput } from "./rank";
 
-// Golden values hand-derived per issue #90's decision 3: dense/standard
-// competition ranking (ties share a place, e.g. 1, 1, 3), sorted by points
-// descending. No CLAUDE.md rule exists for tie-break beyond this -- see
-// issue #90's decision log for why this default was picked over
-// alternatives without escalating.
+// Golden values hand-derived per issue #204: standard ("skip"/"1224")
+// competition ranking -- ties share a place, and the next distinct value's
+// rank accounts for every tied player above it (e.g. 1, 1, 3, 4; a
+// three-way tie at 1 is followed by 4, not 2), sorted by points descending.
 
 function score(playerId: string, points: number): ScoreInput {
   return { playerId, points };
@@ -22,12 +21,13 @@ describe("rankScores", () => {
     expect(result.find((r) => r.playerId === "a")?.points).toBe(10);
   });
 
-  it("gives tied players the same dense rank, and skips no numbers", () => {
+  it("gives tied players the same rank, and skips ahead by the tie count", () => {
     const result = rankScores([score("a", 20), score("b", 20), score("c", 10)]);
     expect(result.find((r) => r.playerId === "a")?.rank).toBe(1);
     expect(result.find((r) => r.playerId === "b")?.rank).toBe(1);
-    // Dense ranking: the next distinct value is rank 2, not rank 3.
-    expect(result.find((r) => r.playerId === "c")?.rank).toBe(2);
+    // Skip ranking: two players tied at 1st, so the next distinct value is
+    // rank 3, not rank 2.
+    expect(result.find((r) => r.playerId === "c")?.rank).toBe(3);
   });
 
   it("gives everyone rank 1 when all players are tied on 0", () => {
@@ -58,12 +58,16 @@ describe("rankScores", () => {
     expect(result.find((r) => r.playerId === "a")?.rank).toBe(1);
     expect(result.find((r) => r.playerId === "b")?.rank).toBe(1);
     expect(result.find((r) => r.playerId === "c")?.rank).toBe(1);
-    expect(result.find((r) => r.playerId === "d")?.rank).toBe(2);
+    // Skip ranking: three tied at 1st, so the next distinct value is rank 4.
+    expect(result.find((r) => r.playerId === "d")?.rank).toBe(4);
   });
 
-  // Invariant: rank is always a positive integer no greater than the number
-  // of distinct point values, regardless of input order or size.
-  it("never assigns a rank greater than the count of distinct point values", () => {
+  // Invariant: rank is always a positive integer no greater than the
+  // player count, regardless of input order or size. (Skip ranking, unlike
+  // dense ranking, can legitimately reach the full player count -- e.g.
+  // everyone on a distinct score -- so the bound is the roster size, not
+  // the number of distinct point values.)
+  it("never assigns a rank greater than the number of players", () => {
     const input = [
       score("a", 7),
       score("b", 7),
@@ -71,11 +75,26 @@ describe("rankScores", () => {
       score("d", 9),
       score("e", 3),
     ];
-    const distinctValues = new Set(input.map((s) => s.points)).size;
     const result = rankScores(input);
     for (const row of result) {
       expect(row.rank).toBeGreaterThanOrEqual(1);
-      expect(row.rank).toBeLessThanOrEqual(distinctValues);
+      expect(row.rank).toBeLessThanOrEqual(input.length);
     }
+  });
+
+  it("skips ahead by the tie count for a mixed tie/distinct set", () => {
+    // d(9) 1st; a(7)/b(7) tied 2nd; next distinct c/e(3) is 4th, not 3rd.
+    const result = rankScores([
+      score("a", 7),
+      score("b", 7),
+      score("c", 3),
+      score("d", 9),
+      score("e", 3),
+    ]);
+    expect(result.find((r) => r.playerId === "d")?.rank).toBe(1);
+    expect(result.find((r) => r.playerId === "a")?.rank).toBe(2);
+    expect(result.find((r) => r.playerId === "b")?.rank).toBe(2);
+    expect(result.find((r) => r.playerId === "c")?.rank).toBe(4);
+    expect(result.find((r) => r.playerId === "e")?.rank).toBe(4);
   });
 });

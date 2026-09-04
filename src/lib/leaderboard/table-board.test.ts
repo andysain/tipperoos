@@ -40,9 +40,9 @@ const SECOND_PLACE = {
   boldCallScore: 0,
 };
 
-// A dense-rank tie: two eligible players on the same score share a place,
-// and the next distinct value takes the next rank with no gap (rank.ts's
-// existing rule, reused rather than re-decided here).
+// A skip-rank tie: two eligible players on the same score share a place,
+// and the next distinct value's rank accounts for both tied players above
+// it (rank.ts's existing rule, reused rather than re-decided here).
 const TIED_A = {
   playerId: "p-tied-a",
   displayName: "Tie A",
@@ -105,7 +105,7 @@ describe("buildTableLeaderboard", () => {
     expect(rows[2].playerId).toBe("p-second");
   });
 
-  it("dense-ranks a tie among eligible players with no gap for the next distinct score", () => {
+  it("skip-ranks a tie among eligible players, so the next distinct score skips ahead by the tie count", () => {
     const rows = buildTableLeaderboard(
       [LEADER, TIED_A, TIED_B, AFTER_TIE],
       "p-tied-a",
@@ -117,7 +117,8 @@ describe("buildTableLeaderboard", () => {
 
     expect(tiedA?.rank).toBe(2);
     expect(tiedB?.rank).toBe(2);
-    expect(afterTie?.rank).toBe(3);
+    // Two players tied 2nd, so the next distinct score is 4th, not 3rd.
+    expect(afterTie?.rank).toBe(4);
   });
 
   it("marks the viewer's own row and carries every score component through verbatim", () => {
