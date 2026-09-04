@@ -33,7 +33,7 @@ export interface TableLeaderboardRow {
   displayName: string;
   emoji: string | null;
   isLateJoiner: boolean;
-  /** Dense rank over non-Late-Joiners only; null for a Late Joiner (D13). */
+  /** Skip ("standard") rank over non-Late-Joiners only; null for a Late Joiner (D13). */
   rank: number | null;
   totalScore: number;
   placementScore: number;

@@ -26,7 +26,7 @@ export interface LeaderboardCardRow {
   displayName: string;
   emoji: string | null;
   isViewer: boolean;
-  /** Dense rank over the eligible subset; null when ineligible for it. */
+  /** Skip ("standard") rank over the eligible subset; null when ineligible for it. */
   rank: number | null;
   /** Short reserved-column label when `rank` is null (e.g. "Bot", "Late"). */
   ineligibleLabel: string | null;
@@ -62,7 +62,9 @@ function RankSlot({
         {/* A peer of the rank numeral, not a footnote. D12's whole argument
             is that this column ANSWERS "where does this player stand"; at
             0.55rem under a blanket opacity it whispered it, at ~2.6:1. */}
-        <span className={`${T.dense} font-extrabold uppercase tracking-[0.06em] text-info`}>
+        <span
+          className={`${T.dense} font-extrabold uppercase tracking-[0.06em] text-info`}
+        >
           {row.ineligibleLabel}
         </span>
       </span>
