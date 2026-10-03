@@ -21,7 +21,9 @@ const bandBonusValues = [...new Set(TABLE_BANDS.map((band) => band.bonus))];
 function ScoreTable({ children }: { children: React.ReactNode }) {
   return (
     <div className="overflow-x-auto [mask-image:linear-gradient(to_right,black_0,black_calc(100%-16px),transparent_100%)] rounded-btn border border-paper-line">
-      <table className={`w-full min-w-[18rem] border-collapse text-left ${T.dense}`}>
+      <table
+        className={`w-full min-w-[18rem] border-collapse text-left ${T.dense}`}
+      >
         {children}
       </table>
     </div>
@@ -31,7 +33,9 @@ function ScoreTable({ children }: { children: React.ReactNode }) {
 export function WeeklyScoringTable() {
   return (
     <ScoreTable>
-      <thead className={`bg-paper ${T.label} font-bold tracking-wide ${TX.muted} uppercase`}>
+      <thead
+        className={`bg-paper ${T.label} font-bold tracking-wide ${TX.muted} uppercase`}
+      >
         <tr>
           <th className="px-3 py-2">What matched</th>
           <th className="px-3 py-2 text-right">Points</th>
@@ -61,7 +65,9 @@ export function TableScoringTable() {
   return (
     <div className="flex flex-col gap-3">
       <ScoreTable>
-        <thead className={`bg-paper ${T.label} font-bold tracking-wide ${TX.muted} uppercase`}>
+        <thead
+          className={`bg-paper ${T.label} font-bold tracking-wide ${TX.muted} uppercase`}
+        >
           <tr>
             <th className="px-3 py-2">Club&apos;s actual Band</th>
             <th className="px-3 py-2 text-right">Points</th>
@@ -88,7 +94,9 @@ export function TableScoringTable() {
           </tr>
           <tr>
             <td className="px-3 py-2">3+ Bands away or unplaced</td>
-            <td className={`px-3 py-2 text-right font-extrabold ${TX.decorative}`}>
+            <td
+              className={`px-3 py-2 text-right font-extrabold ${TX.decorative}`}
+            >
               {PLACEMENT_POINTS_BY_DISTANCE[3] ?? NO_PICK_POINTS}
             </td>
           </tr>
@@ -99,7 +107,9 @@ export function TableScoringTable() {
         clubs inside the Band does not matter.
       </p>
       <ScoreTable>
-        <thead className={`bg-paper ${T.label} font-bold tracking-wide ${TX.muted} uppercase`}>
+        <thead
+          className={`bg-paper ${T.label} font-bold tracking-wide ${TX.muted} uppercase`}
+        >
           <tr>
             <th className="px-3 py-2">Extra scoring</th>
             <th className="px-3 py-2 text-right">Points</th>
@@ -167,8 +177,8 @@ export function ScoringSummary({ kind }: { kind: "matches" | "table" }) {
           {table ? (
             <>
               <p>
-                You place all 20 clubs into seven Table Bands. Here is the full
-                scoring ladder.
+                You place all 20 clubs into {TABLE_BANDS.length} Table Bands.
+                Here is the full scoring ladder.
               </p>
               <TableScoringTable />
               <p className={`${T.dense} ${TX.muted}`}>

@@ -6,6 +6,11 @@ import { FOCUS, T, TX } from "@/components/ui/tokens";
 import { useId, useState } from "react";
 import { getMatchBreakdown } from "./match-breakdown";
 
+/** `+3 pts` for a score, `0 pts` for none -- zero never carries a sign. */
+export function formatPointsBadge(points: number): string {
+  return points > 0 ? `+${points} pts` : `${points} pts`;
+}
+
 export function ScoringBreakdown({
   pickHome,
   pickAway,
@@ -46,9 +51,17 @@ export function ScoringBreakdown({
         <span className={TX.base}>How did you score?</span>
         {/* Still a fill rather than `success` as text: this is one of the
             three emotional accent moments, and the fill reads the same on
-            either ground. */}
-        <span className="ml-auto rounded-badge bg-success px-2.5 py-1 font-extrabold text-on-ink">
-          +{points} pts
+            either ground. Zero is not a moment: it renders `0 pts` on a
+            neutral ground, never a green "+0" (DESIGN_SYSTEM.md -> Numbers
+            and units). */}
+        <span
+          className={`ml-auto rounded-badge px-2.5 py-1 font-extrabold tabular-nums ${
+            points > 0
+              ? "bg-success text-on-ink"
+              : `border border-paper-line bg-paper ${TX.base}`
+          }`}
+        >
+          {formatPointsBadge(points)}
         </span>
         <ChevronDown
           className={`size-4 ${TX.muted} transition-transform ${open ? "rotate-180" : ""}`}
@@ -66,7 +79,9 @@ export function ScoringBreakdown({
               filled in automatically.
             </p>
           ) : breakdown.wrongWayRound ? (
-            <div className={`flex items-center justify-between gap-3 ${T.dense}`}>
+            <div
+              className={`flex items-center justify-between gap-3 ${T.dense}`}
+            >
               <span className={TX.muted}>
                 Wrong Way Round: you said {pickHome}–{pickAway}, it finished{" "}
                 {resultHome}–{resultAway}.

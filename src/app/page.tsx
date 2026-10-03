@@ -29,6 +29,7 @@ import { PickBoardSlotCard } from "@/components/pick-board/PickBoardSlotCard";
 import { TablePredictionStrip } from "@/components/pick-board/TablePredictionStrip";
 import { ScoringSummary } from "@/components/scoring/ScoringSummary";
 import { T, TX, FOCUS } from "@/components/ui/tokens";
+import { EmojiChip } from "@/components/ui/PlayerChip";
 import {
   DEFAULT_TIME_ZONE,
   TIMEZONE_COOKIE_NAME,
@@ -163,26 +164,39 @@ export default async function PickBoardPage() {
       })
     : ({ kind: "hidden" } as const);
 
+  // Slots still taking picks, and how many of those already hold one --
+  // drives the header's "you're set" line, the board's finished state.
+  const openMatchSlots = (gameweek?.slots ?? []).filter(
+    (slot) =>
+      slot.kind === "match" &&
+      !slot.voided &&
+      !isMatchLocked(new Date(slot.match.kickoffUtcIso), now),
+  );
+  const openSlots = openMatchSlots.length;
+  const filedOpenSlots = openMatchSlots.filter(
+    (slot) => slot.kind === "match" && slot.ownPick !== null,
+  ).length;
+
   return (
     // md:max-w-4xl mx-auto matches predict-table's mobile/desktop pivot
     // (PredictTableFlow.tsx) -- one column on phone, room for two slot
     // cards side by side once there's a tablet/desktop-width viewport.
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4">
-      {/* Home carries a title like every other surface, for consistency
-          across four surfaces. Help/Switch Player used to live as fixed
-          top-right chrome with no reserved gutter, which this h1 partially
-          mitigated by giving them something to sit beside above the fold
-          (issue #185) -- they've since moved into the bottom tab bar's
-          "More" menu (ADR-0005 amendment), so this h1 is now just the
-          page's title, nothing more. */}
-      <h1 className={`${T.h1} font-extrabold text-text`}>Pick Board</h1>
+      {/* Names whose board this is. On a shared family phone the board
+          never said, so a parent filing straight after a child had no way
+          to confirm the switch worked before tapping digits. It replaces
+          a "Pick Board" title that only restated the active tab. */}
+      <h1 className="flex min-w-0 items-center gap-2">
+        <EmojiChip emoji={player.emoji} />
+        <span className={`min-w-0 truncate ${T.h2} font-extrabold text-text`}>
+          {player.displayName}&apos;s picks
+        </span>
+      </h1>
 
-      {/* The summary sits above the picks. Recorded honestly: a review
-          measured that this pushes the second match card's entry controls
-          toward the fold on a pre-lock phone visit, against ADR 0007's
-          cost-of-missing logic. It is a deliberate call made with the
-          alternative on screen (ADR 0013 D15), helped by home no longer
-          carrying an H1 that restated the tab the player is standing on. */}
+      {/* The summary sits above the picks (ADR 0013 D15). To keep the
+          entry controls as high as that allows, the scoring explainer now
+          sits below the slots instead of between the header and the
+          first card. */}
       <SummarySection recap={recap} ladder={ladder} />
       <TablePredictionStrip state={tablePredictionStripState} />
 
@@ -192,12 +206,15 @@ export default async function PickBoardPage() {
             gameweekNumber={gameweek.number}
             earliestOpenKickoffUtcIso={gameweek.earliestOpenKickoffUtcIso}
             timeZone={timeZone}
+            filedOpenSlots={filedOpenSlots}
+            openSlots={openSlots}
           />
-          <ScoringSummary kind="matches" />
           <div className="flex flex-col gap-3 md:grid md:grid-cols-2 md:items-start md:gap-4">
             {gameweek.slots.map((slot, index) => (
               <PickBoardSlotCard
-                key={index}
+                // Keyed by match, not position, so a card's local state can
+                // never carry over to a different fixture.
+                key={slot.kind === "match" ? slot.match.id : `skipped-${index}`}
                 slot={slot}
                 locked={
                   slot.kind === "match"
@@ -210,9 +227,8 @@ export default async function PickBoardPage() {
             ))}
           </div>
 
-          {/* The link the Pick Board has been holding a comment for since
-              #90: once a match locks there is a room to look at, and until
-              then there deliberately isn't (ADR 0013 D3/D6). */}
+          {/* Once a match locks there is a room to look at, and until then
+              there deliberately isn't (ADR 0013 D3/D6). */}
           {gameweek.slots.some(
             (slot) =>
               slot.kind === "match" &&
@@ -228,10 +244,13 @@ export default async function PickBoardPage() {
               <ChevronRight className="size-4" aria-hidden />
             </Link>
           ) : null}
+
+          <ScoringSummary kind="matches" />
         </>
       ) : (
         <p className={`${T.caption} ${TX.muted}`}>
-          No Tipped Matches yet -- check back soon.
+          No matches to pick yet. The next two land a few days before the
+          gameweek starts.
         </p>
       )}
     </main>

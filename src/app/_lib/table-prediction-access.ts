@@ -66,6 +66,10 @@ export interface TablePredictionPlayer {
   id: string;
   competitionId: string;
   joinedAt: Date;
+  /** Read in the same query so the Pick Board can say whose board it is
+   *  on a shared phone, at no extra round trip. */
+  displayName: string;
+  emoji: string | null;
 }
 
 export interface TablePredictionRecord {
@@ -293,7 +297,7 @@ export async function getPlayerForTablePrediction(
 ): Promise<TablePredictionPlayer | null> {
   const { data: player, error } = await supabase
     .from("players")
-    .select("id, competition_id, joined_at")
+    .select("id, competition_id, joined_at, display_name, emoji")
     .eq("id", playerId)
     .maybeSingle();
   if (error || !player) return null;
@@ -301,5 +305,7 @@ export async function getPlayerForTablePrediction(
     id: player.id,
     competitionId: player.competition_id,
     joinedAt: new Date(player.joined_at),
+    displayName: player.display_name,
+    emoji: player.emoji,
   };
 }

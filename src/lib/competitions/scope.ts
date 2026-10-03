@@ -1,4 +1,5 @@
 import "server-only";
+import { isLockedAt } from "./lock-window";
 import { tippedSlots } from "@/lib/gameweeks/tipped-slots";
 import type { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -174,11 +175,8 @@ export interface CompetitionPickRow {
 export type PicksForMatchResult =
   { locked: false } | { locked: true; picks: CompetitionPickRow[] };
 
-/** Picks lock 5 minutes before kickoff (CLAUDE.md -> Predictions). */
-const LOCK_WINDOW_MS = 5 * 60 * 1000;
-
 export function isMatchLocked(kickoffTime: Date, now: Date): boolean {
-  return now.getTime() >= kickoffTime.getTime() - LOCK_WINDOW_MS;
+  return isLockedAt(kickoffTime.toISOString(), now.getTime());
 }
 
 /**
