@@ -176,6 +176,15 @@ export default async function PickBoardPage() {
   const filedOpenSlots = openMatchSlots.filter(
     (slot) => slot.kind === "match" && slot.ownPick !== null,
   ).length;
+  // Locked without a pick: the header must not say "you're set" while
+  // that slot's own card says "No pick this time" right below it.
+  const missedSlots = (gameweek?.slots ?? []).filter(
+    (slot) =>
+      slot.kind === "match" &&
+      !slot.voided &&
+      slot.ownPick === null &&
+      isMatchLocked(new Date(slot.match.kickoffUtcIso), now),
+  ).length;
 
   return (
     // md:max-w-4xl mx-auto matches predict-table's mobile/desktop pivot
@@ -208,6 +217,7 @@ export default async function PickBoardPage() {
             timeZone={timeZone}
             filedOpenSlots={filedOpenSlots}
             openSlots={openSlots}
+            missedSlots={missedSlots}
           />
           <div className="flex flex-col gap-3 md:grid md:grid-cols-2 md:items-start md:gap-4">
             {gameweek.slots.map((slot, index) => (

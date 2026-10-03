@@ -12,6 +12,7 @@ export function GameweekHeader({
   timeZone,
   filedOpenSlots,
   openSlots,
+  missedSlots,
 }: {
   gameweekNumber: number;
   earliestOpenKickoffUtcIso: string | null;
@@ -20,6 +21,8 @@ export function GameweekHeader({
   filedOpenSlots: number;
   /** Slots still taking picks. */
   openSlots: number;
+  /** Slots that locked with no pick from this player. */
+  missedSlots: number;
 }) {
   // The lock instant, not the raw kickoff, or the deadline visibly
   // misleads a player by 5 minutes.
@@ -59,8 +62,13 @@ export function GameweekHeader({
               className="size-4 shrink-0 stroke-success"
               aria-hidden
             />
-            {openSlots === 1 ? "Your pick is in." : "Both picks in."}{" "}
-            You&apos;re set for Gameweek {gameweekNumber}.
+            {missedSlots > 0
+              ? // One match already locked without a pick: confirm what is
+                // in, but don't claim the week is done.
+                openSlots === 1
+                ? "Your other pick is in."
+                : "Your remaining picks are in."
+              : `${openSlots === 1 ? "Your pick is in." : "Both picks in."} You're set for Gameweek ${gameweekNumber}.`}
           </p>
         ) : (
           <p role="status" className={`${T.caption} font-semibold ${TX.muted}`}>
