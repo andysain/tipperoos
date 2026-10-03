@@ -1,0 +1,402 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-03T04:55:50+00:00",
+  "title": "Design System: Tipperoos",
+  "extensions": {
+    "colorMeta": {
+      "floodlit-ink": {
+        "role": "primary",
+        "displayName": "Floodlit Ink",
+        "canonical": "oklch(33.1% 0.047 210.4)",
+        "tonalRamp": [
+          "oklch(15% 0.040 210.4)",
+          "oklch(25% 0.044 210.4)",
+          "oklch(35% 0.046 210.4)",
+          "oklch(48% 0.041 210.4)",
+          "oklch(60% 0.036 210.4)",
+          "oklch(72% 0.032 210.4)",
+          "oklch(84% 0.027 210.4)",
+          "oklch(95% 0.023 210.4)"
+        ]
+      },
+      "trophy-gold": {
+        "role": "secondary",
+        "displayName": "Trophy Gold",
+        "canonical": "oklch(77.9% 0.145 71.6)",
+        "tonalRamp": [
+          "oklch(15% 0.069 71.6)",
+          "oklch(25% 0.081 71.6)",
+          "oklch(35% 0.093 71.6)",
+          "oklch(48% 0.109 71.6)",
+          "oklch(60% 0.123 71.6)",
+          "oklch(72% 0.138 71.6)",
+          "oklch(84% 0.138 71.6)",
+          "oklch(95% 0.124 71.6)"
+        ]
+      },
+      "pitch-green": {
+        "role": "tertiary",
+        "displayName": "Pitch Green",
+        "canonical": "oklch(52.5% 0.115 143.4)",
+        "tonalRamp": [
+          "oklch(15% 0.079 143.4)",
+          "oklch(25% 0.088 143.4)",
+          "oklch(35% 0.098 143.4)",
+          "oklch(48% 0.110 143.4)",
+          "oklch(60% 0.108 143.4)",
+          "oklch(72% 0.096 143.4)",
+          "oklch(84% 0.085 143.4)",
+          "oklch(95% 0.074 143.4)"
+        ]
+      },
+      "red-card": {
+        "role": "tertiary",
+        "displayName": "Red Card",
+        "canonical": "oklch(54.6% 0.177 21.3)",
+        "tonalRamp": [
+          "oklch(15% 0.119 21.3)",
+          "oklch(25% 0.133 21.3)",
+          "oklch(35% 0.148 21.3)",
+          "oklch(48% 0.167 21.3)",
+          "oklch(60% 0.169 21.3)",
+          "oklch(72% 0.151 21.3)",
+          "oklch(84% 0.134 21.3)",
+          "oklch(95% 0.117 21.3)"
+        ]
+      },
+      "yellow-card": {
+        "role": "tertiary",
+        "displayName": "Yellow Card",
+        "canonical": "oklch(84.3% 0.145 93.7)",
+        "tonalRamp": [
+          "oklch(15% 0.061 93.7)",
+          "oklch(25% 0.073 93.7)",
+          "oklch(35% 0.085 93.7)",
+          "oklch(48% 0.101 93.7)",
+          "oklch(60% 0.116 93.7)",
+          "oklch(72% 0.130 93.7)",
+          "oklch(84% 0.145 93.7)",
+          "oklch(95% 0.132 93.7)"
+        ]
+      },
+      "neutral-teal": {
+        "role": "tertiary",
+        "displayName": "Neutral Teal",
+        "canonical": "oklch(54.9% 0.066 209.2)",
+        "tonalRamp": [
+          "oklch(15% 0.044 209.2)",
+          "oklch(25% 0.049 209.2)",
+          "oklch(35% 0.055 209.2)",
+          "oklch(48% 0.062 209.2)",
+          "oklch(60% 0.063 209.2)",
+          "oklch(72% 0.056 209.2)",
+          "oklch(84% 0.050 209.2)",
+          "oklch(95% 0.044 209.2)"
+        ]
+      },
+      "matchday-paper": {
+        "role": "neutral",
+        "displayName": "Matchday Paper",
+        "canonical": "oklch(96.5% 0.010 87.5)",
+        "tonalRamp": [
+          "oklch(15% 0.010 87.5)",
+          "oklch(25% 0.010 87.5)",
+          "oklch(35% 0.010 87.5)",
+          "oklch(48% 0.010 87.5)",
+          "oklch(60% 0.010 87.5)",
+          "oklch(72% 0.010 87.5)",
+          "oklch(84% 0.010 87.5)",
+          "oklch(95% 0.010 87.5)"
+        ]
+      },
+      "paper-line": {
+        "role": "neutral",
+        "displayName": "Paper Line",
+        "canonical": "oklch(89.2% 0.025 89.2)",
+        "tonalRamp": [
+          "oklch(15% 0.025 89.2)",
+          "oklch(25% 0.025 89.2)",
+          "oklch(35% 0.025 89.2)",
+          "oklch(48% 0.025 89.2)",
+          "oklch(60% 0.025 89.2)",
+          "oklch(72% 0.025 89.2)",
+          "oklch(84% 0.025 89.2)",
+          "oklch(95% 0.025 89.2)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface",
+        "canonical": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "oklch(15% 0.000 89.9)",
+          "oklch(25% 0.000 89.9)",
+          "oklch(35% 0.000 89.9)",
+          "oklch(48% 0.000 89.9)",
+          "oklch(60% 0.000 89.9)",
+          "oklch(72% 0.000 89.9)",
+          "oklch(84% 0.000 89.9)",
+          "oklch(95% 0.000 89.9)"
+        ]
+      },
+      "text-muted": {
+        "role": "neutral",
+        "displayName": "Text Muted",
+        "canonical": "oklch(53.4% 0.034 204.1)",
+        "tonalRamp": [
+          "oklch(15% 0.023 204.1)",
+          "oklch(25% 0.026 204.1)",
+          "oklch(35% 0.029 204.1)",
+          "oklch(48% 0.032 204.1)",
+          "oklch(60% 0.032 204.1)",
+          "oklch(72% 0.029 204.1)",
+          "oklch(84% 0.025 204.1)",
+          "oklch(95% 0.022 204.1)"
+        ]
+      },
+      "text-decorative": {
+        "role": "neutral",
+        "displayName": "Text Decorative",
+        "canonical": "oklch(75.6% 0.015 185.8)",
+        "tonalRamp": [
+          "oklch(15% 0.015 185.8)",
+          "oklch(25% 0.015 185.8)",
+          "oklch(35% 0.015 185.8)",
+          "oklch(48% 0.015 185.8)",
+          "oklch(60% 0.015 185.8)",
+          "oklch(72% 0.015 185.8)",
+          "oklch(84% 0.015 185.8)",
+          "oklch(95% 0.015 185.8)"
+        ]
+      },
+      "on-ink-muted": {
+        "role": "neutral",
+        "displayName": "On-Ink Muted",
+        "canonical": "oklch(78.7% 0.012 176.2)",
+        "tonalRamp": [
+          "oklch(15% 0.012 176.2)",
+          "oklch(25% 0.012 176.2)",
+          "oklch(35% 0.012 176.2)",
+          "oklch(48% 0.012 176.2)",
+          "oklch(60% 0.012 176.2)",
+          "oklch(72% 0.012 176.2)",
+          "oklch(84% 0.012 176.2)",
+          "oklch(95% 0.012 176.2)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Scorelines and ranks, tabular numerals."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page titles."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Section and gameweek headers."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Prose and digit cells, max 52ch."
+      },
+      "body-dense": {
+        "displayName": "Body Dense",
+        "purpose": "Leaderboard and repeated rows."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Secondary lines, deadlines, metadata."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Uppercase tracked section and field labels."
+      },
+      "micro-label": {
+        "displayName": "Micro-label",
+        "purpose": "Inside chips only."
+      }
+    },
+    "shadows": [
+      {
+        "name": "matchday-lift",
+        "value": "0 10px 24px -12px rgba(18, 60, 67, 0.28)",
+        "purpose": "Ambient warmth under cards, the More menu and sheets. Never on controls."
+      }
+    ],
+    "motion": [
+      {
+        "name": "score-settle",
+        "value": "score-settle 0.42s cubic-bezier(0.16, 1, 0.3, 1) both",
+        "purpose": "The scoreline landing when a pick is confirmed filed; motion-safe only."
+      },
+      {
+        "name": "swap-pulse",
+        "value": "swap-pulse 0.5s ease-out both",
+        "purpose": "Predict the Table Band swap feedback."
+      },
+      {
+        "name": "chip-out",
+        "value": "chip-out 0.16s ease-in both",
+        "purpose": "Predict the Table chip leaving a Band."
+      },
+      {
+        "name": "confetti-fall",
+        "value": "confetti-fall 1.1s ease-in both",
+        "purpose": "Rare celebration only."
+      },
+      {
+        "name": "press",
+        "value": "transform scale(0.96–0.98)",
+        "purpose": "Tap feedback on flat controls."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one functional accent per viewport: the main action on a screen.",
+      "html": "<button class=\"ds-btn-primary\">Join the competition</button>",
+      "css": ".ds-btn-primary{font-family:Geist,ui-sans-serif,system-ui,sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:8px;background:#f0a63d;color:#123c43;border:none;border-radius:14px;padding:12px 20px;font-size:1.0625rem;font-weight:700;cursor:pointer;transition:filter .15s,transform .15s;}.ds-btn-primary:hover{filter:brightness(1.05);}.ds-btn-primary:active{transform:scale(.98);}.ds-btn-primary:focus-visible{outline:none;box-shadow:0 0 0 2px #f6f3ec,0 0 0 4px #f0a63d;}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "A strong call that must not spend the accent, such as See everyone's picks.",
+      "html": "<button class=\"ds-btn-secondary\">See everyone's picks <svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m9 18 6-6-6-6\"/></svg></button>",
+      "css": ".ds-btn-secondary{font-family:Geist,ui-sans-serif,system-ui,sans-serif;display:inline-flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px;background:#123c43;color:#f6f3ec;border:none;border-radius:14px;padding:0 14px;font-size:.8rem;font-weight:700;cursor:pointer;transition:filter .15s,transform .15s;}.ds-btn-secondary:hover{filter:brightness(1.1);}.ds-btn-secondary:active{transform:scale(.98);}.ds-btn-secondary:focus-visible{outline:none;box-shadow:0 0 0 2px #f6f3ec,0 0 0 4px #f0a63d;}"
+    },
+    {
+      "name": "Quiet Control",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Low-stakes card action on a white body: Change, Keep 2–1.",
+      "html": "<button class=\"ds-btn-quiet\">Change</button>",
+      "css": ".ds-btn-quiet{font-family:Geist,ui-sans-serif,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;width:240px;height:44px;background:#fff;color:#123c43;border:1px solid #e2dbc9;border-radius:11px;font-size:.8rem;font-weight:700;letter-spacing:.025em;text-transform:uppercase;cursor:pointer;transition:border-color .15s;}.ds-btn-quiet:hover{border-color:rgba(240,166,61,.6);}.ds-btn-quiet:focus-visible{outline:none;box-shadow:0 0 0 2px #f6f3ec,0 0 0 4px #f0a63d;}"
+    },
+    {
+      "name": "Digit Pad",
+      "kind": "custom",
+      "refersTo": "digit-cell",
+      "description": "One side of pick entry: 0–4 plus a 5+ toggle, the selected cell filled gold.",
+      "html": "<div class=\"ds-digits\" role=\"group\" aria-label=\"Arsenal, home goals\"><span class=\"ds-rail\"></span><div class=\"ds-digits-col\"><div class=\"ds-digits-head\"><b>ARS</b><span>Home</span></div><div class=\"ds-digits-grid\"><button class=\"ds-digit\">0</button><button class=\"ds-digit\">1</button><button class=\"ds-digit is-selected\" aria-pressed=\"true\">2</button><button class=\"ds-digit\">3</button><button class=\"ds-digit\">4</button><button class=\"ds-digit ds-more\">5+</button></div></div></div>",
+      "css": ".ds-digits{font-family:Geist,ui-sans-serif,system-ui,sans-serif;display:flex;gap:8px;width:300px;}.ds-rail{width:4px;border-radius:999px;background:#ef0107;}.ds-digits-col{flex:1;display:flex;flex-direction:column;gap:6px;}.ds-digits-head{display:flex;gap:6px;align-items:center;}.ds-digits-head b{font-size:.8rem;font-weight:800;letter-spacing:.025em;color:#123c43;}.ds-digits-head span{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.025em;color:#567376;}.ds-digits-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;}.ds-digit{height:44px;border:1px solid #e2dbc9;border-radius:11px;background:#fff;color:#123c43;font-size:1.0625rem;font-weight:700;font-variant-numeric:tabular-nums;cursor:pointer;transition:transform .1s,border-color .15s;}.ds-digit:hover{border-color:rgba(240,166,61,.6);}.ds-digit:active{transform:scale(.96);}.ds-digit.is-selected{background:#f0a63d;border-color:#f0a63d;color:#123c43;}.ds-more{border-style:dashed;color:#567376;font-size:.8rem;}.ds-digit:focus-visible{outline:none;box-shadow:0 0 0 2px #f6f3ec,0 0 0 4px #f0a63d;}"
+    },
+    {
+      "name": "Tipped Match Card",
+      "kind": "card",
+      "refersTo": "card-shell-header",
+      "description": "The signature ink-header shell: eyebrow, club rows with the gold own-pick scoreline, kit seam, white body.",
+      "html": "<article class=\"ds-tmc\"><header class=\"ds-tmc-head\"><div class=\"ds-tmc-eyebrow\"><span><b>Headline</b> · Sat 4 Oct, 11:30pm · Closes in 2d 4h</span><span class=\"ds-chip\">✓ Filed</span></div><div class=\"ds-tmc-row\"><span class=\"ds-pos\">2nd</span><span class=\"ds-badge\" style=\"background:#ef0107;color:#f6f3ec\">ARS</span><span class=\"ds-team is-home\">Arsenal</span><span class=\"ds-score\">2</span></div><div class=\"ds-tmc-row\"><span class=\"ds-pos\">5th</span><span class=\"ds-badge\" style=\"background:#6cabdd;color:#123c43\">MCI</span><span class=\"ds-team\">Manchester City</span><span class=\"ds-score\">1</span></div></header><div class=\"ds-seam\"><i style=\"background:#ef0107\"></i><i style=\"background:#6cabdd\"></i></div><div class=\"ds-tmc-body\"><button class=\"ds-quiet\">Change</button></div></article>",
+      "css": ".ds-tmc{font-family:Geist,ui-sans-serif,system-ui,sans-serif;width:340px;border-radius:20px;overflow:hidden;box-shadow:0 10px 24px -12px rgba(18,60,67,.28);}.ds-tmc-head{background:#123c43;padding:12px 16px;display:flex;flex-direction:column;gap:8px;}.ds-tmc-eyebrow{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:.8rem;color:#b2bcb9;}.ds-chip{border-radius:999px;padding:2px 8px;font-size:.7rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;background:rgba(246,243,236,.15);color:#f6f3ec;white-space:nowrap;}.ds-tmc-row{display:grid;grid-template-columns:24px auto 1fr auto;align-items:center;gap:6px;}.ds-pos{font-size:.7rem;font-weight:700;color:#b2bcb9;font-variant-numeric:tabular-nums;}.ds-badge{border-radius:6px;padding:2px 6px;font-size:.7rem;font-weight:800;letter-spacing:.025em;}.ds-team{font-size:1.0625rem;font-weight:500;color:#b2bcb9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.ds-team.is-home{font-weight:700;color:#f6f3ec;}.ds-score{font-size:1.75rem;font-weight:800;line-height:1;color:#f0a63d;font-variant-numeric:tabular-nums;}.ds-seam{display:flex;height:6px;border-top:1px solid rgba(18,60,67,.25);border-bottom:1px solid rgba(18,60,67,.25);}.ds-seam i{flex:1;}.ds-tmc-body{background:#fff;padding:8px 16px;}.ds-quiet{width:100%;height:44px;background:#fff;border:1px solid #e2dbc9;border-radius:11px;font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.025em;color:#123c43;cursor:pointer;}.ds-quiet:hover{border-color:rgba(240,166,61,.6);}.ds-quiet:focus-visible{outline:none;box-shadow:0 0 0 2px #f6f3ec,0 0 0 4px #f0a63d;}"
+    },
+    {
+      "name": "Plain Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The default surface: white on paper, lifted by the one warm shadow, no border.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-label\">Leaderboard</div><div class=\"ds-card-row is-you\"><span>1</span><span class=\"ds-emoji\">🦊</span><b>You</b><span class=\"ds-pts\">42</span></div><div class=\"ds-card-row\"><span>2</span><span class=\"ds-emoji\">🐢</span><b>Maya</b><span class=\"ds-pts\">39</span></div></div>",
+      "css": ".ds-card{font-family:Geist,ui-sans-serif,system-ui,sans-serif;width:300px;background:#fff;border-radius:20px;padding:12px 0 4px;box-shadow:0 10px 24px -12px rgba(18,60,67,.28);}.ds-card-label{padding:0 16px 2px;font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#567376;}.ds-card-row{display:flex;align-items:center;gap:6px;padding:6px 16px;font-size:.8rem;color:#567376;font-variant-numeric:tabular-nums;}.ds-card-row b{flex:1;color:#123c43;}.ds-card-row.is-you{background:rgba(240,166,61,.12);}.ds-emoji{display:grid;place-items:center;width:20px;height:20px;border-radius:999px;background:#f6f3ec;font-size:.7rem;}.ds-pts{font-weight:700;color:#123c43;}"
+    },
+    {
+      "name": "Status Chips",
+      "kind": "chip",
+      "refersTo": "status-chip-final",
+      "description": "Lifecycle chips on an ink header: Open, Locked, Final, Called off. Never gold.",
+      "html": "<div class=\"ds-chips\"><span class=\"ds-sc ds-sc-open\">Open</span><span class=\"ds-sc ds-sc-locked\">Locked</span><span class=\"ds-sc ds-sc-final\">Final</span><span class=\"ds-sc ds-sc-off\">Called off</span></div>",
+      "css": ".ds-chips{font-family:Geist,ui-sans-serif,system-ui,sans-serif;display:flex;gap:8px;background:#123c43;padding:12px 16px;border-radius:14px;}.ds-sc{border-radius:999px;padding:2px 8px;font-size:.7rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;}.ds-sc-open{background:rgba(246,243,236,.15);color:#f6f3ec;}.ds-sc-locked{background:rgba(246,243,236,.25);color:#f6f3ec;}.ds-sc-final{background:#f6f3ec;color:#123c43;}.ds-sc-off{background:#ebc94c;color:#123c43;}"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "text-field",
+      "description": "Labelled field on paper, gold border on focus, the error named beneath.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-field-label\">Display name</span><input class=\"ds-input\" placeholder=\"e.g. Maya\"></label>",
+      "css": ".ds-field{font-family:Geist,ui-sans-serif,system-ui,sans-serif;display:flex;flex-direction:column;gap:6px;width:280px;}.ds-field-label{font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#123c43;}.ds-input{font-family:Geist,ui-sans-serif,system-ui,sans-serif;background:#f6f3ec;border:1px solid #e2dbc9;border-radius:14px;padding:12px 16px;font-size:1.0625rem;color:#123c43;outline:none;transition:border-color .15s;}.ds-input::placeholder{color:#a6b3b1;}.ds-input:focus{border-color:#f0a63d;}.ds-input:focus-visible{outline:none;box-shadow:0 0 0 2px #f6f3ec,0 0 0 4px #f0a63d;}"
+    },
+    {
+      "name": "Bottom Tab Bar",
+      "kind": "nav",
+      "refersTo": "tab-bar",
+      "description": "Fixed at every breakpoint; the active slot is ink with a gold top bar, never a gold label.",
+      "html": "<nav class=\"ds-tabs\"><a class=\"ds-tab is-active\" href=\"#\" aria-current=\"page\"><i></i><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"m9 12 2 2 4-4\"/></svg>Picks</a><a class=\"ds-tab\" href=\"#\"><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z\"/></svg>Leaderboard</a><a class=\"ds-tab\" href=\"#\"><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"5\" cy=\"12\" r=\"1\"/><circle cx=\"12\" cy=\"12\" r=\"1\"/><circle cx=\"19\" cy=\"12\" r=\"1\"/></svg>More</a></nav>",
+      "css": ".ds-tabs{font-family:Geist,ui-sans-serif,system-ui,sans-serif;display:flex;width:360px;height:64px;background:#f6f3ec;border-top:1px solid #e2dbc9;}.ds-tab{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:.7rem;font-weight:700;color:#567376;text-decoration:none;}.ds-tab.is-active{color:#123c43;}.ds-tab i{position:absolute;top:0;left:24px;right:24px;height:3px;border-radius:0 0 999px 999px;background:#f0a63d;}.ds-tab:hover{color:#123c43;}.ds-tab:focus-visible{outline:none;box-shadow:0 0 0 2px #f6f3ec,0 0 0 4px #f0a63d;}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Matchday Program",
+    "overview": "Tipperoos looks like the programme you'd buy at the turnstile: warm paper, dark printer's ink, one gold highlight, and each fixture set like a team sheet. It's playful, not childish. The palette comes from what football already means (floodlights, the trophy, the pitch, the yellow and red card), not from generic \"sporty blue\" or any league's broadcast branding. The youngest players are ten and the app is often read over a shoulder on a shared family phone, so a calm system makes the few loud moments land.\n\nThe page is crisp and printed. Controls are flat and precise, like type on a page: digit cells, buttons, chips and rows carry no shadow. Depth is atmosphere. A single warm, soft shadow lifts the things that sit above the paper (cards, menus, sheets) the way a programme rests on a table. Floodlit Ink is used as a *surface*, not only as text. An ink header carrying club identity, a kit-coloured seam and a white body is the shape you'll recognise everywhere.\n\nRestraint is deliberate. Two brighter directions were tried and rejected: \"Sticker Book\" was too loud at this data density and read too young, and \"Scoreboard\" was polished but felt too muted and clean. The accent is spent by rule, motion is saved for saving a pick and revealing a result, and there are no club crests anywhere.",
+    "keyCharacteristics": [
+      "Warm paper ground, Floodlit Ink type and surfaces, Trophy Gold spent by rule.",
+      "The ink-header card shell: identity band, kit-colour seam, white body.",
+      "One typeface (Geist) on a closed scale with a hard 0.7rem floor.",
+      "Flat, printed controls on 44px targets; one warm ambient shadow for raised surfaces.",
+      "Real kit colours only on fixtures and Predict the Table, always passed through the clash rule and contrast floor.",
+      "Emoji are personal (the player's own, 🤖 for bots); functional icons are lucide line icons."
+    ],
+    "rules": [
+      {
+        "name": "The Accent Budget Rule",
+        "body": "Trophy Gold has two tiers. *Emotional* (as a fill): the 1st-place leaderboard row, a player's own predicted scoreline, and Predict the Table's Champion pick. *Functional*: the primary button, the \"You\" badge, the active-tab bar and the focus ring, with at most one functional accent object per viewport (the focus ring doesn't count). Gold never colours a value, a label, a status chip, metadata or a secondary link.",
+        "section": "colors"
+      },
+      {
+        "name": "The Named Roles Rule",
+        "body": "Text colour comes from the five named roles, never from an alpha over ink (`text-ink/60`, `text-paper/80`). An alpha inverts meaninglessly the moment ink becomes a light colour, and five of the twelve alphas once in use failed AA.",
+        "section": "colors"
+      },
+      {
+        "name": "The Kit Colour Rule",
+        "body": "Real club colours appear only on fixtures (the Tipped Match card's badges, seam and digit-row rails) and on Predict the Table. Two rules are mandatory wherever they're rendered. *Clash*: when both clubs' colours are too close to tell apart, the away side falls back to its secondary, then to ink. *Contrast floor*: a kit outside the readable band is mixed toward paper or ink, hue kept, until it clears every ground it's drawn on.",
+        "section": "colors"
+      },
+      {
+        "name": "The Closed Scale Rule",
+        "body": "These eight sizes are the only sizes. No Tailwind size keywords (`text-xs` to `text-xl`) appear in app code, and 0.7rem is a hard floor at any weight on any ground. The app once shipped eighteen sizes, down to 0.55rem.",
+        "section": "typography"
+      },
+      {
+        "name": "The Steady Digits Rule",
+        "body": "Every number a player compares (scores, ranks, points, countdowns) uses tabular numerals so columns never jitter.",
+        "section": "typography"
+      },
+      {
+        "name": "The Printed Controls Rule",
+        "body": "If you tap it, it's flat. Shadow belongs to surfaces that rest above the paper, never to controls on them. A press is shown by a small scale (0.96–0.98), not by lifting or sinking.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** reference named tokens (`bg-ink`, `text-text-muted`, `rounded-card`) and never a raw hex in component code. That's what keeps a future dark theme a token swap.",
+      "**Do** keep every tap target at least 44px and give every interactive element the gold focus ring (2px, offset 2px).",
+      "**Do** render the four facts differently: no pick is the words \"no pick\", scored nothing is `0`, not played is blank, called off is \"off\" or \"Called off\".",
+      "**Do** write points as `+5` for a gain and `0`, never `+0`, for nothing.",
+      "**Do** keep motion to the moments that matter (saving a pick, revealing a result), start it from an already-visible state, and honour `prefers-reduced-motion`. Save the bigger celebration for the season-winner reveal.",
+      "**Do** use lucide icons at `stroke-2` in a text-role colour for functional UI, and keep emoji for personalisation only."
+    ],
+    "donts": [
+      "**Don't** use club crests, league logos or broadcast branding anywhere. It's a trademark constraint, not a style preference.",
+      "**Don't** spend Trophy Gold on a value, label, status chip, metadata or secondary link, or use it as small text on a light ground (about 2:1).",
+      "**Don't** put Pitch Green or Red Card text on an ink surface. Use a fill, and keep rank movement on a light ground.",
+      "**Don't** set any text below 0.7rem, or add a size outside the closed scale.",
+      "**Don't** put a shadow on a control, or a border on a card.",
+      "**Don't** colour text with an alpha over ink or paper. Use a named text role.",
+      "**Don't** use a dash to stand in for a missing pick, score or value."
+    ]
+  }
+}

@@ -258,6 +258,7 @@ describe("POST /api/picks", () => {
 
     expect(response.status).toBe(403);
     expect(body.error).toBe("Picks lock 5 minutes before kickoff.");
+    expect(body.code).toBe("locked");
     expect(picksUpsertMock).not.toHaveBeenCalled();
   });
 

@@ -39,7 +39,9 @@ export function SummarySection({
   if (!recap && ladder.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-2">
+    // Side by side from tablet width up: stacked full-width in the 4xl
+    // column, a three-row ladder stretched to ~900px read as empty space.
+    <div className="flex flex-col gap-2 md:grid md:grid-cols-2 md:items-start md:gap-4">
       {recap ? (
         <div className={`flex flex-col gap-1.5 ${INSET} py-3 ${CARD}`}>
           <Link

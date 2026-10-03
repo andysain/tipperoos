@@ -6,7 +6,12 @@ import {
   type TippedMatchCardState,
 } from "@/components/pick-board/TippedMatchCard";
 import type { PickBoardSlot } from "@/app/_lib/pick-board-access";
-import { T } from "@/components/ui/tokens";
+import { MICRO_LABEL, T, TX } from "@/components/ui/tokens";
+import { lockInstantIso } from "@/lib/competitions/lock-window";
+import {
+  describePickSaveFailure,
+  PickSaveError,
+} from "@/components/pick-board/pick-save-error";
 
 // Maps a loaded PickBoardSlot onto TippedMatchCard's states. `locked` is
 // computed server-side (page.tsx, via isMatchLocked -- src/lib/**, so it
@@ -50,18 +55,49 @@ function buildCardState(
   return { kind: "entry" };
 }
 
-async function savePick(matchId: string, homeScore: number, awayScore: number) {
-  const response = await fetch("/api/picks", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-tipperoos-client": "1",
-    },
-    body: JSON.stringify({ matchId, homeScore, awayScore }),
-  });
-  if (!response.ok) {
-    throw new Error("Couldn't save pick.");
+async function savePick(
+  matchId: string,
+  homeScore: number,
+  awayScore: number,
+  context: { kickoffUtcIso: string; timeZone: string },
+) {
+  let response: Response;
+  try {
+    response = await fetch("/api/picks", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-tipperoos-client": "1",
+      },
+      body: JSON.stringify({ matchId, homeScore, awayScore }),
+    });
+  } catch {
+    throw new PickSaveError(
+      describePickSaveFailure({ status: null, ...lockContext(context) }),
+    );
   }
+  if (!response.ok) {
+    // The route's `code` is what tells "too late" apart from any other
+    // 403; the message itself is written here, for players.
+    const body = (await response.json().catch(() => null)) as {
+      code?: string;
+    } | null;
+    throw new PickSaveError(
+      describePickSaveFailure({
+        status: response.status,
+        code: body?.code ?? null,
+        ...lockContext(context),
+      }),
+    );
+  }
+}
+
+function lockContext(context: { kickoffUtcIso: string; timeZone: string }) {
+  return {
+    kickoffUtcIso: context.kickoffUtcIso,
+    lockUtcIso: lockInstantIso(context.kickoffUtcIso),
+    timeZone: context.timeZone,
+  };
 }
 
 /** Minimal ink plate for a Skipped Slot or Voided Match -- ADR-0007 leaves
@@ -75,11 +111,9 @@ function UnsettledSlotPlate({
   detail: string;
 }) {
   return (
-    <div className="flex flex-col items-center gap-1 rounded-card bg-ink px-4 py-5 text-center text-paper">
-      <span className={`${T.label} font-bold uppercase tracking-[0.06em] text-paper/60`}>
-        {label}
-      </span>
-      <span className={`${T.dense} font-semibold text-paper/85`}>{detail}</span>
+    <div className="flex flex-col items-center gap-1 rounded-card bg-ink px-4 py-5 text-center">
+      <span className={`${MICRO_LABEL} ${TX.onInkMuted}`}>{label}</span>
+      <span className={`${T.dense} font-semibold ${TX.onInk}`}>{detail}</span>
     </div>
   );
 }
@@ -100,8 +134,8 @@ export function PickBoardSlotCard({
   if (slot.kind === "skipped") {
     return (
       <UnsettledSlotPlate
-        label="Skipped slot"
-        detail="This fixture was postponed before picks opened -- no match here this week."
+        label="No match here"
+        detail="This one was postponed before picks closed, so there's one fewer match to pick this week."
       />
     );
   }
@@ -109,8 +143,8 @@ export function PickBoardSlotCard({
   if (slot.voided) {
     return (
       <UnsettledSlotPlate
-        label="Voided match"
-        detail="Postponed after picks locked -- no points either way."
+        label="Called off"
+        detail="Postponed after picks closed, so nobody gets points for this one."
       />
     );
   }
@@ -125,7 +159,24 @@ export function PickBoardSlotCard({
       provenance={slot.provenance}
       state={buildCardState(slot, locked)}
       onSave={async (homeScore, awayScore) => {
-        await savePick(slot.match.id, homeScore, awayScore);
+        try {
+          await savePick(slot.match.id, homeScore, awayScore, {
+            kickoffUtcIso: slot.match.kickoffUtcIso,
+            timeZone,
+          });
+        } catch (caught) {
+          // Locked or stale: the server's view of this card has moved on,
+          // so re-fetch it -- the card then renders its real state, with
+          // the error line still saying why.
+          if (
+            caught instanceof PickSaveError &&
+            (caught.failure.kind === "locked" ||
+              caught.failure.kind === "stale")
+          ) {
+            router.refresh();
+          }
+          throw caught;
+        }
         // page.tsx is a Server Component fetched fresh per request (ADR-0007) --
         // nothing else re-runs that fetch after a client-side save, so the
         // header would keep showing the pre-save state until a hard navigation

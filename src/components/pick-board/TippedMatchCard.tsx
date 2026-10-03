@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { Flame, Shuffle } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Check, Flame, Shuffle } from "lucide-react";
 import { tv } from "tailwind-variants";
 import {
   decomposeCountdown,
   formatCountdown,
   formatKickoffInTimeZone,
 } from "@/lib/dates/kickoff-format";
+import { isLockedAt, lockInstantIso } from "@/lib/competitions/lock-window";
 import { matchBadgeColors } from "@/lib/teams/kit-colors";
 import { ClubCodeBadge } from "@/components/ui/ClubCodeBadge";
 import {
@@ -19,6 +20,9 @@ import {
 import { ScoringBreakdown } from "@/components/scoring/ScoringBreakdown";
 import { ordinal } from "@/lib/format/ordinal";
 import { T, TX, MICRO_LABEL, INSET, FOCUS } from "@/components/ui/tokens";
+import { isLockedWithoutPick, resolveCardStateAt } from "./card-state";
+import { PickSaveError, type PickSaveFailureKind } from "./pick-save-error";
+import { useNow } from "./use-now";
 
 export interface TippedMatchTeam {
   name: string;
@@ -41,9 +45,6 @@ export type TippedMatchProvenance = "top_matchup" | "random_pick";
  * name, status chip) is present in every state, not only once settled;
  * once a pick or result exists it's baked directly into the header rows
  * and the card collapses to just that header (no separate plate below).
- * The previous shipped version had drifted from that prototype (no
- * header/chip/seam at all in the entry state) with nothing in issue
- * #15's decision log explaining why -- this restores it.
  */
 export type TippedMatchCardState =
   | { kind: "entry" }
@@ -75,14 +76,17 @@ export interface TippedMatchCardProps {
   kickoffUtcIso: string;
   /** IANA timezone to render kickoff/countdown in -- see kickoff-format.ts. */
   timeZone: string;
+  /** The server's render time. The card's clock starts here and then
+   *  ticks on the device (useNow), so the countdown moves and the card
+   *  locks itself when the lock instant passes. */
   now: Date;
   provenance: TippedMatchProvenance;
   state: TippedMatchCardState;
   /**
    * Awaited, not optimistic (issue #15 decision 2): the card disables
-   * input and shows a "Filing…" stamp while this is pending, and on
-   * rejection returns to an empty entry state with an inline error --
-   * never shows "Filed" before the write is actually confirmed.
+   * input and shows a "Filing…" stamp while this is pending -- never shows
+   * "Filed" before the write is actually confirmed. Rejects with a
+   * PickSaveError so the card can say what actually went wrong.
    */
   onSave: (homeScore: number, awayScore: number) => Promise<void>;
 }
@@ -102,7 +106,7 @@ const ProvenanceIcon: Record<TippedMatchProvenance, typeof Flame> = {
   random_pick: Shuffle,
 };
 
-type ChipTone = "open" | "locked" | "final";
+type ChipTone = "open" | "filed" | "locked" | "final";
 
 // No accent. A lifecycle status is not one of the accent budget's sanctioned
 // spots (docs/DESIGN_SYSTEM.md -> Accent budget), and here it was competing
@@ -110,10 +114,11 @@ type ChipTone = "open" | "locked" | "final";
 // scoreline, two rows below. `locked` steps up in ground and weight instead,
 // so it still reads as the stronger state without spending the budget.
 const chipStyles = tv({
-  base: `shrink-0 rounded-badge px-2 py-0.5 ${MICRO_LABEL}`,
+  base: `inline-flex shrink-0 items-center gap-1 rounded-badge px-2 py-0.5 ${MICRO_LABEL}`,
   variants: {
     tone: {
       open: "bg-paper/15 text-on-ink",
+      filed: "bg-paper/15 text-on-ink",
       locked: "bg-paper/25 text-on-ink font-extrabold",
       final: "bg-paper text-ink",
     },
@@ -121,19 +126,27 @@ const chipStyles = tv({
 });
 
 function StatusChip({ label, tone }: { label: string; tone: ChipTone }) {
-  return <span className={chipStyles({ tone })}>{label}</span>;
+  return (
+    <span className={chipStyles({ tone })}>
+      {tone === "filed" ? (
+        <Check className="size-[1.1em] stroke-[3]" aria-hidden />
+      ) : null}
+      {label}
+    </span>
+  );
 }
 
-/** Per state.kind -- entry and filed are both pre-lock, so both read "Open"
- * (the header persists unchanged across filing; only the body swaps). */
+/** "Filed" rather than a second "Open": a card that already holds the
+ *  player's pick says so in the one place every state keeps a word. */
 function chipForState(kind: TippedMatchCardState["kind"]): {
   label: string;
   tone: ChipTone;
 } {
   switch (kind) {
     case "entry":
-    case "filed":
       return { label: "Open", tone: "open" };
+    case "filed":
+      return { label: "Filed", tone: "filed" };
     case "locked":
     case "live":
       return { label: kind === "live" ? "Live" : "Locked", tone: "locked" };
@@ -144,9 +157,7 @@ function chipForState(kind: TippedMatchCardState["kind"]): {
 
 /**
  * One header row: position, club badge, full name. Dropped the "Home"/
- * "Away" text label entirely (the row order already conveys it). Team
- * name bumped up a touch (1.0625rem -> 1.125rem) for balance against the
- * larger score column that sits alongside it once a pick or result exists.
+ * "Away" text label entirely (the row order already conveys it).
  */
 function TeamRow({
   team,
@@ -167,9 +178,7 @@ function TeamRow({
       <ClubCodeBadge shortCode={team.shortCode} fill={fill} />
       {/* Home takes visual dominance rather than a label -- the form of the
           home/away rule that survives sharing a line with a scoreline
-          (DESIGN_SYSTEM.md -> Team display in fixtures, amended 2026-08-20).
-          The card dropped the explicit `home` chip for width; this is what
-          replaced it, and it was specified but never applied here. */}
+          (DESIGN_SYSTEM.md -> Team display in fixtures, amended 2026-08-20). */}
       <span
         className={`min-w-0 flex-1 truncate ${T.body} ${
           home ? `font-bold ${TX.onInk}` : `font-medium ${TX.onInkMuted}`
@@ -183,55 +192,49 @@ function TeamRow({
 
 /**
  * A score, in its own grid column rather than trailing inline in the team
- * row -- keeps it vertically centred against that row regardless of the
- * row's own line-height, and lets it sit visually apart (bigger, its own
- * column) instead of reading as an afterthought at the row's tail end.
+ * row. Takes a number only: "no pick" is words, never a dash
+ * (DESIGN_SYSTEM.md -> Numbers and units), so a card with no pick drops
+ * the score column instead of rendering an empty one.
  *
  * `emphasis` exists only for the finished card's two-column comparison
  * (own pick beside the result): the result keeps the Display role, the
- * pick steps down one stop on the scale so the pair reads as
- * "what happened, and what you said" rather than as two equal numbers.
+ * pick steps down one stop on the scale.
  */
 function ScoreCell({
   value,
   tone,
   emphasis = "primary",
+  settle = false,
   className = "",
 }: {
-  value: number | null;
+  value: number;
   tone: "own-pick" | "result";
   emphasis?: "primary" | "secondary";
+  /** Plays the one-off settle the moment a pick is confirmed filed. */
+  settle?: boolean;
   className?: string;
 }) {
   return (
     <span
       className={`shrink-0 text-center font-extrabold leading-none tabular-nums ${
         emphasis === "primary" ? T.score : T.h2
-      } ${tone === "result" ? "text-paper" : "text-accent"} ${className}`}
+      } ${tone === "result" ? "text-paper" : "text-accent"} ${
+        settle ? "motion-safe:animate-score-settle" : ""
+      } ${className}`}
     >
-      {value ?? "–"}
+      {value}
     </span>
   );
 }
 
 /** Column captions for the finished card's two score columns -- without
  *  them the pick and the result are two adjacent numbers with nothing
- *  saying which is which, and colour alone can't carry that
- *  (DESIGN_SYSTEM.md).
+ *  saying which is which, and colour alone can't carry that.
  *
  *  They take the FINAL status chip's own slot at the end of the eyebrow
  *  rather than occupying a row of their own, and land exactly over their
  *  columns because both are right-aligned to the same card inset and
- *  carry the same widths and gap. That's what makes the swap free: no
- *  caption row, no vertical cost, and no caption wide enough to widen a
- *  column and eat the team name's width (as grid cells they cost 24px of
- *  name at 375px -- enough to clip "Manchester United").
- *
- *  FINAL is caption and status at once, which is why the chip it replaces
- *  isn't a loss: a card showing a result column IS a finished match. It
- *  also restores the picks record's exact PICK / FINAL wording. Every
- *  other state, and a finished match with no pick to compare against,
- *  keeps the chip. */
+ *  carry the same widths and gap. */
 function ScoreColumnLabels() {
   const cap = `text-center ${MICRO_LABEL} ${TX.onInkMuted}`;
   return (
@@ -250,6 +253,7 @@ const SCORE_COL_RESULT = "w-10";
 function MetaLine({
   provenance,
   kickoffUtcIso,
+  lockUtcIso,
   timeZone,
   now,
   showCountdown,
@@ -257,17 +261,19 @@ function MetaLine({
 }: {
   provenance: TippedMatchProvenance;
   kickoffUtcIso: string;
+  lockUtcIso: string;
   timeZone: string;
   now: Date;
   showCountdown: boolean;
-  /** "Locked in" / "Playing now" -- replaces the old plate footer's job
-   * now that locked/live states collapse to just the header. Mutually
-   * exclusive with the countdown (never both set for the same state). */
+  /** "Locked in" / "No pick" -- mutually exclusive with the countdown. */
   note?: string;
 }) {
   const Icon = ProvenanceIcon[provenance];
+  // Counts down to the LOCK, not kickoff: the header's "Picks close" is
+  // the lock instant, and the two used to disagree by five minutes at the
+  // exact moment a late player is reading them.
   const countdownParts = showCountdown
-    ? decomposeCountdown(new Date(kickoffUtcIso).getTime() - now.getTime())
+    ? decomposeCountdown(new Date(lockUtcIso).getTime() - now.getTime())
     : null;
   const urgent =
     countdownParts !== null &&
@@ -290,14 +296,14 @@ function MetaLine({
         <>
           <span aria-hidden>·</span>
           <span className={urgent ? "font-bold text-warning" : undefined}>
-            {formatCountdown(kickoffUtcIso, now.getTime())}
+            Closes in {formatCountdown(lockUtcIso, now.getTime())}
           </span>
         </>
       ) : null}
       {note ? (
         <>
           <span aria-hidden>·</span>
-          <span className="font-semibold text-paper/80">{note}</span>
+          <span className={`font-semibold ${TX.onInk}`}>{note}</span>
         </>
       ) : null}
     </div>
@@ -305,23 +311,19 @@ function MetaLine({
 }
 
 interface RowScores {
-  home: number | null;
-  away: number | null;
+  home: number;
+  away: number;
   tone: "own-pick" | "result";
   /** Finished only: the Player's own pick, rendered in its own column
-   *  beside the result instead of as a "You tipped 1-3" line under the
-   *  seam -- the same side-by-side comparison the picks record makes
-   *  (PICK / FINAL), so the two surfaces read the same way. */
+   *  beside the result -- the same side-by-side comparison the picks
+   *  record makes (PICK / FINAL), so the two surfaces read the same way. */
   own?: { home: number; away: number };
 }
 
 /**
- * The card's ink header -- present in every state (docs/adr/0007's own
- * language: club badge and per-row colour bar apply "both times", not just
- * once settled). Once a pick or result exists, `scores` bakes it directly
- * into the team rows -- filed/locked/live/finished then render as this
- * header plus the seam and nothing else, an accordion-style collapse
- * rather than a second, separate score plate below it.
+ * The card's ink header -- present in every state. Once a pick or result
+ * exists, `scores` bakes it directly into the team rows; without one
+ * (entry, or locked with no pick) the rows carry no score column at all.
  */
 function CardHeader({
   home,
@@ -331,10 +333,12 @@ function CardHeader({
   chip,
   provenance,
   kickoffUtcIso,
+  lockUtcIso,
   timeZone,
   now,
   showCountdown,
   scores,
+  settle,
   note,
 }: {
   home: TippedMatchTeam;
@@ -344,22 +348,23 @@ function CardHeader({
   chip: { label: string; tone: ChipTone };
   provenance: TippedMatchProvenance;
   kickoffUtcIso: string;
+  lockUtcIso: string;
   timeZone: string;
   now: Date;
   showCountdown: boolean;
   scores?: RowScores;
+  settle: boolean;
   note?: string;
 }) {
   // The "eyebrow": meta ABOVE the teams, so the card ends on the scoreline
-  // rather than trailing off into small print. Chosen over demoting only the
-  // chip and over a two-line variant. The status chip rides the eyebrow with
-  // it, which also frees the team rows' full width for the score.
+  // rather than trailing off into small print.
   return (
     <CardShellHeader className={INSET}>
       <div className="flex items-center justify-between gap-2">
         <MetaLine
           provenance={provenance}
           kickoffUtcIso={kickoffUtcIso}
+          lockUtcIso={lockUtcIso}
           timeZone={timeZone}
           now={now}
           showCountdown={showCountdown}
@@ -401,9 +406,9 @@ function CardHeader({
       ) : scores ? (
         <div className="grid min-w-0 grid-cols-[1fr_auto] items-center gap-x-2.5 gap-y-1">
           <TeamRow team={home} fill={homeFill} home />
-          <ScoreCell value={scores.home} tone={scores.tone} />
+          <ScoreCell value={scores.home} tone={scores.tone} settle={settle} />
           <TeamRow team={away} fill={awayFill} />
-          <ScoreCell value={scores.away} tone={scores.tone} />
+          <ScoreCell value={scores.away} tone={scores.tone} settle={settle} />
         </div>
       ) : (
         <div className="flex min-w-0 flex-col gap-1">
@@ -416,7 +421,7 @@ function CardHeader({
 }
 
 const digitCell = tv({
-  base: `flex h-11 flex-1 items-center justify-center rounded-btn-sm border border-paper-line bg-surface ${T.body} font-bold tabular-nums text-text transition active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`,
+  base: `flex h-11 items-center justify-center rounded-btn-sm border border-paper-line bg-surface ${T.body} font-bold tabular-nums text-text transition active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`,
   variants: {
     selected: {
       true: "border-accent bg-accent text-accent-ink",
@@ -426,21 +431,14 @@ const digitCell = tv({
   defaultVariants: { selected: false },
 });
 
-// Real top-flight scores essentially never exceed single digits, but this
-// leaves headroom rather than hard-capping at a number someone could argue
-// with -- 20 is generous without inviting genuinely silly values.
-const CUSTOM_SCORE_MAX = 20;
-
-const customScoreInput = tv({
-  base: `h-11 flex-1 min-w-0 rounded-btn-sm border bg-surface text-center ${T.body} font-bold tabular-nums text-text outline-none transition placeholder:font-semibold placeholder:text-text-decorative disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`,
-  variants: {
-    active: {
-      true: "border-accent bg-accent/10",
-      false: "border-paper-line focus:border-accent/60",
-    },
-  },
-  defaultVariants: { active: false },
-});
+const PRIMARY_DIGITS = [0, 1, 2, 3, 4] as const;
+// The route accepts 0-9 per side (api/picks MAX_SCORE), so the extra row is
+// exactly the valid domain. It replaces a free-text 5+ field that allowed up
+// to 20 -- anything over 9 was then refused by the server and reported as a
+// connection problem -- and that filed on blur, so tapping anywhere else on
+// iOS (whose numeric keypad has no Return key) could file a pick by accident.
+// ADR 0007 specified this row; entry is now always exactly two taps again.
+const EXTRA_DIGITS = [5, 6, 7, 8, 9] as const;
 
 function DigitRow({
   team,
@@ -450,137 +448,112 @@ function DigitRow({
   expanded,
   disabled,
   onSelect,
-  onExpand,
+  onToggleExtra,
 }: {
   team: TippedMatchTeam;
-  homeAwayLabel: string;
+  homeAwayLabel: "Home" | "Away";
   fill: string;
   selected: number | null;
   expanded: boolean;
   disabled: boolean;
   onSelect: (value: number) => void;
-  onExpand: () => void;
+  onToggleExtra: () => void;
 }) {
-  const primaryDigits = [0, 1, 2, 3, 4];
-  const showCustom = expanded || (selected !== null && selected >= 5);
-  const customActive = selected !== null && selected >= 5;
-  // Buffers what's being typed until commit (blur/Enter) -- unlike the
-  // digit buttons, which fire (and auto-save) on every tap, a free-text
-  // field needs an explicit "done typing" moment rather than saving on
-  // every keystroke. Only initialised from `selected` on mount: this
-  // subtree remounts fresh each time the entry body reappears (see
-  // TippedMatchCard's showEntryBody), so that's the one moment it needs to
-  // pick up an existing 5+ pick (e.g. reopened via Change).
-  const [customText, setCustomText] = useState(
-    customActive ? String(selected) : "",
+  // A chosen 5-9 keeps its row open: collapsing it would hide the
+  // selection the player just made.
+  const extraHoldsSelection = selected !== null && selected >= 5;
+  const showExtra = expanded || extraHoldsSelection;
+
+  const digit = (value: number) => (
+    <button
+      key={value}
+      type="button"
+      disabled={disabled}
+      aria-pressed={selected === value}
+      className={digitCell({ selected: selected === value })}
+      onClick={() => onSelect(value)}
+    >
+      {value}
+    </button>
   );
 
-  function commitCustom() {
-    if (customText === "") return;
-    const parsed = Number.parseInt(customText, 10);
-    if (Number.isInteger(parsed) && parsed >= 5 && parsed <= CUSTOM_SCORE_MAX) {
-      onSelect(parsed);
-    }
-  }
-
   return (
-    <div className="flex items-stretch gap-2">
+    // The group's name gives every bare digit its team: a screen reader
+    // used to announce "2, toggle button" with nothing saying whose goals.
+    <div
+      role="group"
+      aria-label={`${team.name}, ${homeAwayLabel.toLowerCase()} goals`}
+      className="flex items-stretch gap-2"
+    >
       <span
         aria-hidden
         className="w-1 shrink-0 rounded-full"
         style={{ background: fill }}
       />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <div className="flex items-center gap-1.5">
-          <span className={`truncate ${T.caption} font-extrabold tracking-wide ${TX.base}`}>
-            {team.shortCode ?? "?"}
+        <div aria-hidden className="flex items-center gap-1.5">
+          <span
+            className={`truncate ${T.caption} font-extrabold tracking-wide ${TX.base}`}
+          >
+            {team.shortCode ?? team.name}
           </span>
-          <span className={`${T.label} font-bold uppercase tracking-wide ${TX.muted}`}>
+          <span
+            className={`${T.label} font-bold uppercase tracking-wide ${TX.muted}`}
+          >
             {homeAwayLabel}
           </span>
         </div>
-        <div className="flex items-center gap-1.5">
-          {primaryDigits.map((digit) => (
-            <button
-              key={digit}
-              type="button"
-              disabled={disabled}
-              aria-pressed={selected === digit}
-              className={digitCell({ selected: selected === digit })}
-              onClick={() => onSelect(digit)}
-            >
-              {digit}
-            </button>
-          ))}
-          {!showCustom ? (
-            <button
-              type="button"
-              disabled={disabled}
-              className={`flex h-11 flex-1 items-center justify-center rounded-btn-sm border border-dashed border-paper-line ${T.caption} font-bold ${TX.muted} transition hover:border-accent/60 disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`}
-              onClick={onExpand}
-            >
-              5+
-            </button>
-          ) : (
-            <input
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              maxLength={2}
-              disabled={disabled}
-              value={customText}
-              placeholder="5+"
-              aria-label={`${team.shortCode ?? "team"} score, 5 or more`}
-              className={customScoreInput({ active: customActive })}
-              onChange={(event) =>
-                setCustomText(event.target.value.replace(/\D/g, "").slice(0, 2))
-              }
-              onBlur={commitCustom}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") event.currentTarget.blur();
-              }}
-            />
-          )}
+        {/* Six columns: 0-4 plus the 5+ toggle, then 5-9 directly beneath
+            0-4 so the two rows read as one keypad. */}
+        <div className="grid grid-cols-6 gap-1.5">
+          {PRIMARY_DIGITS.map(digit)}
+          <button
+            type="button"
+            disabled={disabled || extraHoldsSelection}
+            aria-expanded={showExtra}
+            aria-label="5 or more goals"
+            className={`flex h-11 items-center justify-center rounded-btn-sm border ${
+              showExtra
+                ? `border-paper-line bg-paper ${TX.base}`
+                : `border-dashed border-paper-line ${TX.muted} hover:border-accent/60`
+            } ${T.caption} font-bold transition disabled:cursor-not-allowed ${FOCUS}`}
+            onClick={onToggleExtra}
+          >
+            5+
+          </button>
+          {showExtra ? EXTRA_DIGITS.map(digit) : null}
         </div>
       </div>
     </div>
   );
 }
 
-/**
- * Filed (pre-lock) gets a slim, full-width Change affordance below the
- * seam -- the only settled state that still allows editing. It sits on
- * the shell's white body like every other card's content, rather than on
- * a further block of ink: a settled card that stayed ink all the way down
- * left the seam bridging dark to dark and the board with no light surface
- * at all (DESIGN_SYSTEM.md -> Card anatomy, amended 2026-08-23).
- */
-function ChangeButton({ onClick }: { onClick: () => void }) {
+/** The white body under a settled card: holds a status line and, for a
+ *  filed pick, the Change control. */
+function StatusLine({
+  tone,
+  children,
+}: {
+  tone: "muted" | "danger";
+  children: ReactNode;
+}) {
   return (
-    <CardShellBody className="py-2">
-      <button
-        type="button"
-        // h-11, not h-10: it matches the scoring disclosure's own row
-        // height, so a filed card and a finished card have white bodies of
-        // exactly the same depth (68px) instead of differing by 4px. It
-        // also puts the control back on the 44px touch-target floor.
-        className={`flex h-11 w-full items-center justify-center rounded-btn-sm border border-paper-line bg-surface ${T.caption} font-bold tracking-wide ${TX.base} uppercase transition hover:border-accent/60 ${FOCUS}`}
-        onClick={onClick}
-      >
-        Change
-      </button>
-    </CardShellBody>
+    <p
+      role={tone === "danger" ? "alert" : undefined}
+      className={`${T.caption} font-semibold ${
+        tone === "danger" ? "text-danger" : TX.muted
+      }`}
+    >
+      {children}
+    </p>
   );
 }
 
+const quietButton = `flex h-11 w-full items-center justify-center rounded-btn-sm border border-paper-line bg-surface ${T.caption} font-bold tracking-wide ${TX.base} uppercase transition hover:border-accent/60 ${FOCUS}`;
+
 /** Finished only: the points chip, and the one verdict the header's own
  * You/Final columns can't state for themselves -- that the two matched
- * exactly. What the Player tipped is no longer repeated here as prose;
- * it sits in the header beside the result (see RowScores.own), which is
- * where the comparison the line was describing actually happens.
- *
- * On the shell's white body, like the entry state's digit rows and the
- * Change affordance -- the ink stops at the seam in every state now. */
+ * exactly. */
 function FinishedFooter({
   ownHomeScore,
   ownAwayScore,
@@ -597,15 +570,14 @@ function FinishedFooter({
   const filed = ownHomeScore !== null && ownAwayScore !== null;
   const exact =
     filed && ownHomeScore === homeScore && ownAwayScore === awayScore;
-  // Nothing to say in the common case: the header already shows both
-  // scorelines, so a line restating one of them is the redundancy this
-  // replaced. Only the two exceptional readings still get a line.
   const verdict = exact ? (
     /* One of the three emotional accent moments, and a fill rather than
-       text -- `success` reads the same either way as a fill. */
+       text -- `success` reads the same either way as a fill. The rarest
+       good moment of a week, so it's sized to be read, not a micro-label. */
     <span
-      className={`self-start rounded-badge bg-success px-2 py-0.5 ${MICRO_LABEL} text-on-ink`}
+      className={`inline-flex items-center gap-1.5 self-start rounded-badge bg-success px-3 py-1 ${T.caption} font-extrabold text-on-ink motion-safe:animate-score-settle`}
     >
+      <Check className="size-4 stroke-[3]" aria-hidden />
       You called it exactly
     </span>
   ) : !filed ? (
@@ -632,7 +604,7 @@ export function TippedMatchCard({
   away,
   kickoffUtcIso,
   timeZone,
-  now,
+  now: serverNow,
   provenance,
   state,
   onSave,
@@ -642,11 +614,52 @@ export function TippedMatchCard({
   const [homeExpanded, setHomeExpanded] = useState(false);
   const [awayExpanded, setAwayExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{
+    message: string;
+    kind: PickSaveFailureKind;
+  } | null>(null);
   // Re-opens a filed (pre-lock) pick back to blank entry -- issue #15's own
-  // done-when requires re-editing before lock, and the upsert route already
-  // supports it; only the "Change" affordance to reach it was missing.
+  // done-when requires re-editing before lock.
   const [editingFiled, setEditingFiled] = useState(false);
+  // The pick the server just confirmed. Shown at once, rather than leaving
+  // the entry rows on screen until router.refresh() lands -- the write is
+  // already confirmed, so this is not optimistic. Also drives the one-off
+  // settle on the scoreline.
+  const [justFiled, setJustFiled] = useState<{
+    home: number;
+    away: number;
+  } | null>(null);
+  // Screen-reader announcements: "Filing…", then "Pick filed: …". The
+  // visible "Filing…" line sits inside the entry body, which unmounts on
+  // success, so the announcement lives at the card root instead.
+  const [announcement, setAnnouncement] = useState("");
+  const changeButtonRef = useRef<HTMLButtonElement>(null);
+  const focusChangeAfterFiling = useRef(false);
+
+  const now = useNow(serverNow);
+  const lockUtcIso = lockInstantIso(kickoffUtcIso);
+  const lockedNow = isLockedAt(kickoffUtcIso, now.getTime());
+
+  // A confirmed save beats the server's pre-save render until the refresh
+  // arrives; after lock, the client clock beats both.
+  const serverState: TippedMatchCardState =
+    justFiled && (state.kind === "entry" || state.kind === "filed")
+      ? {
+          kind: "filed",
+          ownHomeScore: justFiled.home,
+          ownAwayScore: justFiled.away,
+        }
+      : state;
+  const view = resolveCardStateAt(serverState, lockedNow);
+
+  // Focus would otherwise drop to <body> when the digit button the player
+  // just tapped unmounts. Move it to the control that now does something.
+  useEffect(() => {
+    if (focusChangeAfterFiling.current && changeButtonRef.current) {
+      focusChangeAfterFiling.current = false;
+      changeButtonRef.current.focus();
+    }
+  });
 
   // Header + seam sit on the card's ink ground, so this pair is floored
   // against both ink and white (matchBadgeColors()'s default).
@@ -654,16 +667,19 @@ export function TippedMatchCard({
     home.shortCode,
     away.shortCode,
   );
-  // DigitRow's rail sits on the white CardShellBody only -- flooring it
-  // against ink too would needlessly wash a dark, saturated kit colour
-  // toward pink even though it already reads fine here (the Predict the
-  // Table bug this mirrors: a shared ink+white fill reused on a white-only
-  // ground).
+  // DigitRow's rail sits on the white CardShellBody only.
   const { home: bodyHomeFill, away: bodyAwayFill } = matchBadgeColors(
     home.shortCode,
     away.shortCode,
     ["#ffffff"],
   );
+
+  function resetEntry() {
+    setHomeSelected(null);
+    setAwaySelected(null);
+    setHomeExpanded(false);
+    setAwayExpanded(false);
+  }
 
   async function fileIfComplete(
     nextHome: number | null,
@@ -672,89 +688,99 @@ export function TippedMatchCard({
     if (nextHome === null || nextAway === null) return;
     setSaving(true);
     setError(null);
+    setAnnouncement("Filing your pick…");
     try {
       await onSave(nextHome, nextAway);
+      setJustFiled({ home: nextHome, away: nextAway });
       setEditingFiled(false);
-      // Success: the parent owns pick data and is expected to flip `state`
-      // to "filed" on its next render. Local selection stays as-is until
-      // then (harmless -- it's about to be replaced by the collapsed header).
-    } catch {
-      // A partial/failed pick is never restored (ADR) -- back to a clean
-      // entry state, not a half-filled one, with a plain inline error line
-      // (the deferred "tap to retry" stamp treatment is out of scope).
-      setHomeSelected(null);
-      setAwaySelected(null);
-      setHomeExpanded(false);
-      setAwayExpanded(false);
-      setError(
-        "Couldn't save your pick -- check your connection and try again.",
+      resetEntry();
+      focusChangeAfterFiling.current = true;
+      setAnnouncement(
+        `Pick filed: ${home.name} ${nextHome}, ${away.name} ${nextAway}.`,
       );
+    } catch (caught) {
+      const failure =
+        caught instanceof PickSaveError
+          ? caught.failure
+          : {
+              kind: "retry" as const,
+              message: "That didn't save. Tap a score to try again.",
+            };
+      // A transient failure keeps both selections, so tapping either score
+      // again re-files the same pick in one tap. Anything final (locked,
+      // stale, signed out) clears the half-made entry: the ADR never
+      // restores a partial pick, and there's nothing left to retry.
+      if (failure.kind !== "retry") {
+        resetEntry();
+        setEditingFiled(false);
+      }
+      setAnnouncement("");
+      setError(failure);
     } finally {
       setSaving(false);
     }
   }
 
-  const chip = chipForState(state.kind);
+  const chip = chipForState(view.kind);
   const showEntryBody =
-    state.kind === "entry" || (state.kind === "filed" && editingFiled);
+    view.kind === "entry" || (view.kind === "filed" && editingFiled);
+  const noPick = isLockedWithoutPick(view);
 
-  // Once a pick or result exists, it bakes into the header rows and the
-  // card collapses to just that header + seam -- no separate plate below
-  // (accordion-style; see CardHeader's own doc comment). "See everyone's
-  // picks" now lives on the Pick Board itself, once per gameweek rather
-  // than once per card, since both slots share one destination
-  // that isn't real (ADR-0005).
-  //
-  // Deliberately NOT gated on `!showEntryBody`: while editing a filed pick,
-  // the header keeps showing the pick being replaced, and the digit boxes
-  // below start blank rather than prefilled. Prefilling used to auto-save
-  // the moment one side was re-tapped (the other side's stale prefilled
-  // value completed the pair) -- e.g. re-picking 2-1 as 3-1 would fire and
-  // save 3-0 the instant "3" was tapped. Treating it as a fresh two-tap
-  // entry, with the old pick visible above only for reference, avoids that.
+  // While editing a filed pick, the header keeps showing the pick being
+  // replaced, and the digit rows start blank rather than prefilled.
+  // Prefilling used to auto-save the moment one side was re-tapped.
   let scores: RowScores | undefined;
   let note: string | undefined;
-  switch (state.kind) {
+  switch (view.kind) {
     case "filed":
       scores = {
-        home: state.ownHomeScore,
-        away: state.ownAwayScore,
+        home: view.ownHomeScore,
+        away: view.ownAwayScore,
         tone: "own-pick",
       };
       break;
     case "locked":
-      scores = {
-        home: state.ownHomeScore,
-        away: state.ownAwayScore,
-        tone: "own-pick",
-      };
-      note = "Locked in";
-      break;
     case "live":
-      scores = {
-        home: state.ownHomeScore,
-        away: state.ownAwayScore,
-        tone: "own-pick",
-      };
-      note = "Playing now";
+      // Locked with no pick used to render an accent "–" over a "Locked
+      // in" note: it told a player who had missed the deadline they were
+      // fine. Now the score column is dropped and the note says so.
+      if (view.ownHomeScore !== null && view.ownAwayScore !== null) {
+        scores = {
+          home: view.ownHomeScore,
+          away: view.ownAwayScore,
+          tone: "own-pick",
+        };
+      }
+      // Nothing syncs live scores yet, so a locked card reads the same for
+      // the whole match; "Kicked off" at least tells a player it has
+      // started, rather than 90 minutes of "Locked in".
+      note = noPick
+        ? "No pick"
+        : view.kind === "live"
+          ? "Playing now"
+          : now.getTime() >= new Date(kickoffUtcIso).getTime()
+            ? "Kicked off"
+            : "Locked in";
       break;
     case "finished":
       scores = {
-        home: state.homeScore,
-        away: state.awayScore,
+        home: view.homeScore,
+        away: view.awayScore,
         tone: "result",
         // Only when a pick exists: an empty You column would have to render
         // a dash, and DESIGN_SYSTEM.md -> Numbers and units reserves "no
-        // pick" (the words) for that fact and forbids the dash. Without a
-        // pick the card keeps the single result column and the footer says
-        // it in words.
+        // pick" (the words) for that fact.
         own:
-          state.ownHomeScore !== null && state.ownAwayScore !== null
-            ? { home: state.ownHomeScore, away: state.ownAwayScore }
+          view.ownHomeScore !== null && view.ownAwayScore !== null
+            ? { home: view.ownHomeScore, away: view.ownAwayScore }
             : undefined,
       };
       break;
   }
+
+  const errorLine = error ? (
+    <StatusLine tone="danger">{error.message}</StatusLine>
+  ) : null;
 
   return (
     <CardShell>
@@ -766,13 +792,19 @@ export function TippedMatchCard({
         chip={chip}
         provenance={provenance}
         kickoffUtcIso={kickoffUtcIso}
+        lockUtcIso={lockUtcIso}
         timeZone={timeZone}
         now={now}
-        showCountdown={state.kind === "entry" || state.kind === "filed"}
+        showCountdown={view.kind === "entry" || view.kind === "filed"}
         scores={scores}
+        settle={justFiled !== null && view.kind === "filed" && !editingFiled}
         note={note}
       />
       <CardShellSeam segments={[{ fill: homeFill }, { fill: awayFill }]} />
+
+      <p role="status" className="sr-only">
+        {announcement}
+      </p>
 
       {showEntryBody ? (
         <CardShellBody className="gap-3">
@@ -787,7 +819,7 @@ export function TippedMatchCard({
               setHomeSelected(value);
               void fileIfComplete(value, awaySelected);
             }}
-            onExpand={() => setHomeExpanded(true)}
+            onToggleExtra={() => setHomeExpanded((open) => !open)}
           />
           <DigitRow
             team={away}
@@ -800,34 +832,65 @@ export function TippedMatchCard({
               setAwaySelected(value);
               void fileIfComplete(homeSelected, value);
             }}
-            onExpand={() => setAwayExpanded(true)}
+            onToggleExtra={() => setAwayExpanded((open) => !open)}
           />
-          {saving ? (
-            <p className={`${T.caption} font-semibold ${TX.muted}`}>Filing…</p>
-          ) : null}
-          {error ? (
-            <p className={`${T.caption} font-semibold text-danger`}>{error}</p>
+          {saving ? <StatusLine tone="muted">Filing…</StatusLine> : null}
+          {errorLine}
+          {view.kind === "filed" ? (
+            // The way back out of Change: before this, the only exits were
+            // re-entering a whole pick or reloading the page.
+            <button
+              type="button"
+              disabled={saving}
+              className={quietButton}
+              onClick={() => {
+                resetEntry();
+                setError(null);
+                setEditingFiled(false);
+              }}
+            >
+              Keep {view.ownHomeScore}–{view.ownAwayScore}
+            </button>
           ) : null}
         </CardShellBody>
-      ) : state.kind === "filed" ? (
-        <ChangeButton
-          onClick={() => {
-            // Blank, not seeded from the existing pick -- see the `scores`
-            // comment above for why: the header keeps the old pick visible
-            // as a reference, and re-entry is a fresh two-tap flow.
-            setHomeSelected(null);
-            setAwaySelected(null);
-            setEditingFiled(true);
-          }}
-        />
-      ) : state.kind === "finished" ? (
+      ) : view.kind === "filed" ? (
+        // Filed (pre-lock) keeps a slim Change control on the shell's white
+        // body. h-11 matches the scoring disclosure's own row height, so a
+        // filed card and a finished card have bodies of the same depth.
+        <CardShellBody className="gap-2 py-2">
+          {errorLine}
+          <button
+            ref={changeButtonRef}
+            type="button"
+            className={quietButton}
+            onClick={() => {
+              // Blank, not seeded from the existing pick -- see `scores`.
+              resetEntry();
+              setError(null);
+              setJustFiled(null);
+              setEditingFiled(true);
+            }}
+          >
+            Change
+          </button>
+        </CardShellBody>
+      ) : noPick ? (
+        <CardShellBody className="gap-1 py-3">
+          {errorLine}
+          <StatusLine tone="muted">
+            No pick this time, so no points from this one.
+          </StatusLine>
+        </CardShellBody>
+      ) : view.kind === "finished" ? (
         <FinishedFooter
-          ownHomeScore={state.ownHomeScore}
-          ownAwayScore={state.ownAwayScore}
-          homeScore={state.homeScore}
-          awayScore={state.awayScore}
-          points={state.points}
+          ownHomeScore={view.ownHomeScore}
+          ownAwayScore={view.ownAwayScore}
+          homeScore={view.homeScore}
+          awayScore={view.awayScore}
+          points={view.points}
         />
+      ) : errorLine ? (
+        <CardShellBody className="py-3">{errorLine}</CardShellBody>
       ) : null}
     </CardShell>
   );

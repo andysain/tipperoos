@@ -37,6 +37,14 @@ export function MoreMenuItems({
   async function handleSwitchPlayer() {
     if (pending) return;
     setPending(true);
+    // The Predict the Table "New" nudge is device storage, not session
+    // state: set at one player's signup, it survived the switch and showed
+    // the next player someone else's badge -- and their tap cleared it.
+    try {
+      window.localStorage.removeItem("tipperoos.needsTablePrediction");
+    } catch {
+      // Storage can be unavailable (private mode); nothing to clear then.
+    }
     try {
       await fetch("/api/auth/logout", {
         method: "POST",

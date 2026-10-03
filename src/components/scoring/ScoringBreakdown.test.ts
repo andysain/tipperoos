@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getMatchBreakdown } from "./match-breakdown";
+import { formatPointsBadge } from "./ScoringBreakdown";
 
 describe("getMatchBreakdown", () => {
   it("shows every matching scoring term", () => {
@@ -30,5 +31,15 @@ describe("getMatchBreakdown", () => {
 
     expect(result.rows).toEqual([]);
     expect(result.total).toBe(0);
+  });
+});
+
+describe("formatPointsBadge", () => {
+  it("signs a positive score", () => {
+    expect(formatPointsBadge(4)).toBe("+4 pts");
+  });
+
+  it("never renders +0", () => {
+    expect(formatPointsBadge(0)).toBe("0 pts");
   });
 });

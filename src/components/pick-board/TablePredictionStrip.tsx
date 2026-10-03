@@ -130,7 +130,7 @@ export function TablePredictionStrip({
         <div className="flex items-center gap-2 rounded-btn-sm bg-warning/10 px-3 py-2">
           <TriangleAlert className="size-4 shrink-0 text-warning" aria-hidden />
           <p className={`${T.caption} font-semibold ${TX.muted}`}>
-            Some of your Bands aren&apos;t quite right yet -- check your table.
+            Some of your Bands aren&apos;t the right size yet. Check your table.
           </p>
         </div>
       ) : null}

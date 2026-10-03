@@ -50,10 +50,7 @@ export function TabBar({ isAdmin = false }: { isAdmin?: boolean }) {
         // with the tab bar's DOM subtree or layout. It is not part of the
         // bar in any structural sense, only visually placed near it.
         <div className="fixed right-3 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30">
-          <MoreMenuItems
-            isAdmin={isAdmin}
-            onClose={() => setMoreOpen(false)}
-          />
+          <MoreMenuItems isAdmin={isAdmin} onClose={() => setMoreOpen(false)} />
         </div>
       ) : null}
       <nav
@@ -64,9 +61,12 @@ export function TabBar({ isAdmin = false }: { isAdmin?: boolean }) {
           {TABS.map((tab) => {
             const active = pathname === tab.href;
             const Icon = tab.icon;
+            // Active label in ink, not accent: accent text at 0.7rem on
+            // paper measured ~2:1. The accent moves to a bar above the
+            // tab, where it marks the state without carrying the words.
             const toneClass = active
-              ? "text-accent stroke-accent"
-              : `${TX.muted} stroke-ink/60`;
+              ? `${TX.base} stroke-text`
+              : `${TX.muted} stroke-text-muted`;
             return (
               <li key={tab.href} className="flex-1">
                 <Link
@@ -112,6 +112,12 @@ export function TabBar({ isAdmin = false }: { isAdmin?: boolean }) {
                       New
                     </span>
                   ) : null}
+                  {active ? (
+                    <span
+                      aria-hidden
+                      className="absolute inset-x-6 top-0 h-[3px] rounded-b-full bg-accent"
+                    />
+                  ) : null}
                   <Icon className={`size-6 ${toneClass}`} />
                   <span>{tab.label}</span>
                 </Link>
@@ -126,12 +132,12 @@ export function TabBar({ isAdmin = false }: { isAdmin?: boolean }) {
               onClick={() => setMoreOpen((open) => !open)}
               className={`relative flex h-full w-full flex-col items-center justify-center gap-0.5 ${T.label} font-bold ${
                 moreOpen
-                  ? "text-accent stroke-accent"
-                  : `${TX.muted} stroke-ink/60`
+                  ? `${TX.base} stroke-text`
+                  : `${TX.muted} stroke-text-muted`
               } ${FOCUS}`}
             >
               <MoreHorizontal
-                className={`size-6 ${moreOpen ? "stroke-accent" : "stroke-ink/60"}`}
+                className={`size-6 ${moreOpen ? "stroke-text" : "stroke-text-muted"}`}
               />
               <span>More</span>
             </button>
