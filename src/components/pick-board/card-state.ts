@@ -28,11 +28,12 @@ export function resolveCardStateAt(
   return state;
 }
 
-/** True when a locked card has no pick behind it -- the "no pick, no
- *  points" moment, which must never read as "Locked in". */
+/** True when a locked or live card has no pick behind it -- the "no pick,
+ *  no points" moment, which must never read as "Locked in" or "Playing
+ *  now". */
 export function isLockedWithoutPick(state: TippedMatchCardState): boolean {
   return (
-    state.kind === "locked" &&
+    (state.kind === "locked" || state.kind === "live") &&
     (state.ownHomeScore === null || state.ownAwayScore === null)
   );
 }

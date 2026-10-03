@@ -39,7 +39,7 @@ describe("resolveCardStateAt", () => {
 });
 
 describe("isLockedWithoutPick", () => {
-  it("is true only for a locked card with no pick", () => {
+  it("is true for a locked card with no pick", () => {
     expect(
       isLockedWithoutPick({
         kind: "locked",
@@ -51,5 +51,26 @@ describe("isLockedWithoutPick", () => {
       isLockedWithoutPick({ kind: "locked", ownHomeScore: 0, ownAwayScore: 0 }),
     ).toBe(false);
     expect(isLockedWithoutPick({ kind: "entry" })).toBe(false);
+  });
+
+  it("is also true for a live match with no pick", () => {
+    expect(
+      isLockedWithoutPick({
+        kind: "live",
+        homeScore: 1,
+        awayScore: 0,
+        ownHomeScore: null,
+        ownAwayScore: null,
+      }),
+    ).toBe(true);
+    expect(
+      isLockedWithoutPick({
+        kind: "live",
+        homeScore: 1,
+        awayScore: 0,
+        ownHomeScore: 1,
+        ownAwayScore: 0,
+      }),
+    ).toBe(false);
   });
 });
