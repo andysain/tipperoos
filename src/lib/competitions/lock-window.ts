@@ -1,7 +1,7 @@
-// The one definition of the pick lock window, importable from client code.
-// scope.ts is `server-only`, so client components (the Pick Board's live
-// countdown, its client-side lock flip) used to carry their own copy of
-// this constant -- two copies of a rule that has to agree to the minute.
+// The lock window, importable from client code. scope.ts is `server-only`,
+// so client components (the Pick Board's live countdown, its client-side
+// lock flip) can't use its isMatchLocked. scope.ts keeps its own server
+// copy; lock-window.test.ts pins the two to the same boundary.
 
 /** Picks lock 5 minutes before kickoff (CLAUDE.md -> Predictions). */
 export const LOCK_WINDOW_MS = 5 * 60 * 1000;
