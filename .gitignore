@@ -38,3 +38,9 @@ supabase/.temp
 # project-local, not for version control
 backups/
 .env*
+
+# Impeccable live-mode session state (per-machine, regenerated each session)
+.impeccable/live/sessions/
+.impeccable/live/annotations/
+.impeccable/live/roots.json
+.impeccable/live/inject-journal.json
