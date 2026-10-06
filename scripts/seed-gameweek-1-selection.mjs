@@ -162,13 +162,7 @@ async function main() {
   });
   console.log(`Rank source: ${rankSource}.`);
 
-  // Gameweek 1 has no previous gameweek, so nothing is excluded from the
-  // Match 1 pool.
-  const match1 = selectTopMatchup({
-    fixtures,
-    positions,
-    previousMatch1TeamIds: [],
-  });
+  const match1 = selectTopMatchup({ fixtures, positions });
   if (!match1) {
     throw new Error("selectTopMatchup returned no fixture.");
   }

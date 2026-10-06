@@ -14,12 +14,6 @@ function resolvedPosition(positionByTeamId, teamId) {
   return position ?? PROMOTED_CLUB_SENTINEL_POSITION;
 }
 
-function involvesExcludedClub(fixture, excludedTeamIds) {
-  return (
-    excludedTeamIds.has(fixture.teamAId) || excludedTeamIds.has(fixture.teamBId)
-  );
-}
-
 function rankCandidate(fixture, positionByTeamId) {
   const teamAPosition = resolvedPosition(positionByTeamId, fixture.teamAId);
   const teamBPosition = resolvedPosition(positionByTeamId, fixture.teamBId);
@@ -58,13 +52,7 @@ export function selectTopMatchup(params) {
   const positionByTeamId = new Map(
     params.positions.map((p) => [p.teamId, p.position]),
   );
-  const excludedTeamIds = new Set(params.previousMatch1TeamIds);
-
-  const excludedPool = params.fixtures.filter(
-    (f) => !involvesExcludedClub(f, excludedTeamIds),
-  );
-
-  const pool = excludedPool.length > 0 ? excludedPool : params.fixtures;
+  const pool = params.fixtures;
 
   if (pool.length === 0) return null;
 

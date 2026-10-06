@@ -16,9 +16,9 @@ is unchanged.
 one with the lowest average league position across its two clubs. Ties break
 to the matchup containing the single highest-ranked club, then by a
 deterministic final tiebreak (earliest kickoff, then `provider_match_id`) so
-the rule never depends on arbitrary row order. Any club that appeared in the
+the rule never depends on arbitrary row order. ~~Any club that appeared in the
 previous Gameweek's Match 1 is excluded from the pool, so no club can be the
-marquee two Gameweeks running.
+marquee two Gameweeks running.~~ _Removed 2026-10-07 — see "Amendment" below._
 
 **Rank source, by phase.** Positions come from last season's final table
 (`teams.previous_season_position`, already seeded) until every club has played
@@ -37,8 +37,7 @@ without engineering it. Within a single Gameweek every club plays exactly
 once, so the two slots can never share a club and no rule is needed for that.
 
 **When selection runs.** As soon as the previous Gameweek's Tipped Matches are
-complete — the earliest moment the anti-repetition rule can be evaluated,
-giving players roughly four to five days' notice. It runs on the existing
+complete, giving players roughly four to five days' notice. It runs on the existing
 fixture-sync cadence; no new infrastructure. Gameweek 1 has no previous
 Gameweek, so its two slots are chosen once by a seed script alongside fixture
 seeding, both computable from last season's table with no live data.
@@ -116,3 +115,13 @@ the "random" slot not actually random.
   moot while nothing is player-controlled.
 - Whether the selection rule should switch to live standings from Gameweek 1
   so that it always agrees with what the card displays. Cosmetic; left open.
+
+## Amendment (2026-10-07): repeat-club exclusion removed
+
+The rule excluding the previous Gameweek's Match 1 clubs is gone; Match 1 is
+now simply the best-ranked matchup of the Gameweek. In practice the exclusion
+kept bumping the genuinely biggest fixture out of the headline slot — a top
+club headlining one week disqualified its marquee fixture the next (Man City v
+Liverpool in Gameweek 6 had to be swapped in by hand). The variety it bought
+wasn't worth losing the fixtures the slot exists to surface. Accepted cost:
+the same top clubs can now headline several weeks running.
