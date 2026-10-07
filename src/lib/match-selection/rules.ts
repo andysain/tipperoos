@@ -25,9 +25,6 @@ export const PROMOTED_CLUB_SENTINEL_POSITION = 21;
 export interface SelectTopMatchupParams {
   fixtures: readonly SelectionFixture[];
   positions: readonly ClubPosition[];
-  // Team ids that appeared in the previous gameweek's Match 1 -- excluded so
-  // no club is the marquee two gameweeks running.
-  previousMatch1TeamIds: readonly string[];
 }
 
 function resolvedPosition(
@@ -36,15 +33,6 @@ function resolvedPosition(
 ): number {
   const position = positionByTeamId.get(teamId);
   return position ?? PROMOTED_CLUB_SENTINEL_POSITION;
-}
-
-function involvesExcludedClub(
-  fixture: SelectionFixture,
-  excludedTeamIds: ReadonlySet<string>,
-): boolean {
-  return (
-    excludedTeamIds.has(fixture.teamAId) || excludedTeamIds.has(fixture.teamBId)
-  );
 }
 
 interface RankedCandidate {
@@ -81,16 +69,7 @@ export function selectTopMatchup(
   const positionByTeamId = new Map(
     params.positions.map((p) => [p.teamId, p.position] as const),
   );
-  const excludedTeamIds = new Set(params.previousMatch1TeamIds);
-
-  const excludedPool = params.fixtures.filter(
-    (f) => !involvesExcludedClub(f, excludedTeamIds),
-  );
-
-  // Degenerate case: excluding the previous gameweek's clubs would empty the
-  // pool (only possible for a gameweek reduced to one or two fixtures) --
-  // fall back to the unexcluded pool rather than returning nothing.
-  const pool = excludedPool.length > 0 ? excludedPool : params.fixtures;
+  const pool = params.fixtures;
 
   if (pool.length === 0) return null;
 
@@ -144,9 +123,7 @@ export interface SelectMatch2Params {
  * Chooses the Match 2 fixture: a uniform random draw over the gameweek's
  * fixtures, excluding Match 1 and anything already kicked off. Returns null
  * (a Skipped Slot, per docs/adr/0001-skip-slot-on-pre-lock-postponement.md)
- * when the pool is empty rather than falling back to an excluded fixture --
- * unlike selectTopMatchup, there is no degenerate case here that warrants
- * papering over an empty pool.
+ * when the pool is empty rather than falling back to an excluded fixture.
  */
 export function selectMatch2(
   params: SelectMatch2Params,

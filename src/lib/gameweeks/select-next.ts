@@ -185,13 +185,6 @@ async function selectForCompetition(
     providerMatchId: m.provider_match_id,
   }));
 
-  const previousMatch1Team = latest.match_1_id
-    ? slotMatchById.get(latest.match_1_id)
-    : undefined;
-  const previousMatch1TeamIds = previousMatch1Team
-    ? [previousMatch1Team.team_a_id, previousMatch1Team.team_b_id]
-    : [];
-
   const rankContext = await getRankSourceContext(
     supabase,
     latest.season_id,
@@ -202,11 +195,7 @@ async function selectForCompetition(
   const teamIds = dedupe(fixtures.flatMap((f) => [f.teamAId, f.teamBId]));
   const positions = buildPositions(teamIds, rankContext, teamsById);
 
-  const match1 = selectTopMatchup({
-    fixtures,
-    positions,
-    previousMatch1TeamIds,
-  });
+  const match1 = selectTopMatchup({ fixtures, positions });
   // Unreachable given the non-empty fixtures guard above (selectTopMatchup
   // only returns null on an empty pool), kept for defensive symmetry with D8.
   if (!match1) return false;

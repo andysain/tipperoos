@@ -129,16 +129,7 @@ describe("selectTopMatchup / selectMatch2 / chooseRankSource parity", () => {
   ];
 
   it("selectTopMatchup agrees", () => {
-    const params = { fixtures, positions, previousMatch1TeamIds: [] };
-    expect(selectTopMatchupJs(params)?.id).toBe(selectTopMatchupTs(params)?.id);
-  });
-
-  it("selectTopMatchup agrees with a club excluded", () => {
-    const params = {
-      fixtures,
-      positions,
-      previousMatch1TeamIds: ["arsenal"],
-    };
+    const params = { fixtures, positions };
     expect(selectTopMatchupJs(params)?.id).toBe(selectTopMatchupTs(params)?.id);
   });
 

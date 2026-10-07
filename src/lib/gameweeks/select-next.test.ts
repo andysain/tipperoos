@@ -277,11 +277,11 @@ describe("selectNextGameweekSlots", () => {
     expect(tables.gameweeks.length).toBe(1);
   });
 
-  it("excludes the previous gameweek's Match 1 clubs from the new Match 1 pool", async () => {
-    // m1 (previous Match 1) is team-m1-a/team-m1-b. Gameweek 2's pool has
-    // m3 (better average position, but shares no team with m1 here) and a
-    // fixture reusing team-m1-a, which must be excluded even though it
-    // would otherwise rank best.
+  it("lets a club from the previous gameweek's Match 1 headline again", async () => {
+    // m1 (previous Match 1) is team-m1-a/team-m1-b. Gameweek 2's best-ranked
+    // fixture, m3, reuses team-m1-a -- it must still win on position, since
+    // repeat clubs are no longer excluded (otherwise the season's biggest
+    // matchups get skipped whenever a top club headlined the week before).
     const { client, tables } = fakeSupabase({
       competitions: [COMPETITION],
       gameweeks: [gameweek({ number: 1, match_1_id: "m1", match_2_id: "m2" })],
@@ -305,9 +305,7 @@ describe("selectNextGameweekSlots", () => {
     await selectNextGameweekSlots(client, { random: () => 0 });
 
     const gw2 = tables.gameweeks.find((g) => g.number === 2);
-    // m3 would otherwise win on position (team-m1-a is position 3, team-fresh
-    // is position 2 -> average 2.5, beating m4's 5/15 average 10), but its
-    // club appeared in the previous Match 1 -- m4 must be chosen instead.
-    expect(gw2?.match_1_id).toBe("m4");
+    // m3 averages 2.5 (positions 3 and 2) against m4's 10 (5 and 15).
+    expect(gw2?.match_1_id).toBe("m3");
   });
 });

@@ -54,7 +54,6 @@ describe("selectTopMatchup", () => {
     const result = selectTopMatchup({
       fixtures,
       positions,
-      previousMatch1TeamIds: [],
     });
 
     expect(fixtures.length).toBe(2);
@@ -79,7 +78,6 @@ describe("selectTopMatchup", () => {
     const result = selectTopMatchup({
       fixtures,
       positions,
-      previousMatch1TeamIds: [],
     });
 
     expect(positions[0].position).toBe(1);
@@ -104,7 +102,6 @@ describe("selectTopMatchup", () => {
     const result = selectTopMatchup({
       fixtures,
       positions,
-      previousMatch1TeamIds: [],
     });
 
     expect(fixtures.length).toBe(2);
@@ -128,7 +125,6 @@ describe("selectTopMatchup", () => {
     const result = selectTopMatchup({
       fixtures,
       positions,
-      previousMatch1TeamIds: [],
     });
 
     expect(result?.id).toBe("m1");
@@ -150,56 +146,16 @@ describe("selectTopMatchup", () => {
     const result = selectTopMatchup({
       fixtures,
       positions,
-      previousMatch1TeamIds: [],
     });
 
     expect(result?.id).toBe("m2");
     expect(PROMOTED_CLUB_SENTINEL_POSITION).toBe(21);
   });
 
-  it("excludes any club that appeared in the previous gameweek's Match 1", () => {
-    const fixtures = [
-      // arsenal+villa is the best matchup on paper but arsenal played last week's Match 1
-      fixture("m1", "arsenal", "villa", "2026-08-15T14:00:00Z", "100"),
-      fixture("m2", "city", "fulham", "2026-08-15T14:00:00Z", "101"),
-    ];
-    const positions = [
-      pos("arsenal", 1),
-      pos("villa", 2),
-      pos("city", 3),
-      pos("fulham", 4),
-    ];
-
-    const result = selectTopMatchup({
-      fixtures,
-      positions,
-      previousMatch1TeamIds: ["arsenal"],
-    });
-
-    expect(result?.id).toBe("m2");
-  });
-
-  it("falls back to the unexcluded pool when exclusion would empty it (degenerate case)", () => {
-    const fixtures = [
-      fixture("m1", "arsenal", "villa", "2026-08-15T14:00:00Z", "100"),
-    ];
-    const positions = [pos("arsenal", 1), pos("villa", 2)];
-
-    const result = selectTopMatchup({
-      fixtures,
-      positions,
-      previousMatch1TeamIds: ["arsenal", "villa"],
-    });
-
-    expect(fixtures.length).toBe(1);
-    expect(result?.id).toBe("m1");
-  });
-
   it("returns null when there are no fixtures to choose from", () => {
     const result = selectTopMatchup({
       fixtures: [],
       positions: [],
-      previousMatch1TeamIds: [],
     });
 
     expect(result).toBe(null);
@@ -223,12 +179,10 @@ describe("selectTopMatchup", () => {
     const forward = selectTopMatchup({
       fixtures,
       positions,
-      previousMatch1TeamIds: [],
     });
     const reversed = selectTopMatchup({
       fixtures: [...fixtures].reverse(),
       positions,
-      previousMatch1TeamIds: [],
     });
 
     expect(forward?.id).toBe(reversed?.id);
