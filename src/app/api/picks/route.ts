@@ -133,7 +133,9 @@ export async function POST(request: Request) {
   }
   if (isMatchLocked(new Date(matchResult.data.kickoff_time), new Date())) {
     return NextResponse.json(
-      { error: "Picks lock 5 minutes before kickoff." },
+      // `code` lets the Pick Board tell "too late" apart from the CSRF
+      // 403 above without matching on prose.
+      { error: "Picks lock 5 minutes before kickoff.", code: "locked" },
       { status: 403 },
     );
   }

@@ -1,5 +1,10 @@
 # Tipperoos — Design System
 
+> **The visual source of truth is now [`DESIGN.md`](../DESIGN.md)** at the repo root (tokens plus rules,
+> readable by design tooling). This file stays as the **decision history**: why each rule exists, the dated
+> amendments, and the measurements behind them. When the two disagree, `DESIGN.md` wins for the rule itself;
+> record the reasoning for any change here, as an amendment.
+
 Read `docs/FRONTEND_BRIEFING.md` first for product-level UI context (screens, constraints, domain vocabulary).
 This doc is the visual/interaction spec that briefing points to — the actual palette, type scale, and component
 conventions, decided (not left to whoever builds the first screen to improvise).
