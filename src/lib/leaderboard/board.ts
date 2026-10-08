@@ -20,7 +20,7 @@
 //        not picking raise your average).
 
 import { rankScores } from "./rank";
-import type { PlayerStreak } from "./streaks";
+import type { PlayerStreak, Streak } from "./streaks";
 
 export interface LeaderboardScoreInput {
   playerId: string;
@@ -62,7 +62,7 @@ export interface LeaderboardRow {
   correctResults: number;
   matchesScored: number;
   /** Right-result streak (issue #217); null for a bot, which has none. */
-  streak: { current: number; best: number } | null;
+  streak: Streak | null;
   isViewer: boolean;
 }
 
@@ -163,14 +163,13 @@ export function buildLeaderboard({
         exactTips: row.exactTips,
         correctResults: row.correctResults,
         matchesScored: row.matchesScored,
-        streak: row.isBot ? null : streakOrNull(streakById.get(row.playerId)),
+        streak: row.isBot ? null : toStreak(streakById.get(row.playerId)),
         isViewer: row.playerId === viewerId,
       };
     });
 }
 
-function streakOrNull(
-  streak: PlayerStreak | undefined,
-): LeaderboardRow["streak"] {
+/** Drops `playerId` for the row's view shape. */
+function toStreak(streak: PlayerStreak | undefined): Streak | null {
   return streak ? { current: streak.current, best: streak.best } : null;
 }

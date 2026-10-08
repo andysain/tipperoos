@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { Route } from "next";
 import type { LeaderboardRow } from "@/lib/leaderboard/board";
-import { earnsStreakBadge } from "@/lib/leaderboard/streaks";
+import { earnsStreakBadge, type Streak } from "@/lib/leaderboard/streaks";
 import {
   LeaderboardRowCard,
   type LeaderboardCardRow,
@@ -67,13 +67,7 @@ function toCardRow(row: LeaderboardRow): LeaderboardCardRow {
 
 /** "7 · best 9"; "7 · best" when this run IS the season best; "0" before
  *  any run at all. */
-function formatStreak({
-  current,
-  best,
-}: {
-  current: number;
-  best: number;
-}): string {
+function formatStreak({ current, best }: Streak): string {
   if (best === 0) return "0";
   return current === best ? `${current} · best` : `${current} · best ${best}`;
 }

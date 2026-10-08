@@ -10,6 +10,8 @@ import {
 import {
   chunkForRowCap,
   computeStreaks,
+  countsTowardStreak,
+  SUPABASE_MAX_ROWS,
   type StreakMatch,
   type StreakPick,
 } from "@/lib/leaderboard/streaks";
@@ -231,7 +233,7 @@ export async function loadStreakPicks(
   return results.flatMap(({ data, error }) => {
     if (error) throw error;
     const rows = data ?? [];
-    if (rows.length >= 1000) {
+    if (rows.length >= SUPABASE_MAX_ROWS) {
       throw new Error(
         `loadStreakPicks: a chunk returned ${rows.length} rows, at Supabase's max_rows cap -- picks would be silently truncated`,
       );
@@ -291,7 +293,7 @@ export async function loadLeaderboard(
     lastScoredNumber !== null ? lastScoredNumber - 1 : null;
 
   const finishedMatchIds = tippedMatches
-    .filter((match) => match.result !== null && !match.voided)
+    .filter(countsTowardStreak)
     .map((match) => match.id);
   const humanCount = scores.filter((row) => !row.isBot).length;
 
@@ -315,7 +317,11 @@ export async function loadLeaderboard(
       streaks: computeStreaks({
         matches: tippedMatches,
         picks: streakPicks,
-        players: scores.map((row) => ({ id: row.playerId, isBot: row.isBot })),
+        players: scores.map((row) => ({
+          id: row.playerId,
+          isBot: row.isBot,
+          joinedAt: row.joinedAt,
+        })),
       }),
       viewerId,
     }),

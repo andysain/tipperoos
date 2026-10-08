@@ -13,9 +13,11 @@ import { scoreMatch } from "@/lib/scoring/match";
  * The caller decides the match set -- the leaderboard passes every tipped
  * match with a final result; #218 passes only gameweeks <= N (or N-1).
  *
- * A Late Joiner needs no special case: they have no picks before joining,
- * and a no-pick ahead of a player's first pick can only "break" a streak
- * that is already 0.
+ * A Late Joiner's sequence starts at the first match kicking off at or
+ * after their joined_at (#217 D6) -- inclusive at kickoff, the same
+ * comparison `countGameweeksPlayed` makes per gameweek. The app can't write
+ * a pick before joined_at, but the schema doesn't forbid one, so the
+ * boundary is applied rather than assumed.
  */
 
 export interface StreakMatch {
@@ -38,21 +40,30 @@ export interface StreakPick {
 export interface StreakPlayer {
   id: string;
   isBot: boolean;
+  joinedAt: string;
 }
 
-export interface PlayerStreak {
-  playerId: string;
+/** A run of right results: the one in progress, and the season's longest. */
+export interface Streak {
   current: number;
   best: number;
+}
+
+export interface PlayerStreak extends Streak {
+  playerId: string;
+}
+
+/** Whether a match is in the streak sequence at all: not voided, and its
+ *  final score has landed. Anything else neither extends nor breaks. */
+export function countsTowardStreak(match: StreakMatch): boolean {
+  return !match.voided && match.result !== null;
 }
 
 /** The leaderboard shows the 🔥 badge from this many in a row. */
 export const STREAK_BADGE_MIN = 5;
 
 /** Whether a streak earns the leaderboard's 🔥 badge. A bot has none. */
-export function earnsStreakBadge(
-  streak: { current: number } | null,
-): streak is { current: number } {
+export function earnsStreakBadge(streak: Streak | null): streak is Streak {
   return streak !== null && streak.current >= STREAK_BADGE_MIN;
 }
 
@@ -83,10 +94,18 @@ export function computeStreaks({
   players: readonly StreakPlayer[];
 }): PlayerStreak[] {
   const counted = matches
-    .filter((match) => !match.voided)
+    .filter(countsTowardStreak)
     .sort(compareMatches)
     .flatMap((match) =>
-      match.result === null ? [] : [{ id: match.id, result: match.result }],
+      match.result === null
+        ? []
+        : [
+            {
+              id: match.id,
+              kickoff: new Date(match.kickoffUtcIso).getTime(),
+              result: match.result,
+            },
+          ],
     );
   const pickByKey = new Map(
     picks.map((p) => [`${p.playerId}:${p.matchId}`, p]),
@@ -95,9 +114,11 @@ export function computeStreaks({
   return players
     .filter((player) => !player.isBot)
     .map((player) => {
+      const joinedAt = new Date(player.joinedAt).getTime();
       let current = 0;
       let best = 0;
       for (const match of counted) {
+        if (match.kickoff < joinedAt) continue;
         const pick = pickByKey.get(`${player.id}:${match.id}`);
         const { home, away } = match.result;
         const right =
@@ -111,8 +132,12 @@ export function computeStreaks({
     });
 }
 
-/** Rows per read under Supabase's `max_rows = 1000` (supabase/config.toml),
- *  with headroom -- that cap truncates silently, the #182 class of bug. */
+/** Supabase's `max_rows` (supabase/config.toml). A read past it truncates
+ *  silently -- the #182 class of bug -- so a read that comes back AT it
+ *  must be treated as possibly truncated. */
+export const SUPABASE_MAX_ROWS = 1000;
+
+/** Rows per chunked read: the cap with headroom. */
 const ROW_BUDGET = 900;
 
 /**
