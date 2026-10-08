@@ -38,6 +38,9 @@ export interface LeaderboardCardRow {
   pointsSuffix: string | null;
   /** Season board mutes a Bot's own points figure; Table board never does. */
   mutePoints: boolean;
+  /** Current right-result streak when it earns the 🔥 badge, else null
+   *  (issue #217). Never set for a bot or on the Table board. */
+  streakBadge: number | null;
   panelStats: readonly { value: string; label: string }[];
   panelLink: { href: Route; label: string } | null;
 }
@@ -196,6 +199,21 @@ export function LeaderboardRowCard({
               You
             </span>
           ) : null}
+          {scored && row.streakBadge !== null ? (
+            // A bare award mark, no pill (#217's design): it sits inside the
+            // row's button, so it is never its own tap target (ADR 0012
+            // D11), and the name is what truncates -- this always stays
+            // whole. The emoji is an award, not chrome (DESIGN_SYSTEM.md ->
+            // Icons), so it is hidden and its meaning is spoken instead.
+            <span
+              className={`shrink-0 ${T.dense} font-extrabold tabular-nums text-text`}
+            >
+              <span aria-hidden>🔥{row.streakBadge}</span>
+              <span className="sr-only">
+                , on a streak of {row.streakBadge} right results
+              </span>
+            </span>
+          ) : null}
         </span>
 
         {scored ? (
@@ -243,7 +261,16 @@ export function LeaderboardRowCard({
           id={panelId}
           className={`flex flex-col gap-2 border-t border-paper-line ${INSET} py-2.5`}
         >
-          <div className="flex gap-1.5">
+          {/* Four cells don't fit one row at 375px -- three already fill it --
+              so a four-stat panel (a human on the Season board, #217) goes
+              2x2 on phones and four across from md:. Three stays one row. */}
+          <div
+            className={
+              row.panelStats.length > 3
+                ? "grid grid-cols-2 gap-1.5 md:grid-cols-4"
+                : "flex gap-1.5"
+            }
+          >
             {row.panelStats.map((stat) => (
               <Stat key={stat.label} value={stat.value} label={stat.label} />
             ))}
