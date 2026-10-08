@@ -59,7 +59,7 @@ A tiny, curated weekly surface for one family-and-friends group, not a sports pl
 - The name is **Tipperoos**.
 - **Voice:** kid-friendly, warm, never scolding. Playful, not childish. Copy tone rules live in `docs/DESIGN_SYSTEM.md`. The admin area is the exception: plain, adult language, where every destructive action asks for confirmation and states its consequence in the second person. The no-gambling-words rule still applies there.
 - **No Premier League branding and no club crests** (trademark caution). Clubs are identified by name, 3-letter code and kit colours.
-- **Emoji are the personalization layer only:** the player's emoji, chosen from a curated library, and 🤖 for bots. Functional icons are lucide.
+- **Emoji are for personalization and awards only:** the player's emoji (chosen from a curated library), 🤖 for bots, and award marks for something a player achieved (e.g. the 🔥 streak badge). Functional icons are lucide.
 - The visual system ("The Matchday Program") lives in `DESIGN.md`, which is the visual authority. `docs/DESIGN_SYSTEM.md` keeps the decision history behind it.
 
 ## Evidence on Hand

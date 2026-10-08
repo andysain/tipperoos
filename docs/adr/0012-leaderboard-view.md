@@ -88,6 +88,8 @@ A new pure `src/lib/leaderboard/` module composes roster + score rows + previous
 
 Serial Supabase depth on the route is **3**: `seasonId` → current gameweek number → one parallel wave of (scoped scores, previous-gameweek snapshot, scored-gameweek kickoff list). The first two are genuinely sequential — the gameweek resolver takes `seasonId` as an argument — and match the Pick Board route's existing shape (`docs/standards/PERFORMANCE_TESTING_STANDARD.md` §4.1).
 
+**Corrected 2026-10-08 (issue #217).** The shape above was never what shipped, and "3" undercounted. Counted in real round trips, `loadLeaderboard` is **5** deep: wave 1 is max(`scoresForCompetition` 2, `loadScoredGameweeks` 3, `loadTippedMatches` 2) = 3, then wave 2 is max(`loadPreviousSeasonTotals` 2, the streak picks read 1) = 2. The page adds the active-player and current-season reads ahead of it. #217's streak reads sit inside the existing waves and added no depth.
+
 ### D10 — Exact tips and correct results are shown, and cost nothing to derive
 
 Each row also carries **exact tips** and **correct results**. Neither needs a schema change, a new column or a new query, because the additive formula's reachable score set is `{0, 1, 3, 4, 5, 7}` (`docs/adr/0009`):
@@ -102,6 +104,8 @@ Correct results renders **against matches scored** (`12/16`), not as a bare coun
 **Amended 2026-08-16**: these two are the first stats in the panel, not the last. D11's tap-to-open placement was chosen specifically so the panel can take further stats later without the closed list paying for them in height — that extensibility is now a stated requirement of the design, not an accident of it.
 
 The bound that still holds: the panel is a **player's record against their own picks** (counts and averages derived from the `scores` ledger), never a trend, chart, streak or head-to-head. Those are the analytics pages `CLAUDE.md` puts explicitly out of scope, and the per-match detail behind any of it is `/gameweek/[n]`'s job. A stat that can't be computed by folding the score rows this route already reads is the signal that the line has been crossed.
+
+**Amended 2026-10-08 (issue #217): one streak, and only one.** The panel carries a correct-result **streak** (current and season best), and the closed row carries a 🔥 badge from 5 in a row. This is a deliberate, narrow exception to "never a streak": a single derived number about a player's own picks, not a trend line, a chart, a head-to-head or a streaks page, all of which stay out. It is also the one panel stat not folded from the score rows. It derives from picks plus live results through the scoring engine's breakdown (`src/lib/leaderboard/streaks.ts`), so that it updates per match and can't be moved by a future points multiplier. See #217 for the decision log.
 
 ### D11 — The row is a matchday-program card, not a table row
 

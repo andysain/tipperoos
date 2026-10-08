@@ -289,6 +289,13 @@ Emoji stay the personalization layer, separate from functional icons: bot (🤖)
 Never use emoji where a functional icon is needed (rendering is inconsistent across platforms for that use);
 never use a functional icon where personalization is the point.
 
+**Amended 2026-10-08: awards are a third emoji tier** (issues #217 and #218). An award mark celebrates something a
+player _achieved_: the leaderboard's 🔥 streak badge and the Gameweek wrap's 🏆 👑 🔥 🚀 🧊 😬. It is never
+chrome, never navigation, and never a state the UI depends on to work, so the platform-rendering concern above
+doesn't apply: an award that looks slightly different on Android and iOS is harmless. Awards use the same mark
+wherever they appear, so the row badge and the On Fire card visibly refer to one thing. An award mark is
+`aria-hidden`, with its meaning carried in visually hidden text.
+
 **Resolved 2026-08-16 — the circle chip wins.** A player's emoji renders inside a small circle chip
 (mini-avatar treatment), not inline beside their name. Decided by building both against a realistic 16-row
 leaderboard and comparing directly (`docs/adr/0012-leaderboard-view.md` D11): inline emoji sit at name size and

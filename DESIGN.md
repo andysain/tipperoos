@@ -152,7 +152,7 @@ Restraint is deliberate. Two brighter directions were tried and rejected: "Stick
 - One typeface (Geist) on a closed scale with a hard 0.7rem floor.
 - Flat, printed controls on 44px targets; one warm ambient shadow for raised surfaces.
 - Real kit colours only on fixtures and Predict the Table, always passed through the clash rule and contrast floor.
-- Emoji are personal (the player's own, 🤖 for bots); functional icons are lucide line icons.
+- Emoji are personal (the player's own, 🤖 for bots) or awards (🔥 and the Gameweek wrap marks); functional icons are lucide line icons.
 
 ## Colors
 
@@ -293,7 +293,7 @@ The app's centre of gravity, built on the ink-header shell.
 - **Do** render the four facts differently: no pick is the words "no pick", scored nothing is `0`, not played is blank, called off is "off" or "Called off".
 - **Do** write points as `+5` for a gain and `0`, never `+0`, for nothing.
 - **Do** keep motion to the moments that matter (saving a pick, revealing a result), start it from an already-visible state, and honour `prefers-reduced-motion`. Save the bigger celebration for the season-winner reveal.
-- **Do** use lucide icons at `stroke-2` in a text-role colour for functional UI, and keep emoji for personalisation only.
+- **Do** use lucide icons at `stroke-2` in a text-role colour for functional UI, and keep emoji for personalisation and awards only.
 
 ### Don't:
 
