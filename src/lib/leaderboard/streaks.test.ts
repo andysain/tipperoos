@@ -46,7 +46,7 @@ function pick(
 }
 
 function human(id: string) {
-  return { id, isBot: false };
+  return { id, isBot: false, joinedAt: "2026-08-01T00:00:00Z" };
 }
 
 function streakOf(result: ReturnType<typeof computeStreaks>, playerId: string) {
@@ -152,13 +152,31 @@ describe("computeStreaks", () => {
     expect(ana.current).toBe(2);
   });
 
+  it("ignores picks dated before a player joined (D6), even if the data has them", () => {
+    // The app can't write a pick before joined_at, but nothing in the
+    // schema forbids one (staging test data can). Joined at m3's kickoff:
+    // right picks on m1-m2 must not count, so the run is m3-m4 only.
+    const matches = [1, 2, 3, 4].map((n) => match(n, { home: 2, away: 2 }));
+    const picks = matches.map((m) => pick("lou", m.id, 1, 1));
+    const players = [
+      { id: "lou", isBot: false, joinedAt: "2026-09-03T15:00:00Z" },
+    ];
+
+    const lou = streakOf(computeStreaks({ matches, picks, players }), "lou");
+
+    expect(lou.current).toBe(2);
+    expect(lou.best).toBe(2);
+  });
+
   it("doesn't hold a Late Joiner's pre-join matches against them", () => {
     // Joined at m3's kickoff; m1-m2 have no picks. D6 needs no special case:
     // a no-pick before a player's first pick can only "break" a streak that
     // is already 0, so the run from m3 counts in full either way.
     const matches = [1, 2, 3, 4, 5].map((n) => match(n, { home: 0, away: 1 }));
     const picks = ["m3", "m4", "m5"].map((id) => pick("lou", id, 0, 2));
-    const players = [{ id: "lou", isBot: false }];
+    const players = [
+      { id: "lou", isBot: false, joinedAt: "2026-09-03T15:00:00Z" },
+    ];
 
     const lou = streakOf(computeStreaks({ matches, picks, players }), "lou");
 
@@ -235,7 +253,10 @@ describe("computeStreaks", () => {
       pick("ana", m.id, 1, 1),
       pick("bot-11", m.id, 1, 1),
     ]);
-    const players = [human("ana"), { id: "bot-11", isBot: true }];
+    const players = [
+      human("ana"),
+      { id: "bot-11", isBot: true, joinedAt: "2026-08-01T00:00:00Z" },
+    ];
 
     const result = computeStreaks({ matches, picks, players });
 
