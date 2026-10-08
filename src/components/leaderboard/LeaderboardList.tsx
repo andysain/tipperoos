@@ -3,7 +3,11 @@
 import { useState } from "react";
 import type { Route } from "next";
 import type { LeaderboardRow } from "@/lib/leaderboard/board";
-import { LeaderboardRowCard, type LeaderboardCardRow } from "./LeaderboardRowCard";
+import { earnsStreakBadge, type Streak } from "@/lib/leaderboard/streaks";
+import {
+  LeaderboardRowCard,
+  type LeaderboardCardRow,
+} from "./LeaderboardRowCard";
 
 /**
  * Owns which row is open.
@@ -30,6 +34,7 @@ function toCardRow(row: LeaderboardRow): LeaderboardCardRow {
         ? `${row.pointsPerGameweek.toFixed(1)}/wk`
         : null,
     mutePoints: row.isBot,
+    streakBadge: earnsStreakBadge(row.streak) ? row.streak.current : null,
     panelStats: [
       // "Exact score", not "Spot on": the app had four names for one
       // concept. "Right result" already matches MATCH_SCORING_TERMS[0], so
@@ -37,15 +42,34 @@ function toCardRow(row: LeaderboardRow): LeaderboardCardRow {
       // panel-local words. Both counts carry their denominator -- a bare
       // count reads as a second ranking, and a Late Joiner's 5 means
       // something different from an on-time player's 5 (D10).
-      { value: `${row.exactTips} of ${row.matchesScored}`, label: "Exact score" },
-      { value: `${row.correctResults} of ${row.matchesScored}`, label: "Right result" },
+      {
+        value: `${row.exactTips} of ${row.matchesScored}`,
+        label: "Exact score",
+      },
+      {
+        value: `${row.correctResults} of ${row.matchesScored}`,
+        label: "Right result",
+      },
       { value: String(row.gameweeksPlayed), label: "Weeks" },
+      // Shown at every length, not just from the badge threshold -- seeing
+      // "3 · best 6" is what makes "don't lose your 🔥" work below it.
+      // Bots have no streak and keep three cells.
+      ...(row.streak !== null
+        ? [{ value: formatStreak(row.streak), label: "Streak" }]
+        : []),
     ],
     panelLink: {
       href: `/picks/${row.playerId}` as Route,
       label: `See ${row.isViewer ? "your" : `${row.displayName}'s`} picks`,
     },
   };
+}
+
+/** "7 · best 9"; "7 · best" when this run IS the season best; "0" before
+ *  any run at all. */
+function formatStreak({ current, best }: Streak): string {
+  if (best === 0) return "0";
+  return current === best ? `${current} · best` : `${current} · best ${best}`;
 }
 
 export function LeaderboardList({

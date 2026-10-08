@@ -10,7 +10,10 @@ import {
   TABLE_BANDS,
   TOTAL_TEAMS,
 } from "@/lib/scoring/predict-table";
-import { LeaderboardRowCard, type LeaderboardCardRow } from "./LeaderboardRowCard";
+import {
+  LeaderboardRowCard,
+  type LeaderboardCardRow,
+} from "./LeaderboardRowCard";
 
 // The Predict the Table segment (issue #171, docs/adr/0012-leaderboard-view.md
 // D13): same list-open-state ownership as LeaderboardList, adapting
@@ -45,10 +48,21 @@ function toCardRow(row: TableLeaderboardRow): LeaderboardCardRow {
     pointsDisplay: `${row.totalScore}/${MAX_PREDICT_TABLE_SCORE}`,
     pointsSuffix: null,
     mutePoints: false,
+    // Streaks are a Season-segment stat (issue #217).
+    streakBadge: null,
     panelStats: [
-      { value: `${row.placementScore}/${MAX_PLACEMENT_SCORE}`, label: "Placement" },
-      { value: `${row.bandBonusScore}/${MAX_BAND_BONUS_SCORE}`, label: "Bands" },
-      { value: `${row.boldCallScore}/${MAX_BOLD_CALL_SCORE}`, label: "Bold calls" },
+      {
+        value: `${row.placementScore}/${MAX_PLACEMENT_SCORE}`,
+        label: "Placement",
+      },
+      {
+        value: `${row.bandBonusScore}/${MAX_BAND_BONUS_SCORE}`,
+        label: "Bands",
+      },
+      {
+        value: `${row.boldCallScore}/${MAX_BOLD_CALL_SCORE}`,
+        label: "Bold calls",
+      },
     ],
     // No "see their table" destination exists -- Predict the Table has no
     // peer-visibility concept anywhere in the spec (unlike match picks,

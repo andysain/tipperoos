@@ -7,6 +7,7 @@ import { LeaderboardList } from "@/components/leaderboard/LeaderboardList";
 import { TableLeaderboardList } from "@/components/leaderboard/TableLeaderboardList";
 import { LeaderboardSegmentedControl } from "@/components/leaderboard/LeaderboardSegmentedControl";
 import { T, TX } from "@/components/ui/tokens";
+import { earnsStreakBadge, STREAK_BADGE_MIN } from "@/lib/leaderboard/streaks";
 import type { LeaderboardRow } from "@/lib/leaderboard/board";
 import type { TableLeaderboardRow } from "@/lib/leaderboard/table-board";
 
@@ -71,8 +72,14 @@ function SeasonSegment({
           (it needs a standings snapshot), so mid-gameweek the board shows
           points and ranks but no "/wk" — and explaining a figure that
           isn't on screen is worse than not explaining it. */}
+      {/* The 🔥 key leads this caption rather than adding a third line,
+          and only when a badge is actually on screen (#217). "Right
+          results" is the engine's own term (MATCH_SCORING_TERMS). */}
       {scored ? (
         <p className={`${T.caption} ${TX.muted}`}>
+          {rows.some((row) => earnsStreakBadge(row.streak))
+            ? `🔥 = ${STREAK_BADGE_MIN}+ right results in a row. `
+            : ""}
           {rows.some((row) => row.pointsPerGameweek !== null)
             ? "“/wk” is your points for each gameweek since you joined. Tap a player to see how they’re doing."
             : "Tap a player to see how they’re doing."}

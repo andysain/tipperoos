@@ -7,6 +7,15 @@ import {
   type PreviousSeasonTotal,
   type ScoredGameweek,
 } from "@/lib/leaderboard/board";
+import {
+  chunkForRowCap,
+  computeStreaks,
+  countsTowardStreak,
+  SUPABASE_MAX_ROWS,
+  type StreakMatch,
+  type StreakPick,
+} from "@/lib/leaderboard/streaks";
+import { isMatchVoided } from "@/lib/matches/voided";
 
 // DB-fetching glue for the leaderboard route (issue #24) -- outside
 // src/lib/** for the same reason as pick-board-access.ts: plain scoped
@@ -125,6 +134,119 @@ export async function loadPreviousSeasonTotals(
   }));
 }
 
+/**
+ * Every Tipped Match in this competition's season, in the shape
+ * `computeStreaks` folds (issue #217). Deliberately NOT bounded to scored
+ * (snapshotted) gameweeks the way `loadScoredGameweeks` is: the streak
+ * updates as each match gets its final score, mid-gameweek included (#217
+ * D5). Two round trips: gameweeks (scoped by competition + season), then
+ * their matches by id -- a fixture is global, so the scope comes from the
+ * gameweek read.
+ */
+export async function loadTippedMatches(
+  supabase: SupabaseClient,
+  competitionId: string,
+  seasonId: string,
+): Promise<StreakMatch[]> {
+  const { data: gameweekRows, error: gameweeksError } = await supabase
+    .from("gameweeks")
+    .select("match_1_id, match_2_id, match_1_voided_at, match_2_voided_at")
+    .eq("competition_id", competitionId)
+    .eq("season_id", seasonId)
+    .order("number", { ascending: true });
+  if (gameweeksError) throw gameweeksError;
+
+  // Every slot referencing a match, for isMatchVoided. A Skipped Slot (null
+  // match id) has no match and isn't part of the sequence.
+  const slotsByMatchId = new Map<string, { voidedAt: string | null }[]>();
+  for (const gw of gameweekRows ?? []) {
+    for (const [matchId, voidedAt] of [
+      [gw.match_1_id, gw.match_1_voided_at],
+      [gw.match_2_id, gw.match_2_voided_at],
+    ] as const) {
+      if (matchId === null) continue;
+      const slots = slotsByMatchId.get(matchId) ?? [];
+      slots.push({ voidedAt });
+      slotsByMatchId.set(matchId, slots);
+    }
+  }
+  if (slotsByMatchId.size === 0) return [];
+
+  const { data: matchRows, error: matchesError } = await supabase
+    .from("matches")
+    .select(
+      "id, kickoff_time, provider_match_id, status, team_a_score, team_b_score",
+    )
+    .in("id", [...slotsByMatchId.keys()])
+    .order("kickoff_time", { ascending: true })
+    .order("id", { ascending: true });
+  if (matchesError) throw matchesError;
+
+  return (matchRows ?? []).map((row) => ({
+    id: row.id,
+    kickoffUtcIso: row.kickoff_time,
+    providerMatchId: row.provider_match_id,
+    // A final result needs `completed` AND both scores -- a completed match
+    // whose score hasn't landed is skipped, not counted as a miss (#217 L5).
+    result:
+      row.status === "completed" &&
+      row.team_a_score !== null &&
+      row.team_b_score !== null
+        ? { home: row.team_a_score, away: row.team_b_score }
+        : null,
+    voided: isMatchVoided(slotsByMatchId.get(row.id) ?? [], row.status),
+  }));
+}
+
+/**
+ * Human picks on the given matches, competition-scoped through
+ * `players!inner` -- never by match_id alone, since another competition may
+ * have tipped the same fixture (AGENTS.md, ADR 0004).
+ *
+ * A season of picks (~76 matches x roster) passes Supabase's silent
+ * `max_rows = 1000` cap, so the read is split by `chunkForRowCap` and issued
+ * as one parallel wave -- serial depth 1 regardless of chunk count. A chunk
+ * that still comes back at the cap throws rather than truncating.
+ */
+export async function loadStreakPicks(
+  supabase: SupabaseClient,
+  competitionId: string,
+  matchIds: readonly string[],
+  humanCount: number,
+): Promise<StreakPick[]> {
+  const chunks = chunkForRowCap(matchIds, humanCount);
+  const results = await Promise.all(
+    chunks.map((chunk) =>
+      supabase
+        .from("picks")
+        .select(
+          "player_id, match_id, pred_home_score, pred_away_score, players!inner(competition_id, is_bot)",
+        )
+        .in("match_id", chunk)
+        .eq("players.competition_id", competitionId)
+        .eq("players.is_bot", false)
+        .order("match_id", { ascending: true })
+        .order("player_id", { ascending: true }),
+    ),
+  );
+
+  return results.flatMap(({ data, error }) => {
+    if (error) throw error;
+    const rows = data ?? [];
+    if (rows.length >= SUPABASE_MAX_ROWS) {
+      throw new Error(
+        `loadStreakPicks: a chunk returned ${rows.length} rows, at Supabase's max_rows cap -- picks would be silently truncated`,
+      );
+    }
+    return rows.map((row) => ({
+      playerId: row.player_id,
+      matchId: row.match_id,
+      home: row.pred_home_score,
+      away: row.pred_away_score,
+    }));
+  });
+}
+
 export interface LeaderboardView {
   rows: LeaderboardRow[];
   /** False before the competition's first scored match -- ADR 0012 D8. */
@@ -132,9 +254,12 @@ export interface LeaderboardView {
 }
 
 /**
- * Serial Supabase depth 2 on this route: (scores, scored gameweeks) in one
- * parallel wave, then previous-season-totals once the last scored gameweek
- * number is known.
+ * Serial Supabase depth 5, counted in round trips: wave 1 is
+ * max(scoresForCompetition 2, loadScoredGameweeks 3, loadTippedMatches 2) =
+ * 3; wave 2 is max(loadPreviousSeasonTotals 2, loadStreakPicks 1) = 2. The
+ * second wave can't join the first: it needs the last scored gameweek
+ * number, and the streak picks need the roster's human count and the
+ * tipped match ids.
  *
  * Movement's "previous gameweek" is deliberately **the gameweek before the
  * last SCORED one** -- not `resolveCurrentGameweekForCompetition() - 1`,
@@ -154,9 +279,10 @@ export async function loadLeaderboard(
   seasonId: string,
   viewerId: string,
 ): Promise<LeaderboardView> {
-  const [scores, scoredGameweeks] = await Promise.all([
+  const [scores, scoredGameweeks, tippedMatches] = await Promise.all([
     scoresForCompetition(supabase, competitionId, seasonId),
     loadScoredGameweeks(supabase, competitionId, seasonId),
+    loadTippedMatches(supabase, competitionId, seasonId),
   ]);
 
   const lastScoredNumber = scoredGameweeks.reduce<number | null>(
@@ -166,21 +292,37 @@ export async function loadLeaderboard(
   const previousGameweekNumber =
     lastScoredNumber !== null ? lastScoredNumber - 1 : null;
 
-  const previousSeasonTotals =
+  const finishedMatchIds = tippedMatches
+    .filter(countsTowardStreak)
+    .map((match) => match.id);
+  const humanCount = scores.filter((row) => !row.isBot).length;
+
+  const [previousSeasonTotals, streakPicks] = await Promise.all([
     previousGameweekNumber !== null
-      ? await loadPreviousSeasonTotals(
+      ? loadPreviousSeasonTotals(
           supabase,
           competitionId,
           seasonId,
           previousGameweekNumber,
         )
-      : [];
+      : Promise.resolve([]),
+    loadStreakPicks(supabase, competitionId, finishedMatchIds, humanCount),
+  ]);
 
   return {
     rows: buildLeaderboard({
       scores,
       previousSeasonTotals,
       scoredGameweeks,
+      streaks: computeStreaks({
+        matches: tippedMatches,
+        picks: streakPicks,
+        players: scores.map((row) => ({
+          id: row.playerId,
+          isBot: row.isBot,
+          joinedAt: row.joinedAt,
+        })),
+      }),
       viewerId,
     }),
     scored: scores.some((row) => row.matchesScored > 0),

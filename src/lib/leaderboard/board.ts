@@ -20,6 +20,7 @@
 //        not picking raise your average).
 
 import { rankScores } from "./rank";
+import type { PlayerStreak, Streak } from "./streaks";
 
 export interface LeaderboardScoreInput {
   playerId: string;
@@ -60,6 +61,8 @@ export interface LeaderboardRow {
   exactTips: number;
   correctResults: number;
   matchesScored: number;
+  /** Right-result streak (issue #217); null for a bot, which has none. */
+  streak: Streak | null;
   isViewer: boolean;
 }
 
@@ -69,6 +72,8 @@ export interface BuildLeaderboardInput {
   previousSeasonTotals: readonly PreviousSeasonTotal[];
   /** Gameweeks that have been scored, any order. */
   scoredGameweeks: readonly ScoredGameweek[];
+  /** `computeStreaks` output -- one entry per human player. */
+  streaks: readonly PlayerStreak[];
   viewerId: string;
 }
 
@@ -105,9 +110,11 @@ export function buildLeaderboard({
   scores,
   previousSeasonTotals,
   scoredGameweeks,
+  streaks,
   viewerId,
 }: BuildLeaderboardInput): LeaderboardRow[] {
   const currentRanks = humanRanks(scores);
+  const streakById = new Map(streaks.map((s) => [s.playerId, s]));
 
   // The previous snapshot is re-ranked here rather than read as a stored
   // rank, and is filtered to players who are still in the competition and
@@ -156,7 +163,13 @@ export function buildLeaderboard({
         exactTips: row.exactTips,
         correctResults: row.correctResults,
         matchesScored: row.matchesScored,
+        streak: row.isBot ? null : toStreak(streakById.get(row.playerId)),
         isViewer: row.playerId === viewerId,
       };
     });
+}
+
+/** Drops `playerId` for the row's view shape. */
+function toStreak(streak: PlayerStreak | undefined): Streak | null {
+  return streak ? { current: streak.current, best: streak.best } : null;
 }

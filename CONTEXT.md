@@ -56,6 +56,13 @@ The points one Player earned on one Tipped Match: 0–7, drawn from `{0, 1, 3, 4
 A Pick that names the exact scoreline with the sides swapped (called 2–1, it finished 1–2). Worth +1, and mutually exclusive with every other scoring term by construction. Can never occur on a draw.
 _Avoid_: Reversed, Flipped (both read as an admin action on a result, not a Player's outcome)
 
+**Streak**:
+A Player's run of consecutive right-result Tipped Matches in kickoff order, across Gameweeks. A Wrong Way Round or a missing Pick ends it; a Voided Match is skipped. Carried as **current** and the season's **best**, for humans only. A current Streak of 5 or more shows a 🔥 badge on the leaderboard (issue #217, `docs/adr/0012-leaderboard-view.md` D10).
+_Avoid_: Hot streak, Form (the old app's analytics pages, which stay out of scope)
+
+**Award mark**:
+An emoji that celebrates something a Player achieved, such as the Streak's 🔥 or a Gameweek wrap award. The third emoji tier, alongside the Player's own emoji and 🤖 for Bots. Never chrome or state (`docs/DESIGN_SYSTEM.md` → _Icons_).
+
 **Benchmark Line**:
 The Median Bot's Season Total, treated as a bar to clear rather than a rival to beat — Bots can't win. Beating the crowd's own consensus over a full season is the app's one comparison that reflects skill rather than luck. **This is a conceptual framing, not a rendered feature**: the leaderboard gives the Median Bot no special visual treatment (`docs/adr/0012-leaderboard-view.md` D6). It sits in its true list position by points, tagged as a Bot and carrying no rank, so whether you're above or below it is answerable at a glance without a bespoke benchmark line to design, explain and keep correct. Revisit once a season of real data shows where players actually land relative to it.
 

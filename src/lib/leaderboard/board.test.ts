@@ -78,6 +78,7 @@ describe("buildLeaderboard ranking", () => {
     scores,
     previousSeasonTotals: [],
     scoredGameweeks: GW,
+    streaks: [],
     viewerId: "andy",
   });
 
@@ -131,6 +132,7 @@ describe("buildLeaderboard movement", () => {
         { playerId: "medianbot", seasonTotal: 58 },
       ],
       scoredGameweeks: GW,
+      streaks: [],
       viewerId: "andy",
     });
     expect(rows.find((r) => r.playerId === "sophie")!.movement).toBe(1);
@@ -148,6 +150,7 @@ describe("buildLeaderboard movement", () => {
         { playerId: "medianbot", seasonTotal: 58 },
       ],
       scoredGameweeks: GW,
+      streaks: [],
       viewerId: "andy",
     });
     expect(rows.find((r) => r.playerId === "sophie")!.movement).toBe(1);
@@ -161,6 +164,7 @@ describe("buildLeaderboard movement", () => {
         { playerId: "andy", seasonTotal: 40 },
       ],
       scoredGameweeks: GW,
+      streaks: [],
       viewerId: "andy",
     });
     expect(rows.find((r) => r.playerId === "andy")!.movement).toBe(0);
@@ -171,6 +175,7 @@ describe("buildLeaderboard movement", () => {
       scores,
       previousSeasonTotals: [{ playerId: "sophie", seasonTotal: 50 }],
       scoredGameweeks: GW,
+      streaks: [],
       viewerId: "andy",
     });
     expect(rows.find((r) => r.playerId === "andy")!.movement).toBeNull();
@@ -181,6 +186,7 @@ describe("buildLeaderboard movement", () => {
       scores,
       previousSeasonTotals: [],
       scoredGameweeks: GW,
+      streaks: [],
       viewerId: "andy",
     });
     expect(rows.every((r) => r.movement === null)).toBe(true);
@@ -195,6 +201,7 @@ describe("buildLeaderboard movement", () => {
         { playerId: "andy", seasonTotal: 40 },
       ],
       scoredGameweeks: GW,
+      streaks: [],
       viewerId: "andy",
     });
     expect(rows.find((r) => r.playerId === "medianbot")!.movement).toBeNull();
@@ -207,6 +214,7 @@ describe("buildLeaderboard points per gameweek played", () => {
       scores: [score("sophie", 62)],
       previousSeasonTotals: [],
       scoredGameweeks: GW,
+      streaks: [],
       viewerId: "sophie",
     });
     expect(rows[0].gameweeksPlayed).toBe(4);
@@ -219,6 +227,7 @@ describe("buildLeaderboard points per gameweek played", () => {
       scores: [score("ava", 24, { joinedAt: "2026-09-01T00:00:00Z" })],
       previousSeasonTotals: [],
       scoredGameweeks: GW,
+      streaks: [],
       viewerId: "ava",
     });
     expect(rows[0].gameweeksPlayed).toBe(2);
@@ -230,6 +239,7 @@ describe("buildLeaderboard points per gameweek played", () => {
       scores: [score("newbie", 0, { joinedAt: "2026-12-01T00:00:00Z" })],
       previousSeasonTotals: [],
       scoredGameweeks: GW,
+      streaks: [],
       viewerId: "newbie",
     });
     expect(rows[0].gameweeksPlayed).toBe(0);
@@ -245,6 +255,7 @@ describe("buildLeaderboard points per gameweek played", () => {
       ],
       previousSeasonTotals: [],
       scoredGameweeks: GW,
+      streaks: [],
       viewerId: "sophie",
     });
     expect(rows.map((r) => r.playerId)).toEqual(["sophie", "ava"]);
@@ -260,9 +271,26 @@ describe("buildLeaderboard day one", () => {
       scores: [score("sophie", 0, { matchesScored: 0 })],
       previousSeasonTotals: [],
       scoredGameweeks: [],
+      streaks: [],
       viewerId: "sophie",
     });
     expect(rows[0].rank).toBe(1);
     expect(rows[0].gameweeksPlayed).toBe(0);
+  });
+});
+
+describe("buildLeaderboard streaks (issue #217)", () => {
+  it("carries a human's streak onto their row and leaves a bot's null", () => {
+    const rows = buildLeaderboard({
+      scores: [score("andy", 40), score("medianbot", 38, { isBot: true })],
+      previousSeasonTotals: [],
+      scoredGameweeks: GW,
+      streaks: [{ playerId: "andy", current: 6, best: 9 }],
+      viewerId: "andy",
+    });
+    const andy = rows.find((r) => r.playerId === "andy")!;
+    expect(andy.streak?.current).toBe(6);
+    expect(andy.streak?.best).toBe(9);
+    expect(rows.find((r) => r.playerId === "medianbot")!.streak).toBe(null);
   });
 });
