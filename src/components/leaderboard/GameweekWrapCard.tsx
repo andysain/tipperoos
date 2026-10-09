@@ -86,7 +86,7 @@ function winnerLines(award: WrapAward): WinnerLine[] {
         // No 😅 here, though #218 D6's example has one: emoji are only
         // personal or award marks (DESIGN_SYSTEM.md -> Icons), and the 😬
         // mark already sets the tone.
-        fact: `Said ${w.pick.home}–${w.pick.away}, finished ${w.result.home}–${w.result.away}`,
+        fact: `${w.homeTeam} v ${w.awayTeam}: said ${w.pick.home}–${w.pick.away}, finished ${w.result.home}–${w.result.away}`,
       }));
   }
 }

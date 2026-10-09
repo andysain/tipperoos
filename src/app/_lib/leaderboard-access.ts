@@ -202,7 +202,9 @@ export async function loadTippedMatches(
   const { data: matchRows, error: matchesError } = await supabase
     .from("matches")
     .select(
-      "id, kickoff_time, provider_match_id, status, team_a_score, team_b_score",
+      "id, kickoff_time, provider_match_id, status, team_a_score, team_b_score, " +
+        "team_a:teams!matches_team_a_id_fkey(name), " +
+        "team_b:teams!matches_team_b_id_fkey(name)",
     )
     .in("id", [...slotsByMatchId.keys()])
     .order("kickoff_time", { ascending: true })
@@ -212,7 +214,17 @@ export async function loadTippedMatches(
   // Every id was read from a gameweek slot above, so its number is always
   // known; a row without one is skipped rather than given a stand-in that
   // would count as "through any N".
-  return (matchRows ?? []).flatMap((row) => {
+  type Row = {
+    id: string;
+    kickoff_time: string;
+    provider_match_id: string;
+    status: string;
+    team_a_score: number | null;
+    team_b_score: number | null;
+    team_a: { name: string } | null;
+    team_b: { name: string } | null;
+  };
+  return ((matchRows ?? []) as unknown as Row[]).flatMap((row) => {
     const gameweekNumber = gameweekByMatchId.get(row.id);
     if (gameweekNumber === undefined) return [];
     return [
@@ -221,6 +233,8 @@ export async function loadTippedMatches(
         gameweekNumber,
         kickoffUtcIso: row.kickoff_time,
         providerMatchId: row.provider_match_id,
+        homeTeam: row.team_a?.name ?? "—",
+        awayTeam: row.team_b?.name ?? "—",
         // A final result needs `completed` AND both scores -- a completed match
         // whose score hasn't landed is skipped, not counted as a miss (#217 L5).
         result:
