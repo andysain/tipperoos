@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   chunkForRowCap,
+  compareStreakMatches,
   computeStreaks,
   type StreakMatch,
   type StreakPick,
@@ -304,5 +305,20 @@ describe("chunkForRowCap", () => {
   it("returns no chunks when there are no humans or no matches", () => {
     expect(chunkForRowCap(ids, 0).length).toBe(0);
     expect(chunkForRowCap([], 12).length).toBe(0);
+  });
+});
+
+// Exported for the Gameweek wrap (#218), which walks a gameweek's matches in
+// the same order the streak does.
+describe("compareStreakMatches", () => {
+  it("orders by kickoff, then numeric provider id", () => {
+    const kickoff = "2026-09-06T14:00:00Z";
+    const later = match(9, { home: 0, away: 0 });
+    const id100 = match(1, null, { kickoff, providerMatchId: "100" });
+    const id99 = match(2, null, { kickoff, providerMatchId: "99" });
+
+    const ordered = [later, id100, id99].sort(compareStreakMatches);
+
+    expect(ordered.map((m) => m.providerMatchId).join(",")).toBe("99,100,1009");
   });
 });
