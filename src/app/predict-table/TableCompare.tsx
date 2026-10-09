@@ -46,9 +46,6 @@ import {
   TX,
 } from "@/components/ui/tokens";
 
-/** How a call that scored no Placement points is drawn (TEMPORARY choice). */
-export type MissStyle = "faded" | "dashed";
-
 export interface ComparePlayer {
   displayName: string;
   emoji: string | null;
@@ -73,17 +70,11 @@ export function TableCompare({
   them,
   seasonOver,
   standingsNote,
-  miss,
 }: {
   comparison: TableComparison;
   you: ComparePlayer;
   them: ComparePlayer;
   seasonOver: boolean;
-  /**
-   * TEMPORARY (issue #214 before/after): how a no-points call's bar is
-   * drawn. Remove the prop and keep the chosen style before merge.
-   */
-  miss: MissStyle;
   /** Set when the standings are stale: the date they're measured against. */
   standingsNote: string | null;
 }) {
@@ -114,11 +105,7 @@ export function TableCompare({
           the card instead of the page. overflow-clip rounds the corners
           without that side effect. */}
       <div className={`overflow-clip rounded-card bg-surface ${CARD_SHADOW}`}>
-        <ChartKey
-          themName={them.displayName}
-          seasonOver={seasonOver}
-          miss={miss}
-        />
+        <ChartKey themName={them.displayName} seasonOver={seasonOver} />
         <StickyMarks />
         <ol className="flex flex-col">
           {comparison.sections.map((section) => {
@@ -162,7 +149,7 @@ export function TableCompare({
                       key={row.teamId}
                       row={row}
                       seasonOver={seasonOver}
-                      miss={miss}
+
                       open={row.teamId === openTeamId}
                       onTap={() =>
                         setOpenTeamId((id) =>
@@ -183,7 +170,7 @@ export function TableCompare({
           row={openRow}
           themName={them.displayName}
           seasonOver={seasonOver}
-          miss={miss}
+
           onHeight={setCardHeight}
           onClose={() => setOpenTeamId(null)}
         />
@@ -440,11 +427,9 @@ function Mark({
 function ChartKey({
   themName,
   seasonOver,
-  miss,
 }: {
   themName: string;
   seasonOver: boolean;
-  miss: MissStyle;
 }) {
   const item = "flex items-center gap-1.5";
   return (
@@ -468,18 +453,11 @@ function ChartKey({
         Right Band
       </span>
       <span className={item}>
-        <span
-          aria-hidden
-          className={`h-1.5 w-5 ${miss === "faded" ? "rounded-badge bg-accent opacity-35" : ""}`}
-          style={
-            miss === "dashed"
-              ? {
-                  backgroundImage:
-                    "repeating-linear-gradient(90deg, var(--color-accent) 0 4px, transparent 4px 7px)",
-                }
-              : undefined
-          }
-        />
+        {/* A no-points call in miniature: faded bar, lightly faded mark. */}
+        <span aria-hidden className="flex items-center">
+          <span className="h-1.5 w-4 rounded-badge bg-accent opacity-35" />
+          <Mark who="you" className="-ml-1 opacity-60" />
+        </span>
         {`No points: ${String(SCORING_REACH + 1)}+ Bands out`}
       </span>
       <span className={item}>
@@ -588,14 +566,11 @@ function Lane({
   actualBand,
   who,
   top,
-  miss,
 }: {
   call: SideCall;
   actualBand: number;
   who: "you" | "them";
   top: string;
-  /** How a call that scored no Placement points is drawn. */
-  miss: MissStyle;
 }) {
   const you = who === "you";
   if (call.band === null) {
@@ -611,10 +586,9 @@ function Lane({
   const from = Math.min(call.band, actualBand);
   const span = Math.abs(call.band - actualBand);
   // A call that scored no Placement points (too far out) is a bad tip, and
-  // the whole bar says so: faded, or dashed (issue #214, the owner's
-  // before/after). A solid bar is a call that scored.
+  // the whole call says so: the bar fades well back and the mark a little,
+  // so it stays readable (issue #214). Solid gold is a call that scored.
   const missed = span > 0 && call.placement === 0;
-  const colour = you ? "var(--color-accent)" : "var(--color-text-muted)";
   return (
     <>
       {span > 0 ? (
@@ -622,26 +596,17 @@ function Lane({
         // fill, a bar, a ring"); the peer's bar in the muted text role.
         <span
           aria-hidden
-          className={`absolute -translate-y-1/2 ${you ? "h-1.5" : "h-0.5"} ${
-            missed && miss === "faded" ? "opacity-35" : ""
-          } ${missed && miss === "dashed" ? "" : "rounded-badge"}`}
-          style={{
-            top,
-            left: centre(from),
-            width: pct(span),
-            ...(missed && miss === "dashed"
-              ? {
-                  backgroundImage: `repeating-linear-gradient(90deg, ${colour} 0 4px, transparent 4px 7px)`,
-                }
-              : { background: colour }),
-          }}
+          className={`absolute -translate-y-1/2 rounded-badge ${
+            you ? "h-1.5 bg-accent" : "h-0.5 bg-text-muted"
+          } ${missed ? "opacity-35" : ""}`}
+          style={{ top, left: centre(from), width: pct(span) }}
         />
       ) : null}
       <Mark
         who={who}
         hit={span === 0}
         size={span === 0 ? "size-4" : "size-3.5"}
-        className="absolute -translate-x-1/2 -translate-y-1/2"
+        className={`absolute -translate-x-1/2 -translate-y-1/2 ${missed ? "opacity-60" : ""}`}
         style={{ top, left: centre(call.band) }}
       />
       {call.boldCall ? (
@@ -666,13 +631,11 @@ function rowSpeech(call: SideCall, actualBand: number): string {
 function Row({
   row,
   seasonOver,
-  miss,
   open,
   onTap,
 }: {
   row: ComparisonRow;
   seasonOver: boolean;
-  miss: MissStyle;
   open: boolean;
   onTap: () => void;
 }) {
@@ -714,14 +677,12 @@ function Row({
             actualBand={row.actualBand}
             who="you"
             top="34%"
-            miss={miss}
           />
           <Lane
             call={row.them}
             actualBand={row.actualBand}
             who="them"
             top="68%"
-            miss={miss}
           />
         </span>
 
@@ -757,14 +718,12 @@ function TapCard({
   row,
   themName,
   seasonOver,
-  miss,
   onHeight,
   onClose,
 }: {
   row: ComparisonRow;
   themName: string;
   seasonOver: boolean;
-  miss: MissStyle;
   onHeight: (height: number) => void;
   onClose: () => void;
 }) {
@@ -832,7 +791,7 @@ function TapCard({
             You: {rowSpeech(row.you, row.actualBand)}. {themName}:{" "}
             {rowSpeech(row.them, row.actualBand)}.
           </p>
-          <Ladder row={row} miss={miss} />
+          <Ladder row={row} />
           <div className="grid grid-cols-2 gap-2">
             <ScoreTile
               name="You"
@@ -860,7 +819,7 @@ function TapCard({
  * ticks, labelled only at the Bands this card is about -- where the club is
  * now and the two calls.
  */
-function Ladder({ row, miss }: { row: ComparisonRow; miss: MissStyle }) {
+function Ladder({ row }: { row: ComparisonRow }) {
   const labelled = new Set([row.actualBand, row.you.band, row.them.band]);
   return (
     <div className="relative" aria-hidden>
@@ -874,19 +833,12 @@ function Ladder({ row, miss }: { row: ComparisonRow; miss: MissStyle }) {
           className="absolute inset-y-1 w-px bg-ink"
           style={{ left: centre(row.actualBand) }}
         />
-        <Lane
-          call={row.you}
-          actualBand={row.actualBand}
-          who="you"
-          top="32%"
-          miss={miss}
-        />
+        <Lane call={row.you} actualBand={row.actualBand} who="you" top="32%" />
         <Lane
           call={row.them}
           actualBand={row.actualBand}
           who="them"
           top="70%"
-          miss={miss}
         />
       </span>
       <span className="relative grid grid-cols-8 pb-1.5">

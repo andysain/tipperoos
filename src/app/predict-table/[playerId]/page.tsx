@@ -31,15 +31,10 @@ export const dynamic = "force-dynamic";
 
 export default async function CompareTablePage({
   params,
-  searchParams,
 }: {
   params: Promise<{ playerId: string }>;
-  searchParams: Promise<{ miss?: string }>;
 }) {
   const { playerId: targetId } = await params;
-  // TEMPORARY (issue #214 before/after): `?miss=dashed` draws a no-points
-  // call's bar dashed instead of faded. Remove before merge.
-  const { miss } = await searchParams;
   const { playerId: viewerId, competitionId } = await loadActivePlayer();
   // Your own id goes to your own table before anything is read (D6): it
   // never waits on, or fails with, the comparison's reads.
@@ -139,7 +134,6 @@ export default async function CompareTablePage({
         }}
         seasonOver={isSeasonOver(cohort.minPlayed)}
         standingsNote={standingsNote}
-        miss={miss === "dashed" ? "dashed" : "faded"}
       />
     </main>
   );
