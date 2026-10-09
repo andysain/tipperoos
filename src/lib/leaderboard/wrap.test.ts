@@ -103,6 +103,37 @@ describe("buildGameweekWrap: Tipper of the Week", () => {
     const tipper = award(wrap.fired, "tipper")!;
     expect(tipper.winners.length).toBe(2);
     expect(tipper.winners[0].points).toBe(9);
+    // A tie for top has no next best.
+    expect(tipper.nextBest).toBe(null);
+  });
+
+  it("names the next best score below a single winner, ties listed", () => {
+    const wrap = buildGameweekWrap(
+      base({
+        players: [human("ana"), human("ben"), human("cat"), human("dan")],
+        snapshot: [
+          snap("ana", 12, 12),
+          snap("ben", 10, 10),
+          snap("cat", 10, 10),
+          snap("dan", 3, 3),
+        ],
+      }),
+    );
+
+    const next = award(wrap.fired, "tipper")!.nextBest!;
+    expect(next.points).toBe(10);
+    expect(next.playerIds.join(",")).toBe("ben,cat");
+  });
+
+  it("has no next best when nobody else scored", () => {
+    const wrap = buildGameweekWrap(
+      base({
+        players: [human("ana"), human("ben")],
+        snapshot: [snap("ana", 4, 4), snap("ben", 0, 0)],
+      }),
+    );
+
+    expect(award(wrap.fired, "tipper")!.nextBest).toBe(null);
   });
 
   it("doesn't fire when the top score is 0", () => {
@@ -462,6 +493,9 @@ describe("buildGameweekWrap: Streak Snapped", () => {
     const snapped = award(wrap.fired, "streakSnapped")!;
     expect(snapped.winners[0].endedAt).toBe(7);
     expect(snapped.winners[0].stillSeasonBest).toBe(true);
+    // The match that broke it, so the card can name it.
+    expect(snapped.winners[0].homeTeam).toBe("Home 4.2");
+    expect(snapped.winners[0].awayTeam).toBe("Away 4.2");
   });
 
   it("doesn't fire when the broken run was only 4", () => {
