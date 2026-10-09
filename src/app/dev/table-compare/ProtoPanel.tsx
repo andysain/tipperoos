@@ -45,7 +45,7 @@ const QUESTIONS: {
   },
   {
     key: "q3",
-    title: "Q3 · Per-row Bold Call ★",
+    title: "Q3 · ★ also on the chart mark (points always show +8★)",
     options: [
       ["both", "Both"],
       ["you", "Only you"],

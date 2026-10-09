@@ -503,8 +503,8 @@ function Who({
 /** Row grid: label | 8-Band axis | You | Them. Shared by axis and rows. */
 function gridCols(options: Options): string {
   return options.q5 === "name"
-    ? "grid-cols-[5.5rem_1fr_2.25rem_2.25rem]"
-    : "grid-cols-[2.75rem_1fr_2.25rem_2.25rem]";
+    ? "grid-cols-[5.5rem_1fr_2.5rem_2.5rem]"
+    : "grid-cols-[2.75rem_1fr_2.5rem_2.5rem]";
 }
 
 function AxisHeader({ options }: { options: Options }) {
@@ -651,8 +651,10 @@ function Row({
           )}
           <span className="sr-only">
             , finished {ordinal(row.position)}. You{" "}
-            {placementReason(row.you, row.actualBand)}. Them{" "}
-            {placementReason(row.them, row.actualBand)}.
+            {placementReason(row.you, row.actualBand)}
+            {row.you.boldCall ? ", plus a Bold Call" : ""}. Them{" "}
+            {placementReason(row.them, row.actualBand)}
+            {row.them.boldCall ? ", plus a Bold Call" : ""}.
           </span>
         </span>
 
@@ -685,35 +687,30 @@ function Row({
           />
         </span>
 
-        <PointsCell
-          mine={row.you.points}
-          theirs={row.them.points}
-          options={options}
-        />
-        <PointsCell
-          mine={row.them.points}
-          theirs={row.you.points}
-          options={options}
-        />
+        <PointsCell call={row.you} theirs={row.them.points} options={options} />
+        <PointsCell call={row.them} theirs={row.you.points} options={options} />
       </button>
     </li>
   );
 }
 
 function PointsCell({
-  mine,
+  call,
   theirs,
   options,
 }: {
-  mine: number;
+  call: SideCall;
   theirs: number;
   options: Options;
 }) {
+  const mine = call.points;
   const green = greenFor(mine, theirs, options);
   return (
-    // `+5` / `0` through the app's own pointLabel (DESIGN.md -> Do's).
+    // `+5` / `0` through the app's own pointLabel (DESIGN.md -> Do's). A
+    // Bold Call is folded in (`+8★`); the star slot is always reserved so
+    // digits stay in one column (DESIGN.md -> Steady Digits).
     <span
-      className={`text-right ${T.caption} tabular-nums ${
+      className={`flex items-center justify-end gap-0.5 ${T.caption} tabular-nums ${
         green
           ? "font-extrabold text-success"
           : mine === 0
@@ -723,6 +720,11 @@ function PointsCell({
       aria-hidden
     >
       {pointLabel(mine)}
+      <span className="flex w-2.5 justify-center">
+        {call.boldCall ? (
+          <Star className="size-2.5 fill-current" aria-hidden />
+        ) : null}
+      </span>
     </span>
   );
 }

@@ -14,7 +14,14 @@ import { TABLE_BANDS } from "@/lib/table-predictions/rules";
 export interface SideCall {
   /** Predicted Band index, or null when the club was never placed. */
   band: number | null;
-  /** Placement points only (issue D10). */
+  /** This club's Placement points (its Band distance). */
+  placement: number;
+  /**
+   * What the row shows: Placement plus the Bold Call bonus when this club
+   * earned one -- the owner's call (2026-10-10), reversing issue D10's
+   * Placement-only figure so a row's numbers add up to the player's
+   * Placement + Bold calls. The ★ beside it says why it's more than the bar.
+   */
   points: number;
   boldCall: boolean;
 }
@@ -82,10 +89,13 @@ function side(
   result: PredictTableScoreResult,
   teamId: string,
 ): SideCall {
+  const placement = result.teamScores[teamId] ?? 0;
+  const boldCall = result.boldCalls.includes(teamId);
   return {
     band: bands.get(teamId) ?? null,
-    points: result.teamScores[teamId] ?? 0,
-    boldCall: result.boldCalls.includes(teamId),
+    placement,
+    points: placement + (boldCall ? BOLD_CALL_BONUS : 0),
+    boldCall,
   };
 }
 
