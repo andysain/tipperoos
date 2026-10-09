@@ -73,7 +73,7 @@ export function earnsStreakBadge(streak: Streak | null): streak is Streak {
  * arbitrarily. A non-numeric id falls back to a text compare, keeping the
  * order total.
  */
-function compareMatches(a: StreakMatch, b: StreakMatch): number {
+export function compareStreakMatches(a: StreakMatch, b: StreakMatch): number {
   const byKickoff =
     new Date(a.kickoffUtcIso).getTime() - new Date(b.kickoffUtcIso).getTime();
   if (byKickoff !== 0) return byKickoff;
@@ -95,7 +95,7 @@ export function computeStreaks({
 }): PlayerStreak[] {
   const counted = matches
     .filter(countsTowardStreak)
-    .sort(compareMatches)
+    .sort(compareStreakMatches)
     .flatMap((match) =>
       match.result === null
         ? []

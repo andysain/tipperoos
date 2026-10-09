@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { EmojiChip } from "@/components/ui/PlayerChip";
+import { YouPill } from "@/components/ui/YouPill";
 import { T, TX, MICRO_LABEL, FOCUS, INSET } from "@/components/ui/tokens";
 
 // The leaderboard's row (docs/adr/0012-leaderboard-view.md D11): a
@@ -191,13 +192,7 @@ export function LeaderboardRowCard({
             // intensities on one card is three objects with no hierarchy
             // between them. Ink-as-surface is sanctioned grammar, and this is
             // one FEWER accent object, not a fourth.
-            <span
-              className={`shrink-0 rounded-badge px-1.5 py-0.5 ${MICRO_LABEL} ${
-                first ? "bg-ink text-on-ink" : "bg-accent text-accent-ink"
-              }`}
-            >
-              You
-            </span>
+            <YouPill tone={first ? "ink" : "accent"} />
           ) : null}
           {scored && row.streakBadge !== null ? (
             // A bare award mark, no pill (#217's design): it sits inside the

@@ -84,7 +84,9 @@ function award<K extends WrapAward["kind"]>(
   awards: readonly WrapAward[],
   kind: K,
 ): Extract<WrapAward, { kind: K }> | undefined {
-  return awards.find((a): a is Extract<WrapAward, { kind: K }> => a.kind === kind);
+  return awards.find(
+    (a): a is Extract<WrapAward, { kind: K }> => a.kind === kind,
+  );
 }
 
 describe("buildGameweekWrap: Tipper of the Week", () => {
@@ -116,7 +118,10 @@ describe("buildGameweekWrap: Tipper of the Week", () => {
 
 describe("buildGameweekWrap: the only-one-to-call-it line", () => {
   // GW1: g1s1 finished 3-1, g1s2 finished 0-0.
-  const matches = [match(1, 1, { home: 3, away: 1 }), match(1, 2, { home: 0, away: 0 })];
+  const matches = [
+    match(1, 1, { home: 3, away: 1 }),
+    match(1, 2, { home: 0, away: 0 }),
+  ];
 
   it("names an exact score no other human picked", () => {
     const wrap = buildGameweekWrap(
@@ -155,7 +160,12 @@ describe("buildGameweekWrap: the only-one-to-call-it line", () => {
 });
 
 describe("buildGameweekWrap: Top of the Hill", () => {
-  const players = [human("ana"), human("ben"), human("cat"), { id: "bot", isBot: true, joinedAt: JOINED }];
+  const players = [
+    human("ana"),
+    human("ben"),
+    human("cat"),
+    { id: "bot", isBot: true, joinedAt: JOINED },
+  ];
 
   it("goes to a new human leader, never a bot", () => {
     // N-1: ana 20, ben 18. N: ben 25, ana 22. The bot on 40 ranks no one.
@@ -164,7 +174,11 @@ describe("buildGameweekWrap: Top of the Hill", () => {
         gameweekNumber: 2,
         scoredGameweekNumbers: [1, 2],
         players,
-        previousSnapshot: [snap("ana", 0, 20), snap("ben", 0, 18), snap("bot", 0, 30)],
+        previousSnapshot: [
+          snap("ana", 0, 20),
+          snap("ben", 0, 18),
+          snap("bot", 0, 30),
+        ],
         snapshot: [snap("ana", 2, 22), snap("ben", 7, 25), snap("bot", 10, 40)],
       }),
     );
@@ -228,7 +242,10 @@ describe("buildGameweekWrap: Rocket", () => {
     snap("p4", 0, 20),
     snap("p5", 0, 10),
   ];
-  const matches = [match(1, 1, { home: 1, away: 0 }), match(2, 1, { home: 1, away: 0 })];
+  const matches = [
+    match(1, 1, { home: 1, away: 0 }),
+    match(2, 1, { home: 1, away: 0 }),
+  ];
 
   it("fires for a climb of 3 places, with the new rank", () => {
     // p5 jumps from 5th to 2nd.
@@ -338,7 +355,11 @@ describe("buildGameweekWrap: On Fire", () => {
   it("fires the week a streak reaches 5", () => {
     // 6 right through GW3; through GW2 it was 4.
     const ms = season(3);
-    const wrap = streakWrap(3, [human("ana")], ms.map((m) => right("ana", m)));
+    const wrap = streakWrap(
+      3,
+      [human("ana")],
+      ms.map((m) => right("ana", m)),
+    );
 
     const fire = award(wrap.fired, "onFire")!;
     expect(fire.winners[0].streakLength).toBe(6);
@@ -348,7 +369,11 @@ describe("buildGameweekWrap: On Fire", () => {
   it("doesn't fire for a streak that simply continues, even as the record holder", () => {
     // 8 right through GW4: already 6 (and the season record) through GW3.
     const ms = season(4);
-    const wrap = streakWrap(4, [human("ana")], ms.map((m) => right("ana", m)));
+    const wrap = streakWrap(
+      4,
+      [human("ana")],
+      ms.map((m) => right("ana", m)),
+    );
 
     expect(award(wrap.fired, "onFire")).toBe(undefined);
   });
@@ -391,7 +416,9 @@ describe("buildGameweekWrap: Streak Snapped", () => {
   it("fires when a run of 5+ breaks, giving the length it ended at", () => {
     // 6 right through GW3; GW4: right then wrong -> ended at 7.
     const ms = season(4);
-    const picks = ms.map((m) => (m.id === "g4s2" ? wrong("ana", m) : right("ana", m)));
+    const picks = ms.map((m) =>
+      m.id === "g4s2" ? wrong("ana", m) : right("ana", m),
+    );
     const wrap = streakWrap(4, [human("ana")], picks);
 
     const snapped = award(wrap.fired, "streakSnapped")!;
@@ -402,7 +429,9 @@ describe("buildGameweekWrap: Streak Snapped", () => {
   it("doesn't fire when the broken run was only 4", () => {
     // 4 right through GW2, wrong in GW3.
     const ms = season(3);
-    const picks = ms.map((m) => (m.gameweekNumber === 3 ? wrong("ana", m) : right("ana", m)));
+    const picks = ms.map((m) =>
+      m.gameweekNumber === 3 ? wrong("ana", m) : right("ana", m),
+    );
     const wrap = streakWrap(3, [human("ana")], picks);
 
     expect(award(wrap.fired, "streakSnapped")).toBe(undefined);
@@ -413,7 +442,9 @@ describe("buildGameweekWrap: Streak Snapped", () => {
     // wrong in GW5 -> ended at 7, not the season best.
     const ms = season(5);
     const picks = ms.flatMap((m) => [
-      m.id === "g1s1" || m.gameweekNumber === 5 ? wrong("ana", m) : right("ana", m),
+      m.id === "g1s1" || m.gameweekNumber === 5
+        ? wrong("ana", m)
+        : right("ana", m),
       m.gameweekNumber === 5 ? wrong("ben", m) : right("ben", m),
     ]);
     const wrap = streakWrap(5, [human("ana"), human("ben")], picks);
@@ -490,13 +521,20 @@ describe("buildGameweekWrap: Furthest Off", () => {
           matches: ms,
           picks,
           snapshot: [snap("ana", 0, 0), snap("ben", 0, 0)],
-          previousSnapshot: n > 1 ? [snap("ana", 0, 0), snap("ben", 0, 0)] : null,
+          previousSnapshot:
+            n > 1 ? [snap("ana", 0, 0), snap("ben", 0, 0)] : null,
         }),
       );
 
-    expect(award(wrapFor(2).fired, "furthestOff")!.winners[0].playerId).toBe("ben");
-    expect(award(wrapFor(3).fired, "furthestOff")!.winners[0].playerId).toBe("ana");
-    expect(award(wrapFor(3).fired, "furthestOff")!.winners[0].goalError).toBe(7);
+    expect(award(wrapFor(2).fired, "furthestOff")!.winners[0].playerId).toBe(
+      "ben",
+    );
+    expect(award(wrapFor(3).fired, "furthestOff")!.winners[0].playerId).toBe(
+      "ana",
+    );
+    expect(award(wrapFor(3).fired, "furthestOff")!.winners[0].goalError).toBe(
+      7,
+    );
   });
 });
 
@@ -548,7 +586,9 @@ describe("buildGameweekWrap: the cap of 4, order, and bots", () => {
     );
     expect(wrap.shown.length).toBe(4);
     // The bot's 99-point week and 198 total win nothing.
-    const everyone = wrap.fired.flatMap((a) => a.winners.map((w) => w.playerId));
+    const everyone = wrap.fired.flatMap((a) =>
+      a.winners.map((w) => w.playerId),
+    );
     expect(everyone.includes("bot")).toBe(false);
   });
 });

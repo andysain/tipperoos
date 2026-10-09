@@ -4,7 +4,6 @@ import { scoresForCompetition } from "@/lib/competitions/scope";
 import {
   buildLeaderboard,
   type LeaderboardRow,
-  type PreviousSeasonTotal,
   type ScoredGameweek,
 } from "@/lib/leaderboard/board";
 import {
@@ -12,10 +11,15 @@ import {
   computeStreaks,
   countsTowardStreak,
   SUPABASE_MAX_ROWS,
-  type StreakMatch,
   type StreakPick,
 } from "@/lib/leaderboard/streaks";
 import { isMatchVoided } from "@/lib/matches/voided";
+import {
+  buildGameweekWrap,
+  type GameweekWrap,
+  type WrapMatch,
+  type WrapSnapshotRow,
+} from "@/lib/leaderboard/wrap";
 
 // DB-fetching glue for the leaderboard route (issue #24) -- outside
 // src/lib/** for the same reason as pick-board-access.ts: plain scoped
@@ -99,39 +103,55 @@ export async function loadScoredGameweeks(
 }
 
 /**
- * The previous gameweek's stored season totals, re-ranked by the caller
- * (ADR 0012 D2/D12) rather than read as `season_standing` -- that column is
- * bot-inclusive by design (#23 D3), so diffing a humans-only live rank
- * against it would be wrong for every player below a bot.
+ * Stored snapshot rows for the given gameweek numbers -- N-1 for the
+ * list's movement (ADR 0012 D2), and N plus N-1 for the Gameweek wrap
+ * (#218 L11). Totals are re-ranked by the caller rather than read as
+ * `season_standing`, which is bot-inclusive by design (#23 D3), so diffing
+ * a humans-only rank against it would be wrong for every player below a
+ * bot. Two round trips; at most (numbers x roster) rows, far under the
+ * row cap.
  */
-export async function loadPreviousSeasonTotals(
+export async function loadSnapshotTotals(
   supabase: SupabaseClient,
   competitionId: string,
   seasonId: string,
-  previousGameweekNumber: number,
-): Promise<PreviousSeasonTotal[]> {
-  if (previousGameweekNumber < 1) return [];
+  gameweekNumbers: readonly number[],
+): Promise<Map<number, WrapSnapshotRow[]>> {
+  const wanted = gameweekNumbers.filter((n) => n >= 1);
+  const byNumber = new Map<number, WrapSnapshotRow[]>();
+  if (wanted.length === 0) return byNumber;
 
-  const { data: gameweek, error: gameweekError } = await supabase
+  const { data: gameweeks, error: gameweekError } = await supabase
     .from("gameweeks")
-    .select("id")
+    .select("id, number")
     .eq("competition_id", competitionId)
     .eq("season_id", seasonId)
-    .eq("number", previousGameweekNumber)
-    .maybeSingle();
+    .in("number", wanted)
+    .order("number", { ascending: true });
   if (gameweekError) throw gameweekError;
-  if (!gameweek) return [];
+  if (!gameweeks || gameweeks.length === 0) return byNumber;
 
+  const numberById = new Map(gameweeks.map((gw) => [gw.id, gw.number]));
   const { data, error } = await supabase
     .from("standings_snapshots")
-    .select("player_id, season_total")
-    .eq("gameweek_id", gameweek.id);
+    .select("gameweek_id, player_id, gameweek_score, season_total")
+    .in("gameweek_id", [...numberById.keys()])
+    .order("gameweek_id", { ascending: true })
+    .order("player_id", { ascending: true });
   if (error) throw error;
 
-  return (data ?? []).map((row) => ({
-    playerId: row.player_id,
-    seasonTotal: row.season_total,
-  }));
+  for (const row of data ?? []) {
+    const number = numberById.get(row.gameweek_id);
+    if (number === undefined) continue;
+    const rows = byNumber.get(number) ?? [];
+    rows.push({
+      playerId: row.player_id,
+      gameweekScore: row.gameweek_score,
+      seasonTotal: row.season_total,
+    });
+    byNumber.set(number, rows);
+  }
+  return byNumber;
 }
 
 /**
@@ -147,18 +167,22 @@ export async function loadTippedMatches(
   supabase: SupabaseClient,
   competitionId: string,
   seasonId: string,
-): Promise<StreakMatch[]> {
+): Promise<WrapMatch[]> {
   const { data: gameweekRows, error: gameweeksError } = await supabase
     .from("gameweeks")
-    .select("match_1_id, match_2_id, match_1_voided_at, match_2_voided_at")
+    .select(
+      "number, match_1_id, match_2_id, match_1_voided_at, match_2_voided_at",
+    )
     .eq("competition_id", competitionId)
     .eq("season_id", seasonId)
     .order("number", { ascending: true });
   if (gameweeksError) throw gameweeksError;
 
   // Every slot referencing a match, for isMatchVoided. A Skipped Slot (null
-  // match id) has no match and isn't part of the sequence.
+  // match id) has no match and isn't part of the sequence. The gameweek
+  // number lets the Gameweek wrap bound streaks to "through N" (#218 L9).
   const slotsByMatchId = new Map<string, { voidedAt: string | null }[]>();
+  const gameweekByMatchId = new Map<string, number>();
   for (const gw of gameweekRows ?? []) {
     for (const [matchId, voidedAt] of [
       [gw.match_1_id, gw.match_1_voided_at],
@@ -168,6 +192,9 @@ export async function loadTippedMatches(
       const slots = slotsByMatchId.get(matchId) ?? [];
       slots.push({ voidedAt });
       slotsByMatchId.set(matchId, slots);
+      if (!gameweekByMatchId.has(matchId)) {
+        gameweekByMatchId.set(matchId, gw.number);
+      }
     }
   }
   if (slotsByMatchId.size === 0) return [];
@@ -184,6 +211,7 @@ export async function loadTippedMatches(
 
   return (matchRows ?? []).map((row) => ({
     id: row.id,
+    gameweekNumber: gameweekByMatchId.get(row.id) ?? 0,
     kickoffUtcIso: row.kickoff_time,
     providerMatchId: row.provider_match_id,
     // A final result needs `completed` AND both scores -- a completed match
@@ -249,6 +277,8 @@ export async function loadStreakPicks(
 
 export interface LeaderboardView {
   rows: LeaderboardRow[];
+  /** The last snapshotted gameweek's awards (#218); null before any. */
+  wrap: GameweekWrap | null;
   /** False before the competition's first scored match -- ADR 0012 D8. */
   scored: boolean;
 }
@@ -256,7 +286,7 @@ export interface LeaderboardView {
 /**
  * Serial Supabase depth 5, counted in round trips: wave 1 is
  * max(scoresForCompetition 2, loadScoredGameweeks 3, loadTippedMatches 2) =
- * 3; wave 2 is max(loadPreviousSeasonTotals 2, loadStreakPicks 1) = 2. The
+ * 3; wave 2 is max(loadSnapshotTotals 2, loadStreakPicks 1) = 2. The
  * second wave can't join the first: it needs the last scored gameweek
  * number, and the streak picks need the roster's human count and the
  * tipped match ids.
@@ -297,34 +327,53 @@ export async function loadLeaderboard(
     .map((match) => match.id);
   const humanCount = scores.filter((row) => !row.isBot).length;
 
-  const [previousSeasonTotals, streakPicks] = await Promise.all([
-    previousGameweekNumber !== null
-      ? loadPreviousSeasonTotals(
-          supabase,
-          competitionId,
-          seasonId,
+  const [snapshotTotals, streakPicks] = await Promise.all([
+    lastScoredNumber !== null && previousGameweekNumber !== null
+      ? loadSnapshotTotals(supabase, competitionId, seasonId, [
           previousGameweekNumber,
-        )
-      : Promise.resolve([]),
+          lastScoredNumber,
+        ])
+      : Promise.resolve(new Map<number, WrapSnapshotRow[]>()),
     loadStreakPicks(supabase, competitionId, finishedMatchIds, humanCount),
   ]);
+
+  const players = scores.map((row) => ({
+    id: row.playerId,
+    isBot: row.isBot,
+    joinedAt: row.joinedAt,
+  }));
+  const previousRows =
+    previousGameweekNumber !== null
+      ? (snapshotTotals.get(previousGameweekNumber) ?? null)
+      : null;
 
   return {
     rows: buildLeaderboard({
       scores,
-      previousSeasonTotals,
+      previousSeasonTotals: (previousRows ?? []).map((row) => ({
+        playerId: row.playerId,
+        seasonTotal: row.seasonTotal,
+      })),
       scoredGameweeks,
       streaks: computeStreaks({
         matches: tippedMatches,
         picks: streakPicks,
-        players: scores.map((row) => ({
-          id: row.playerId,
-          isBot: row.isBot,
-          joinedAt: row.joinedAt,
-        })),
+        players,
       }),
       viewerId,
     }),
+    wrap:
+      lastScoredNumber !== null
+        ? buildGameweekWrap({
+            gameweekNumber: lastScoredNumber,
+            players,
+            matches: tippedMatches,
+            picks: streakPicks,
+            scoredGameweekNumbers: scoredGameweeks.map((gw) => gw.number),
+            snapshot: snapshotTotals.get(lastScoredNumber) ?? [],
+            previousSnapshot: previousRows,
+          })
+        : null,
     scored: scores.some((row) => row.matchesScored > 0),
   };
 }

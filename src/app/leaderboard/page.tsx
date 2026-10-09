@@ -4,11 +4,13 @@ import { loadLeaderboard } from "@/app/_lib/leaderboard-access";
 import { loadTableLeaderboard } from "@/app/_lib/table-leaderboard-access";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { LeaderboardList } from "@/components/leaderboard/LeaderboardList";
+import { GameweekWrapCard } from "@/components/leaderboard/GameweekWrapCard";
 import { TableLeaderboardList } from "@/components/leaderboard/TableLeaderboardList";
 import { LeaderboardSegmentedControl } from "@/components/leaderboard/LeaderboardSegmentedControl";
 import { T, TX } from "@/components/ui/tokens";
 import { earnsStreakBadge, STREAK_BADGE_MIN } from "@/lib/leaderboard/streaks";
 import type { LeaderboardRow } from "@/lib/leaderboard/board";
+import type { GameweekWrap } from "@/lib/leaderboard/wrap";
 import type { TableLeaderboardRow } from "@/lib/leaderboard/table-board";
 
 // Same freshness contract as the Pick Board: rank is derived per request
@@ -20,9 +22,13 @@ export const dynamic = "force-dynamic";
 function SeasonSegment({
   rows,
   scored,
+  wrap,
+  viewerId,
 }: {
   rows: readonly LeaderboardRow[];
   scored: boolean;
+  wrap: GameweekWrap | null;
+  viewerId: string;
 }) {
   // Day one drops the numbers rather than showing a column of zeros, and
   // shows who's playing instead (D8) -- alphabetical, since there's no
@@ -45,6 +51,22 @@ function SeasonSegment({
         <p className={`${T.caption} ${TX.muted}`}>
           No points yet — the season starts here. Everyone below is in.
         </p>
+      ) : null}
+
+      {/* The Gameweek wrap (#218) sits above the bots caption, so that
+          caption stays directly above the list it explains. It renders
+          nothing on a week where no award fired. */}
+      {wrap !== null ? (
+        <GameweekWrapCard
+          wrap={wrap}
+          viewerId={viewerId}
+          people={Object.fromEntries(
+            rows.map((row) => [
+              row.playerId,
+              { displayName: row.displayName, emoji: row.emoji },
+            ]),
+          )}
+        />
       ) : null}
 
       {/* Above the list, not below it. This is the only thing that
@@ -160,7 +182,12 @@ export default async function LeaderboardPage({
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4">
       <h1 className={`${T.h1} font-extrabold text-text`}>Leaderboard</h1>
       <LeaderboardSegmentedControl active="season" />
-      <SeasonSegment rows={view?.rows ?? []} scored={view?.scored ?? false} />
+      <SeasonSegment
+        rows={view?.rows ?? []}
+        scored={view?.scored ?? false}
+        wrap={view?.wrap ?? null}
+        viewerId={playerId}
+      />
     </main>
   );
 }
