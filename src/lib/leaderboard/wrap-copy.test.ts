@@ -87,8 +87,12 @@ describe("formatWrapText", () => {
         "😬 Furthest Off: Ava · Arsenal v Chelsea: said 3–0, finished 0–2",
       ].join("\n"),
     );
-    expect(text.split("\n").length).toBe(9);
+    const lines = text.split("\n");
+    expect(lines.length).toBe(9);
     expect(text.endsWith("\n")).toBe(false);
+    // A tie gives one line per winner, and next best follows Tipper directly.
+    expect(lines.filter((l) => l.startsWith("👑")).length).toBe(2);
+    expect(lines.indexOf("Mia and Ava next best with 10pts")).toBe(2);
   });
 
   it("writes a GW1 week: Tipper (tied, so no next best) and Furthest Off", () => {
