@@ -14,7 +14,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { useSearchParams } from "next/navigation";
-import { Check, ChevronLeft, Star, X } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, Star, X } from "lucide-react";
 import {
   MAX_PREDICT_TABLE_SCORE,
   type PredictTableScoreResult,
@@ -51,6 +51,7 @@ import {
   totals,
   withExactBand,
   type CompareRow,
+  type CompareSection,
   type SentenceRule,
   type SideCall,
   type SideTotals,
@@ -213,6 +214,19 @@ export function TableComparePrototype({ payload }: { payload: ProtoPayload }) {
     sections.flatMap((s) => s.rows).find((r) => r.teamId === openTeamId) ??
     null;
 
+  const rowFor = (row: CompareRow) => (
+    <Row
+      key={row.teamId}
+      row={row}
+      options={options}
+      seasonOver={seasonOver}
+      open={row.teamId === openTeamId}
+      onTap={() =>
+        setOpenTeamId((id) => (id === row.teamId ? null : row.teamId))
+      }
+    />
+  );
+
   return (
     <main
       className={PAGE}
@@ -240,72 +254,61 @@ export function TableComparePrototype({ payload }: { payload: ProtoPayload }) {
         </p>
       ) : null}
 
-      {/* A plain surface card, not CardShell: CardShell's overflow-hidden
-          makes the card a scroll container, which pins the sticky axis to
-          the card instead of the page. overflow-clip rounds the corners
-          without that side effect. */}
-      <div className={`overflow-clip rounded-card bg-surface ${CARD_SHADOW}`}>
-        <ChartKey themName={themPlayer.displayName} seasonOver={seasonOver} />
-        <AxisHeader options={options} />
-        <ol className="flex flex-col">
-          {sections.map((section) => {
-            const band = TABLE_BANDS[section.bandIndex];
-            const { Icon, positions } = BAND_META[band.key];
-            const youBonus = bandBonus(youScore, section.bandIndex);
-            const themBonus = bandBonus(themScore, section.bandIndex);
-            return (
+      {/* Q14: three structural takes on the same data. The header card,
+          rows, key and tap card are shared, so the comparison is purely
+          about how the page is organised. */}
+      {options.q14 === "differences" ? (
+        <DifferencesLayout
+          sections={sections}
+          youScore={youScore}
+          themScore={themScore}
+          themName={themPlayer.displayName}
+          seasonOver={seasonOver}
+          options={options}
+          rowFor={rowFor}
+        />
+      ) : options.q14 === "cards" ? (
+        <BandCardsLayout
+          sections={sections}
+          youScore={youScore}
+          themScore={themScore}
+          themName={themPlayer.displayName}
+          seasonOver={seasonOver}
+          options={options}
+          rowFor={rowFor}
+        />
+      ) : (
+        // A plain surface card, not CardShell: CardShell's overflow-hidden
+        // makes the card a scroll container, which pins the sticky axis to
+        // the card instead of the page. overflow-clip rounds the corners
+        // without that side effect.
+        <div className={`overflow-clip rounded-card bg-surface ${CARD_SHADOW}`}>
+          <ChartKey themName={themPlayer.displayName} seasonOver={seasonOver} />
+          <AxisHeader options={options} />
+          <ol className="flex flex-col">
+            {sections.map((section) => (
               <li
                 key={section.bandIndex}
                 className="border-t border-paper-line first:border-t-0"
               >
                 {/* The /picks in-card week heading (Label, muted), with the
-                    Band's wayfinding icon as BandSummary carries it. An
-                    exact-Band bonus sits on the right in its player's
-                    points column. */}
+                    Band's wayfinding icon as BandSummary carries it. */}
                 <div
                   className={`flex items-center gap-1.5 ${INSET} pt-2.5 pb-0.5 ${TX.muted}`}
                 >
-                  <Icon className="size-3.5 shrink-0" aria-hidden />
-                  <span className={`truncate ${LABEL}`}>{section.label}</span>
-                  <span
-                    className={`shrink-0 ${T.caption} font-medium tabular-nums`}
-                  >
-                    {positions}
-                  </span>
-                  {youBonus > 0 || themBonus > 0 ? (
-                    // Each chip carries its owner's mark, so it never relies
-                    // on which column it happens to sit above.
-                    <span className="ml-auto flex shrink-0 gap-1">
-                      <BandBonusChip who="you" name="You" value={youBonus} />
-                      <BandBonusChip
-                        who="them"
-                        name={themPlayer.displayName}
-                        value={themBonus}
-                      />
-                    </span>
-                  ) : null}
+                  <BandHeading
+                    bandIndex={section.bandIndex}
+                    youBonus={bandBonus(youScore, section.bandIndex)}
+                    themBonus={bandBonus(themScore, section.bandIndex)}
+                    themName={themPlayer.displayName}
+                  />
                 </div>
-                <ul>
-                  {section.rows.map((row) => (
-                    <Row
-                      key={row.teamId}
-                      row={row}
-                      options={options}
-                      seasonOver={seasonOver}
-                      open={row.teamId === openTeamId}
-                      onTap={() =>
-                        setOpenTeamId((id) =>
-                          id === row.teamId ? null : row.teamId,
-                        )
-                      }
-                    />
-                  ))}
-                </ul>
+                <ul>{section.rows.map(rowFor)}</ul>
               </li>
-            );
-          })}
-        </ol>
-      </div>
+            ))}
+          </ol>
+        </div>
+      )}
 
       {openRow ? (
         <TapCard
@@ -582,6 +585,212 @@ function gridCols(options: Options): string {
   return options.q5 === "name"
     ? "grid-cols-[5.5rem_1fr_2rem_2rem]"
     : "grid-cols-[2.75rem_1fr_2rem_2rem]";
+}
+
+/** A Band's name, positions and any exact-Band chips, for any heading. */
+function BandHeading({
+  bandIndex,
+  youBonus,
+  themBonus,
+  themName,
+  onInk = false,
+}: {
+  bandIndex: number;
+  youBonus: number;
+  themBonus: number;
+  themName: string;
+  onInk?: boolean;
+}) {
+  const band = TABLE_BANDS[bandIndex];
+  const { Icon, positions } = BAND_META[band.key];
+  return (
+    <>
+      <Icon className="size-3.5 shrink-0" aria-hidden />
+      <span className={`truncate ${LABEL}`}>{band.label}</span>
+      {onInk ? (
+        // BandSummary's positions pill on the ink header.
+        <span
+          className={`shrink-0 rounded-badge bg-paper/15 px-2 py-0.5 ${T.label} font-extrabold tabular-nums ${TX.onInk}`}
+        >
+          {positions}
+        </span>
+      ) : (
+        <span className={`shrink-0 ${T.caption} font-medium tabular-nums`}>
+          {positions}
+        </span>
+      )}
+      {youBonus > 0 || themBonus > 0 ? (
+        // Each chip carries its owner's mark, so it never relies on which
+        // column it happens to sit above.
+        <span className="ml-auto flex shrink-0 gap-1">
+          <BandBonusChip who="you" name="You" value={youBonus} />
+          <BandBonusChip who="them" name={themName} value={themBonus} />
+        </span>
+      ) : null}
+    </>
+  );
+}
+
+interface LayoutProps {
+  sections: CompareSection[];
+  youScore: PredictTableScoreResult;
+  themScore: PredictTableScoreResult;
+  themName: string;
+  seasonOver: boolean;
+  options: Options;
+  rowFor: (row: CompareRow) => React.ReactNode;
+}
+
+/**
+ * Q14 "differences": the page answers "why is the gap what it is?" by its
+ * structure. Clubs that moved the gap come first, grouped by who gained and
+ * biggest swing first; clubs on the same points fold away at the end. The
+ * Band each club sits in is still its shaded column.
+ */
+function DifferencesLayout({
+  sections,
+  youScore,
+  themScore,
+  themName,
+  seasonOver,
+  options,
+  rowFor,
+}: LayoutProps) {
+  const rows = sections.flatMap((s) => s.rows);
+  const swing = (r: CompareRow) => r.you.points - r.them.points;
+  const youGained = rows
+    .filter((r) => swing(r) > 0)
+    .sort((a, b) => swing(b) - swing(a));
+  const themGained = rows
+    .filter((r) => swing(r) < 0)
+    .sort((a, b) => swing(a) - swing(b));
+  const level = rows.filter((r) => swing(r) === 0);
+  const sum = (list: CompareRow[]) =>
+    list.reduce((total, r) => total + Math.abs(swing(r)), 0);
+  const exactBands = sections.filter(
+    (s) =>
+      bandBonus(youScore, s.bandIndex) > 0 ||
+      bandBonus(themScore, s.bandIndex) > 0,
+  );
+
+  const groupHeading = (label: string, amount: number | null) => (
+    <div
+      className={`flex items-baseline gap-2 border-t border-paper-line ${INSET} pt-3 pb-1 first:border-t-0`}
+    >
+      <span className={`${LABEL} ${TX.muted}`}>{label}</span>
+      {amount !== null ? (
+        <span className={`${T.caption} font-extrabold tabular-nums ${TX.base}`}>
+          {pointLabel(amount)}
+        </span>
+      ) : null}
+    </div>
+  );
+
+  return (
+    <div className={`overflow-clip rounded-card bg-surface ${CARD_SHADOW}`}>
+      <ChartKey themName={themName} seasonOver={seasonOver} />
+      <AxisHeader options={options} />
+      {youGained.length > 0 ? (
+        <section>
+          {groupHeading("Where you gained", sum(youGained))}
+          <ul>{youGained.map(rowFor)}</ul>
+        </section>
+      ) : null}
+      {themGained.length > 0 ? (
+        <section>
+          {groupHeading(`Where ${themName} gained`, sum(themGained))}
+          <ul>{themGained.map(rowFor)}</ul>
+        </section>
+      ) : null}
+      {exactBands.length > 0 ? (
+        // Band Bonus belongs to a whole Band, not a club, so it can't sit
+        // in a club row; it gets its own line in the gap's accounting.
+        <section>
+          {groupHeading("Exactly right Bands", null)}
+          <ul className={`flex flex-col gap-1 ${INSET} pb-2.5`}>
+            {exactBands.map((s) => (
+              <li
+                key={s.bandIndex}
+                className={`flex items-center gap-1.5 ${TX.muted}`}
+              >
+                <BandHeading
+                  bandIndex={s.bandIndex}
+                  youBonus={bandBonus(youScore, s.bandIndex)}
+                  themBonus={bandBonus(themScore, s.bandIndex)}
+                  themName={themName}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      {level.length > 0 ? (
+        // Clubs on the same points don't explain the gap, so they fold
+        // away -- still one tap from the full table.
+        <details className="group border-t border-paper-line">
+          <summary
+            className={`flex min-h-11 cursor-pointer list-none items-center gap-2 ${INSET} ${FOCUS}`}
+          >
+            <span className={`${LABEL} ${TX.muted}`}>Same points</span>
+            <span className={`${T.caption} tabular-nums ${TX.muted}`}>
+              {level.length} clubs
+            </span>
+            <ChevronDown
+              className="ml-auto size-4 stroke-text-muted transition-transform group-open:rotate-180"
+              aria-hidden
+            />
+          </summary>
+          <ul>{level.map(rowFor)}</ul>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Q14 "cards": each Band is its own card with an ink header, the grammar
+ * /predict-table's BandSummary already uses for a table. The marks strip
+ * sticks above the whole stack.
+ */
+function BandCardsLayout({
+  sections,
+  youScore,
+  themScore,
+  themName,
+  seasonOver,
+  options,
+  rowFor,
+}: LayoutProps) {
+  return (
+    <div className="flex flex-col gap-3">
+      <div className={`overflow-clip rounded-card bg-surface ${CARD_SHADOW}`}>
+        <ChartKey themName={themName} seasonOver={seasonOver} />
+      </div>
+      {/* The sticky marks strip lives outside the cards: CardShell's
+          overflow-hidden would trap it. */}
+      <div
+        className={`sticky top-0 z-10 overflow-clip rounded-btn ${CARD_SHADOW}`}
+      >
+        <AxisHeader options={options} />
+      </div>
+      {sections.map((section) => (
+        <CardShell key={section.bandIndex} className="bg-surface">
+          <div
+            className={`flex items-center gap-1.5 bg-ink ${INSET} py-2.5 ${TX.onInk}`}
+          >
+            <BandHeading
+              bandIndex={section.bandIndex}
+              youBonus={bandBonus(youScore, section.bandIndex)}
+              themBonus={bandBonus(themScore, section.bandIndex)}
+              themName={themName}
+              onInk
+            />
+          </div>
+          <ul className="py-1">{section.rows.map(rowFor)}</ul>
+        </CardShell>
+      ))}
+    </div>
+  );
 }
 
 /**

@@ -27,6 +27,7 @@ export const OPTION_DEFAULTS = {
   q10: "none",
   q12: "visual",
   q13: "none",
+  q14: "chart",
 };
 export type Options = Record<keyof typeof OPTION_DEFAULTS, string>;
 
@@ -35,6 +36,15 @@ const QUESTIONS: {
   title: string;
   options: [string, string][];
 }[] = [
+  {
+    key: "q14",
+    title: "Q14 · Page layout",
+    options: [
+      ["chart", "A · Chart by Band"],
+      ["differences", "B · Differences first"],
+      ["cards", "C · Band cards"],
+    ],
+  },
   {
     key: "q2",
     title: "Q2 · Club never placed",
