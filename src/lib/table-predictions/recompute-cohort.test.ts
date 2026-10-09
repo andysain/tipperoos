@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { fakeSupabase, type Row } from "../../../vitest/fake-supabase";
 import { recomputePredictTableCohort } from "./recompute-cohort";
 import { TABLE_BANDS as RULE_BANDS } from "./rules";
 
@@ -7,66 +7,12 @@ import { TABLE_BANDS as RULE_BANDS } from "./rules";
 // table_predictions / table_prediction_ranks / team_standings / seasons /
 // matches reads -> scorePredictTableCohort -> table_prediction_scores
 // write) against an in-memory fake that persists upserts so a repeat call
-// in the same test sees them, mirroring select-next.test.ts's fake.
-
-interface Row {
-  [key: string]: unknown;
-}
-
-function filterable(rows: Row[]): {
-  eq: (col: string, val: unknown) => ReturnType<typeof filterable>;
-  in: (col: string, vals: readonly unknown[]) => ReturnType<typeof filterable>;
-  order: () => ReturnType<typeof filterable>;
-  limit: (n: number) => ReturnType<typeof filterable>;
-  maybeSingle: () => Promise<{ data: Row | null; error: null }>;
-  then: (resolve: (result: { data: Row[]; error: null }) => void) => void;
-} {
-  return {
-    eq: (col, val) => filterable(rows.filter((r) => r[col] === val)),
-    in: (col, vals) => filterable(rows.filter((r) => vals.includes(r[col]))),
-    order: () => filterable(rows),
-    limit: (n) => filterable(rows.slice(0, n)),
-    maybeSingle: () => Promise.resolve({ data: rows[0] ?? null, error: null }),
-    then: (resolve) => resolve({ data: rows, error: null }),
-  };
-}
-
-function fakeSupabase(seed: {
-  seasons?: Row[];
-  matches?: Row[];
-  team_standings?: Row[];
-  players?: Row[];
-  table_predictions?: Row[];
-  table_prediction_ranks?: Row[];
-}) {
-  const tables: Record<string, Row[]> = {
-    seasons: seed.seasons ?? [],
-    matches: seed.matches ?? [],
-    team_standings: seed.team_standings ?? [],
-    players: seed.players ?? [],
-    table_predictions: seed.table_predictions ?? [],
-    table_prediction_ranks: seed.table_prediction_ranks ?? [],
-    table_prediction_scores: [],
-  };
-
-  const client = {
-    from: (table: string) => ({
-      select: (_cols: string) => filterable(tables[table]),
-      upsert: (rows: Row[], _options: { onConflict: string }) => {
-        for (const row of rows) {
-          const index = tables[table].findIndex(
-            (r) => r.player_id === row.player_id,
-          );
-          if (index >= 0) tables[table][index] = { ...row };
-          else tables[table].push({ ...row });
-        }
-        return Promise.resolve({ error: null });
-      },
-    }),
-  } as unknown as SupabaseClient;
-
-  return { client, tables };
-}
+// in the same test sees them.
+//
+// Issue #214 D1 moved the reads into the shared, embedded-select
+// loadScoredCohort (cohort.ts). These seeds and every golden value below
+// are unchanged by that refactor -- they are the proof the recompute writes
+// identical scores before and after it.
 
 const SEASON_ID = "s1";
 const COMPETITION_ID = "c1";
@@ -118,26 +64,81 @@ function seedRows() {
   swappedBands.set("t2", "champion");
 
   const players = [
-    { id: "p1", competition_id: COMPETITION_ID, joined_at: BEFORE_GW1, is_bot: false },
-    { id: "p2", competition_id: COMPETITION_ID, joined_at: BEFORE_GW1, is_bot: false },
+    {
+      id: "p1",
+      competition_id: COMPETITION_ID,
+      joined_at: BEFORE_GW1,
+      is_bot: false,
+    },
+    {
+      id: "p2",
+      competition_id: COMPETITION_ID,
+      joined_at: BEFORE_GW1,
+      is_bot: false,
+    },
     // Late Joiner: submits an exact-match prediction like p1, but sits
     // outside the Bold Call process in both directions (CLAUDE.md).
-    { id: "p3", competition_id: COMPETITION_ID, joined_at: AFTER_GW1, is_bot: false },
+    {
+      id: "p3",
+      competition_id: COMPETITION_ID,
+      joined_at: AFTER_GW1,
+      is_bot: false,
+    },
     // Skipped -- has ranks (defensively) but must be excluded entirely.
-    { id: "p4", competition_id: COMPETITION_ID, joined_at: BEFORE_GW1, is_bot: false },
+    {
+      id: "p4",
+      competition_id: COMPETITION_ID,
+      joined_at: BEFORE_GW1,
+      is_bot: false,
+    },
     // Never submitted -- has a table_predictions row but submitted_at null.
-    { id: "p5", competition_id: COMPETITION_ID, joined_at: BEFORE_GW1, is_bot: false },
+    {
+      id: "p5",
+      competition_id: COMPETITION_ID,
+      joined_at: BEFORE_GW1,
+      is_bot: false,
+    },
     // No table_predictions row at all.
-    { id: "p6", competition_id: COMPETITION_ID, joined_at: BEFORE_GW1, is_bot: false },
+    {
+      id: "p6",
+      competition_id: COMPETITION_ID,
+      joined_at: BEFORE_GW1,
+      is_bot: false,
+    },
     // Bot -- excluded by is_bot regardless of any table_predictions row.
-    { id: "p-bot", competition_id: COMPETITION_ID, joined_at: BEFORE_GW1, is_bot: true },
+    {
+      id: "p-bot",
+      competition_id: COMPETITION_ID,
+      joined_at: BEFORE_GW1,
+      is_bot: true,
+    },
   ];
 
   const tablePredictions = [
-    { id: "tp1", player_id: "p1", submitted_at: "2026-08-01T00:00:00Z", is_skipped: false },
-    { id: "tp2", player_id: "p2", submitted_at: "2026-08-01T00:00:00Z", is_skipped: false },
-    { id: "tp3", player_id: "p3", submitted_at: "2026-09-02T00:00:00Z", is_skipped: false },
-    { id: "tp4", player_id: "p4", submitted_at: "2026-08-01T00:00:00Z", is_skipped: true },
+    {
+      id: "tp1",
+      player_id: "p1",
+      submitted_at: "2026-08-01T00:00:00Z",
+      is_skipped: false,
+    },
+    {
+      id: "tp2",
+      player_id: "p2",
+      submitted_at: "2026-08-01T00:00:00Z",
+      is_skipped: false,
+    },
+    {
+      id: "tp3",
+      player_id: "p3",
+      submitted_at: "2026-09-02T00:00:00Z",
+      is_skipped: false,
+    },
+    {
+      id: "tp4",
+      player_id: "p4",
+      submitted_at: "2026-08-01T00:00:00Z",
+      is_skipped: true,
+    },
     { id: "tp5", player_id: "p5", submitted_at: null, is_skipped: false },
   ];
 
