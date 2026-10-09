@@ -152,6 +152,35 @@ function finishedMatchesOf(
     .flatMap((m) => (m.result === null ? [] : [{ ...m, result: m.result }]));
 }
 
+export interface NoPicksInput {
+  gameweekNumber: number;
+  players: readonly StreakPlayer[];
+  matches: readonly WrapMatch[];
+  picks: readonly StreakPick[];
+}
+
+/**
+ * Humans missing a pick on at least one of gameweek N's counted matches,
+ * in roster order -- the admin wrap panel's "No picks" line (#219 L4, L5).
+ * A match that kicked off before a player joined isn't held against them,
+ * the same rule as Streak Snapped; bots are never listed.
+ */
+export function findNoPicks(input: NoPicksInput): string[] {
+  const matches = finishedMatchesOf(input.matches, input.gameweekNumber);
+  const picked = new Set(input.picks.map((p) => `${p.playerId}:${p.matchId}`));
+  return input.players
+    .filter((player) => !player.isBot)
+    .filter((player) => {
+      const joinedAt = new Date(player.joinedAt).getTime();
+      return matches.some(
+        (m) =>
+          new Date(m.kickoffUtcIso).getTime() >= joinedAt &&
+          !picked.has(`${player.id}:${m.id}`),
+      );
+    })
+    .map((player) => player.id);
+}
+
 /** Skip rank by season total -- callers pass humans only (ADR 0012 D12). */
 function ranksOf(rows: readonly WrapSnapshotRow[]): Map<string, number> {
   return new Map(

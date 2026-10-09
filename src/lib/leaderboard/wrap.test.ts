@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildGameweekWrap,
+  findNoPicks,
   type GameweekWrapInput,
   type WrapAward,
   type WrapMatch,
@@ -665,5 +666,76 @@ describe("buildGameweekWrap: the cap of 4, order, and bots", () => {
       a.winners.map((w) => w.playerId),
     );
     expect(everyone.includes("bot")).toBe(false);
+  });
+});
+
+// #219 L4/L5: humans missing a pick on one of N's counted matches (completed
+// with a result, not voided), skipping matches that kicked off before they
+// joined. GW2 kicks off 2026-08-23 14:00 (s1) and 2026-08-24 14:00 (s2).
+describe("findNoPicks", () => {
+  const ms = [
+    match(1, 1, { home: 2, away: 0 }),
+    match(2, 1, { home: 2, away: 0 }),
+    match(2, 2, { home: 1, away: 1 }),
+    match(2, 3, null),
+    match(2, 4, { home: 3, away: 1 }, { voided: true }),
+  ];
+  const midGameweek = "2026-08-23T20:00:00Z";
+
+  it("lists humans missing one or both, never bots, voided or result-less matches", () => {
+    const ids = findNoPicks({
+      gameweekNumber: 2,
+      players: [
+        human("ana"),
+        human("ben"),
+        human("cat"),
+        human("dan", midGameweek),
+        human("eve", midGameweek),
+        { id: "bot", isBot: true, joinedAt: JOINED },
+      ],
+      matches: ms,
+      picks: [
+        // ana: both of GW2's counted matches; nothing on GW1, which isn't N.
+        pick("ana", "g2s1", 1, 0),
+        pick("ana", "g2s2", 0, 0),
+        // ben: only the first.
+        pick("ben", "g2s1", 1, 0),
+        // dan joined after s1 kicked off and picked s2: nothing missed.
+        pick("dan", "g2s2", 2, 2),
+        // eve joined after s1 and missed s2. cat picked nothing.
+      ],
+    });
+
+    expect(ids.length).toBe(3);
+    expect(ids.join(",")).toBe("ben,cat,eve");
+    expect(ids.indexOf("ana")).toBe(-1);
+    expect(ids.indexOf("dan")).toBe(-1);
+    expect(ids.indexOf("bot")).toBe(-1);
+  });
+
+  it("is empty when every one of N's matches was voided", () => {
+    const ids = findNoPicks({
+      gameweekNumber: 3,
+      players: [human("ana"), human("ben")],
+      matches: [
+        match(3, 1, { home: 2, away: 0 }, { voided: true }),
+        match(3, 2, null, { voided: true }),
+      ],
+      picks: [],
+    });
+
+    expect(ids.length).toBe(0);
+  });
+
+  it("skips a player who joined after every one of N's kickoffs", () => {
+    const ids = findNoPicks({
+      gameweekNumber: 2,
+      players: [human("ana"), human("zed", "2026-09-01T00:00:00Z")],
+      matches: ms,
+      picks: [],
+    });
+
+    expect(ids.length).toBe(1);
+    expect(ids[0]).toBe("ana");
   });
 });
