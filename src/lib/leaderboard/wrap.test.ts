@@ -45,6 +45,8 @@ function match(
     gameweekNumber: gameweek,
     kickoffUtcIso: kickoff(gameweek, slot),
     providerMatchId: String(gameweek * 10 + slot),
+    homeTeam: `Home ${gameweek}.${slot}`,
+    awayTeam: `Away ${gameweek}.${slot}`,
     result,
     voided: opts.voided ?? false,
   };
@@ -512,6 +514,9 @@ describe("buildGameweekWrap: Furthest Off", () => {
     expect(off.winners[0].playerId).toBe("ana");
     expect(off.winners[0].goalError).toBe(5);
     expect(off.winners[0].pick.away).toBe(3);
+    // The card names the fixture, so the award carries it.
+    expect(off.winners[0].homeTeam).toBe("Home 1.1");
+    expect(off.winners[0].awayTeam).toBe("Away 1.1");
   });
 
   it("never goes to a Wrong Way Round, a missing pick, or a voided or result-less match", () => {
