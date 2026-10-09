@@ -28,7 +28,7 @@ export const AWARD_META: Record<Kind, { mark: string; name: string }> = {
   furthestOff: { mark: "😬", name: "Furthest Off" },
 };
 
-export interface WinnerLine {
+interface WinnerLine {
   playerId: string;
   fact: string;
 }
@@ -85,7 +85,7 @@ export function nameOf(people: WrapPeople, playerId: string): string {
 }
 
 /** "Mia", "Mia and Sam", "Mia, Sam and Jo". */
-export function joinNames(names: readonly string[]): string {
+function joinNames(names: readonly string[]): string {
   return names.length <= 1
     ? (names[0] ?? "")
     : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;

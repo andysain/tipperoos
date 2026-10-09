@@ -89,9 +89,9 @@ export default async function AdminIndexPage() {
       return { counts, health };
     })(),
     loadAdminWrap(supabase, admin.competitionId, admin.playerId).catch(
-      (error: unknown): AdminWrap | "error" => {
+      (error: unknown): AdminWrap => {
         console.error("admin wrap failed to load", error);
-        return "error";
+        return { kind: "error" };
       },
     ),
   ]);
@@ -142,19 +142,7 @@ export default async function AdminIndexPage() {
         </p>
       </section>
 
-      {wrap === "error" ? (
-        <WrapPanel state="error" />
-      ) : wrap.kind === "none" ? (
-        <WrapPanel state="none" />
-      ) : (
-        <WrapPanel
-          state="ready"
-          gameweekNumber={wrap.gameweekNumber}
-          text={wrap.text}
-          awardCount={wrap.awardCount}
-          noPicks={wrap.noPicks}
-        />
-      )}
+      <WrapPanel wrap={wrap} />
 
       <Link
         href={{ pathname: "/admin/players" }}

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Check } from "lucide-react";
+import type { AdminWrap } from "@/app/_lib/admin-wrap-access";
 import { Button } from "@/components/ui/Button";
 import { CARD_SHADOW, LABEL, MICRO_LABEL, T, TX } from "@/components/ui/tokens";
 
@@ -16,33 +18,22 @@ const CARD = `flex flex-col gap-3 rounded-card border border-paper-line bg-white
 /** How long "Copied ✓" holds before the label returns. */
 const COPIED_MS = 2000;
 
-export type WrapPanelProps =
-  | { state: "none" }
-  | { state: "error" }
-  | {
-      state: "ready";
-      gameweekNumber: number;
-      text: string;
-      awardCount: number;
-      noPicks: string[];
-    };
-
-export function WrapPanel(props: WrapPanelProps) {
-  if (props.state !== "ready") {
+export function WrapPanel({ wrap }: { wrap: AdminWrap }) {
+  if (wrap.kind !== "ready") {
     return (
       <section className={CARD} aria-labelledby="admin-wrap-heading">
         <h2 id="admin-wrap-heading" className={`${LABEL} ${TX.muted}`}>
           Gameweek wrap
         </h2>
         <p className={`${T.dense} ${TX.muted}`}>
-          {props.state === "none"
+          {wrap.kind === "none"
             ? "The first wrap appears once Gameweek 1 is scored."
             : "Couldn't load the wrap. Reload to try again."}
         </p>
       </section>
     );
   }
-  return <ReadyWrap {...props} />;
+  return <ReadyWrap {...wrap} />;
 }
 
 function ReadyWrap({
@@ -50,7 +41,7 @@ function ReadyWrap({
   text,
   awardCount,
   noPicks,
-}: Extract<WrapPanelProps, { state: "ready" }>) {
+}: Extract<AdminWrap, { kind: "ready" }>) {
   const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
   const blockRef = useRef<HTMLDivElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -104,7 +95,14 @@ function ReadyWrap({
       )}
 
       <Button intent="secondary" fullWidth disabled={!hasAwards} onClick={copy}>
-        {status === "copied" ? "Copied ✓" : "Copy as text"}
+        {status === "copied" ? (
+          <>
+            <Check className="size-4" aria-hidden="true" />
+            Copied
+          </>
+        ) : (
+          "Copy as text"
+        )}
       </Button>
       {/* Always mounted so screen readers announce changes; visually
           hidden except for the fallback's instruction. */}
@@ -113,7 +111,7 @@ function ReadyWrap({
         className={status === "failed" ? `${T.caption} ${TX.muted}` : "sr-only"}
       >
         {status === "copied"
-          ? "Wrap copied"
+          ? "Copied"
           : status === "failed"
             ? "Copy didn't work here. The text is selected, so use your phone's Copy."
             : ""}

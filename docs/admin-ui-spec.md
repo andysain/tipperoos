@@ -127,7 +127,7 @@ Table submissions (submitted / skipped / outstanding).
 > Skipped-Slot week has one tipped match, so it shows **no tips / tipped**). Same
 > count-not-scoreline rule as §6.1's roster column (D3).
 
-**Gameweek wrap** (issue #219), below the counts row: every award that fired for the
+**Gameweek wrap** (issue #219), below the Snapshot card and above the Players & access door: every award that fired for the
 last scored gameweek (uncapped, unlike the Season tab's four), shown as the exact plain
 text a **Copy as text** button puts on the clipboard, for pasting into the group's own
 message. Under it, an admin-only **No picks** line: humans missing a pick on that

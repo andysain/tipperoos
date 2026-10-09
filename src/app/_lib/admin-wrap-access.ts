@@ -11,6 +11,8 @@ import { formatWrapText, nameOf } from "@/lib/leaderboard/wrap-copy";
 
 export type AdminWrap =
   | { kind: "none" }
+  /** Set by the page when this loader throws, never returned by it. */
+  | { kind: "error" }
   | {
       kind: "ready";
       gameweekNumber: number;
