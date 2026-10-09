@@ -5,6 +5,7 @@ import {
 } from "@/lib/scoring/predict-table";
 import { TABLE_PREDICTION_DEADLINE } from "./rules";
 import {
+  SCORING_REACH,
   MAX_BAND_BONUS,
   MAX_BOLD_CALLS_SCORE,
   MAX_PLACEMENT,
@@ -252,5 +253,11 @@ describe("score-part maximums", () => {
     expect(MAX_BAND_BONUS).toBe(85);
     expect(MAX_BOLD_CALLS_SCORE).toBe(15);
     expect(MAX_PLACEMENT + MAX_BAND_BONUS + MAX_BOLD_CALLS_SCORE).toBe(200);
+  });
+});
+
+describe("SCORING_REACH", () => {
+  it("is 2: a call one or two Bands out still scores, three or more scores 0 (CLAUDE.md)", () => {
+    expect(SCORING_REACH).toBe(2);
   });
 });

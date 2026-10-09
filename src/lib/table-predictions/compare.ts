@@ -29,6 +29,13 @@ export const MAX_BAND_BONUS = SCORING_BANDS.reduce(
 );
 export const MAX_BOLD_CALLS_SCORE = MAX_BOLD_CALLS * BOLD_CALL_BONUS;
 
+/**
+ * The furthest a call can be from the right Band and still score: past
+ * this many Bands out, Placement is 0. The chart draws a bar's length
+ * beyond it as "no points this far" (issue #214).
+ */
+export const SCORING_REACH = PLACEMENT_POINTS_BY_DISTANCE.length - 1;
+
 export interface ComparisonTeam {
   id: TeamId;
   name: string;

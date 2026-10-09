@@ -31,10 +31,15 @@ export const dynamic = "force-dynamic";
 
 export default async function CompareTablePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ playerId: string }>;
+  searchParams: Promise<{ cliff?: string }>;
 }) {
   const { playerId: targetId } = await params;
+  // TEMPORARY (issue #214 before/after): `?cliff=off` shows bars without the
+  // dashed "no points this far" segment. Remove before merge.
+  const { cliff } = await searchParams;
   const { playerId: viewerId, competitionId } = await loadActivePlayer();
   // Your own id goes to your own table before anything is read (D6): it
   // never waits on, or fails with, the comparison's reads.
@@ -134,6 +139,7 @@ export default async function CompareTablePage({
         }}
         seasonOver={isSeasonOver(cohort.minPlayed)}
         standingsNote={standingsNote}
+        cliff={cliff !== "off"}
       />
     </main>
   );

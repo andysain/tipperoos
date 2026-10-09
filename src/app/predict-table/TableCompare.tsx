@@ -22,6 +22,7 @@ import {
   MAX_BAND_BONUS,
   MAX_BOLD_CALLS_SCORE,
   MAX_PLACEMENT,
+  SCORING_REACH,
   distanceLabel,
   gapSentence,
   leads,
@@ -69,11 +70,17 @@ export function TableCompare({
   them,
   seasonOver,
   standingsNote,
+  cliff,
 }: {
   comparison: TableComparison;
   you: ComparePlayer;
   them: ComparePlayer;
   seasonOver: boolean;
+  /**
+   * TEMPORARY (issue #214 before/after): dash bars past the scoring reach.
+   * Remove the prop and keep the chosen behaviour before merge.
+   */
+  cliff: boolean;
   /** Set when the standings are stale: the date they're measured against. */
   standingsNote: string | null;
 }) {
@@ -104,7 +111,11 @@ export function TableCompare({
           the card instead of the page. overflow-clip rounds the corners
           without that side effect. */}
       <div className={`overflow-clip rounded-card bg-surface ${CARD_SHADOW}`}>
-        <ChartKey themName={them.displayName} seasonOver={seasonOver} />
+        <ChartKey
+          themName={them.displayName}
+          seasonOver={seasonOver}
+          cliff={cliff}
+        />
         <StickyMarks />
         <ol className="flex flex-col">
           {comparison.sections.map((section) => {
@@ -148,6 +159,7 @@ export function TableCompare({
                       key={row.teamId}
                       row={row}
                       seasonOver={seasonOver}
+                      cliff={cliff}
                       open={row.teamId === openTeamId}
                       onTap={() =>
                         setOpenTeamId((id) =>
@@ -168,6 +180,7 @@ export function TableCompare({
           row={openRow}
           themName={them.displayName}
           seasonOver={seasonOver}
+          cliff={cliff}
           onHeight={setCardHeight}
           onClose={() => setOpenTeamId(null)}
         />
@@ -388,11 +401,14 @@ function Who({
 // Budget Rule, issue #214); theirs is outline ink, never Neutral Teal.
 function Mark({
   who,
+  hit = false,
   size = "size-3",
   className = "",
   style,
 }: {
   who: "you" | "them";
+  /** On the finish line: the right Band. */
+  hit?: boolean;
   size?: string;
   className?: string;
   style?: React.CSSProperties;
@@ -404,6 +420,10 @@ function Mark({
         who === "you"
           ? "bg-accent ring-1 ring-ink"
           : "border-2 border-ink bg-surface"
+      } ${
+        // A direct hit wears Pitch Green -- its DESIGN.md meaning, "a
+        // correct pick". An outline, because your mark's ring is its edge.
+        hit ? "outline-2 outline-offset-1 outline-success" : ""
       } ${className}`}
       style={style}
     />
@@ -414,9 +434,11 @@ function Mark({
 function ChartKey({
   themName,
   seasonOver,
+  cliff,
 }: {
   themName: string;
   seasonOver: boolean;
+  cliff: boolean;
 }) {
   const item = "flex items-center gap-1.5";
   return (
@@ -433,8 +455,25 @@ function ChartKey({
       </span>
       <span className={item}>
         <span aria-hidden className="h-1.5 w-5 rounded-badge bg-accent" />
-        How far off
+        How far off: shorter scores more
       </span>
+      <span className={item}>
+        <Mark who="you" hit />
+        Right Band
+      </span>
+      {cliff ? (
+        <span className={item}>
+          <span
+            aria-hidden
+            className="h-1.5 w-5"
+            style={{
+              backgroundImage:
+                "repeating-linear-gradient(90deg, var(--color-accent) 0 4px, transparent 4px 7px)",
+            }}
+          />
+          {`${String(SCORING_REACH + 1)}+ Bands out: no points`}
+        </span>
+      ) : null}
       <span className={item}>
         {/* The current-Band column and its finish line, in miniature. */}
         <span
@@ -541,11 +580,14 @@ function Lane({
   actualBand,
   who,
   top,
+  cliff,
 }: {
   call: SideCall;
   actualBand: number;
   who: "you" | "them";
   top: string;
+  /** Draw the bar beyond the scoring reach dashed: no points that far. */
+  cliff: boolean;
 }) {
   const you = who === "you";
   if (call.band === null) {
@@ -558,21 +600,48 @@ function Lane({
       </span>
     );
   }
-  const from = Math.min(call.band, actualBand);
   const span = Math.abs(call.band - actualBand);
+  const direction = call.band > actualBand ? 1 : -1;
+  // The bar runs from the finish line out to the mark. Up to the scoring
+  // reach it is solid; past it -- where Placement is 0 -- it's dashed, so
+  // the cliff the scoring has is visible (issue #214).
+  const solid = cliff ? Math.min(span, SCORING_REACH) : span;
+  const beyond = span - solid;
+  const solidFrom = direction > 0 ? actualBand : actualBand - solid;
+  const beyondFrom = direction > 0 ? actualBand + solid : call.band;
+  const height = you ? "h-1.5" : "h-0.5";
+  const colour = you ? "var(--color-accent)" : "var(--color-text-muted)";
   return (
     <>
-      {span > 0 ? (
+      {solid > 0 ? (
         // Gold as a bar for your own call (DESIGN.md -> Trophy Gold, "a
         // fill, a bar, a ring"); the peer's bar in the muted text role.
         <span
           aria-hidden
-          className={`absolute -translate-y-1/2 rounded-badge ${you ? "h-1.5 bg-accent" : "h-0.5 bg-text-muted"}`}
-          style={{ top, left: centre(from), width: pct(span) }}
+          className={`absolute -translate-y-1/2 rounded-badge ${height}`}
+          style={{
+            top,
+            left: centre(solidFrom),
+            width: pct(solid),
+            background: colour,
+          }}
+        />
+      ) : null}
+      {beyond > 0 ? (
+        <span
+          aria-hidden
+          className={`absolute -translate-y-1/2 ${height}`}
+          style={{
+            top,
+            left: centre(beyondFrom),
+            width: pct(beyond),
+            backgroundImage: `repeating-linear-gradient(90deg, ${colour} 0 4px, transparent 4px 7px)`,
+          }}
         />
       ) : null}
       <Mark
         who={who}
+        hit={span === 0}
         size="size-3.5"
         className="absolute -translate-x-1/2 -translate-y-1/2"
         style={{ top, left: centre(call.band) }}
@@ -599,11 +668,13 @@ function rowSpeech(call: SideCall, actualBand: number): string {
 function Row({
   row,
   seasonOver,
+  cliff,
   open,
   onTap,
 }: {
   row: ComparisonRow;
   seasonOver: boolean;
+  cliff: boolean;
   open: boolean;
   onTap: () => void;
 }) {
@@ -645,12 +716,14 @@ function Row({
             actualBand={row.actualBand}
             who="you"
             top="34%"
+            cliff={cliff}
           />
           <Lane
             call={row.them}
             actualBand={row.actualBand}
             who="them"
             top="68%"
+            cliff={cliff}
           />
         </span>
 
@@ -686,12 +759,14 @@ function TapCard({
   row,
   themName,
   seasonOver,
+  cliff,
   onHeight,
   onClose,
 }: {
   row: ComparisonRow;
   themName: string;
   seasonOver: boolean;
+  cliff: boolean;
   onHeight: (height: number) => void;
   onClose: () => void;
 }) {
@@ -759,7 +834,7 @@ function TapCard({
             You: {rowSpeech(row.you, row.actualBand)}. {themName}:{" "}
             {rowSpeech(row.them, row.actualBand)}.
           </p>
-          <Ladder row={row} />
+          <Ladder row={row} cliff={cliff} />
           <div className="grid grid-cols-2 gap-2">
             <ScoreTile
               name="You"
@@ -787,7 +862,7 @@ function TapCard({
  * ticks, labelled only at the Bands this card is about -- where the club is
  * now and the two calls.
  */
-function Ladder({ row }: { row: ComparisonRow }) {
+function Ladder({ row, cliff }: { row: ComparisonRow; cliff: boolean }) {
   const labelled = new Set([row.actualBand, row.you.band, row.them.band]);
   return (
     <div className="relative" aria-hidden>
@@ -801,12 +876,19 @@ function Ladder({ row }: { row: ComparisonRow }) {
           className="absolute inset-y-1 w-px bg-ink"
           style={{ left: centre(row.actualBand) }}
         />
-        <Lane call={row.you} actualBand={row.actualBand} who="you" top="32%" />
+        <Lane
+          call={row.you}
+          actualBand={row.actualBand}
+          who="you"
+          top="32%"
+          cliff={cliff}
+        />
         <Lane
           call={row.them}
           actualBand={row.actualBand}
           who="them"
           top="70%"
+          cliff={cliff}
         />
       </span>
       <span className="relative grid grid-cols-8 pb-1.5">
