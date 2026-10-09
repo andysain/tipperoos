@@ -133,7 +133,7 @@ export function TableComparePrototype({ payload }: { payload: ProtoPayload }) {
     return (
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4">
         {backLink}
-        <h1 className={`${T.h1} font-extrabold leading-tight text-text`}>
+        <h1 className={`${T.h1} font-extrabold leading-tight ${TX.base}`}>
           You vs {themPlayer.displayName}
         </h1>
         {/* Q6 proposal: before the first standings sync there is nothing
@@ -271,8 +271,8 @@ function Header({
   options: Options;
 }) {
   const ink = options.q9 === "ink";
-  const base = ink ? "text-on-ink" : TX.base;
-  const muted = ink ? "text-on-ink-muted" : TX.muted;
+  const base = ink ? TX.onInk : TX.base;
+  const muted = ink ? TX.onInkMuted : TX.muted;
   const line = ink ? "border-paper/15" : "border-paper-line";
   // Q9: on ink, Pitch Green is never text (DESIGN.md -> Pitch Green).
   const green = (mine: number, theirs: number) =>
@@ -308,7 +308,9 @@ function Header({
 
   function boldCell(player: ProtoPlayer, valueNum: number) {
     if (!player.isLateJoiner) return String(valueNum);
-    return options.q4 === "text" ? "Not eligible" : "—";
+    // DESIGN.md: never a dash for a missing value, so the options are a
+    // word or the true value (a Late Joiner's Bold Calls really are 0).
+    return options.q4 === "zero" ? String(valueNum) : "Not eligible";
   }
 
   return (
@@ -321,6 +323,7 @@ function Header({
             total={youTotals.total}
             totalClass={green(youTotals.total, themTotals.total)}
             ink={ink}
+            showLate={options.q4b === "name"}
           />
           <Who
             player={them}
@@ -329,6 +332,7 @@ function Header({
             totalClass={green(themTotals.total, youTotals.total)}
             ink={ink}
             alignEnd
+            showLate={options.q4b === "name"}
           />
         </div>
 
@@ -342,9 +346,15 @@ function Header({
               </th>
               <th className="py-1 text-right font-bold" scope="col">
                 You
+                {options.q4b === "column" && you.isLateJoiner ? (
+                  <LateChip />
+                ) : null}
               </th>
               <th className="py-1 text-right font-bold" scope="col">
                 {them.displayName}
+                {options.q4b === "column" && them.isLateJoiner ? (
+                  <LateChip />
+                ) : null}
               </th>
             </tr>
           </thead>
@@ -397,6 +407,17 @@ function Header({
   );
 }
 
+function LateChip() {
+  // Neutral Teal is the Late Joiner badge role (DESIGN.md -> Neutral Teal).
+  return (
+    <span
+      className={`ml-1.5 rounded-badge bg-info px-1.5 py-0.5 ${MICRO_LABEL} ${TX.onInk}`}
+    >
+      Late
+    </span>
+  );
+}
+
 function Who({
   player,
   label,
@@ -404,6 +425,7 @@ function Who({
   totalClass,
   ink,
   alignEnd,
+  showLate,
 }: {
   player: ProtoPlayer;
   label: string;
@@ -411,6 +433,7 @@ function Who({
   totalClass: string;
   ink: boolean;
   alignEnd?: boolean;
+  showLate: boolean;
 }) {
   return (
     <div
@@ -421,21 +444,23 @@ function Who({
       >
         <EmojiChip emoji={player.emoji} onDark={ink} />
         <span
-          className={`min-w-0 truncate ${T.body} font-bold ${ink ? "text-on-ink" : TX.base}`}
+          className={`min-w-0 truncate ${T.body} font-bold ${ink ? TX.onInk : TX.base}`}
         >
           {label}
         </span>
       </div>
-      {player.isLateJoiner ? (
+      {player.isLateJoiner && showLate ? (
         // Q4: the Late badge sits by the name in the header, in Neutral
         // Teal's badge role (DESIGN.md -> Neutral Teal).
         <span
-          className={`rounded-badge px-1.5 py-0.5 ${MICRO_LABEL} ${ink ? "bg-paper/15 text-on-ink" : "bg-info text-on-ink"}`}
+          className={`rounded-badge px-1.5 py-0.5 ${MICRO_LABEL} bg-info ${TX.onInk}`}
         >
           Late
         </span>
       ) : null}
-      <span className={`${T.score} font-extrabold leading-none ${totalClass}`}>
+      <span
+        className={`${T.score} font-extrabold leading-none tabular-nums ${totalClass}`}
+      >
         {total}
       </span>
     </div>
@@ -459,18 +484,29 @@ function AxisHeader({ options }: { options: Options }) {
     >
       <span aria-hidden />
       <div className="grid grid-cols-8">
-        {/* Position ranges ("12-14") don't fit eight-across at phone
-            width, so the axis uses each Band's existing wayfinding icon
-            (BAND_META) and leaves the name to the section headings. */}
+        {/* Q11: position ranges ("12-14") don't fit eight-across on one
+            line at phone width. Either each Band's wayfinding icon
+            (BAND_META), or the range stacked over two lines. */}
         {TABLE_BANDS.map((band) => {
-          const { Icon } = BAND_META[band.key];
+          const { Icon, positions } = BAND_META[band.key];
+          const [from, to] = positions.split("-");
           return (
             <span
               key={band.key}
-              className={`flex justify-center ${TX.muted}`}
-              title={`${band.label} (${BAND_META[band.key].positions})`}
+              className={`flex flex-col items-center leading-none ${TX.muted}`}
+              title={`${band.label} (${positions})`}
             >
-              <Icon className="size-3.5" aria-hidden />
+              {options.q11 === "positions" ? (
+                <span
+                  className={`flex flex-col items-center ${T.label} font-bold tabular-nums`}
+                  aria-hidden
+                >
+                  <span>{from}</span>
+                  {to ? <span>{to}</span> : null}
+                </span>
+              ) : (
+                <Icon className="size-3.5" aria-hidden />
+              )}
               <span className="sr-only">{band.label}</span>
             </span>
           );
@@ -517,13 +553,13 @@ function Lane({
       {span > 0 ? (
         <span
           aria-hidden
-          className={`absolute -translate-y-1/2 rounded-full ${who === "you" ? "h-1.5 bg-accent" : "h-0.5 bg-ink/50"}`}
+          className={`absolute -translate-y-1/2 rounded-badge ${who === "you" ? "h-1.5 bg-accent" : "h-0.5 bg-ink/50"}`}
           style={{ top, left: centre(from), width: pct(span) }}
         />
       ) : null}
       <span
         aria-hidden
-        className={`absolute size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full ${
+        className={`absolute size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-badge ${
           who === "you"
             ? "bg-accent ring-1 ring-ink/40"
             : "border-2 border-ink bg-surface"
@@ -533,7 +569,7 @@ function Lane({
       {showStar ? (
         <span
           aria-hidden
-          className={`absolute -translate-y-1/2 pl-2.5 ${T.label} leading-none text-ink`}
+          className={`absolute -translate-y-1/2 pl-2.5 ${T.label} leading-none ${TX.base}`}
           style={{ top, left: centre(call.band) }}
         >
           ★
@@ -734,7 +770,7 @@ function CardLine({
       <dt className={`font-bold ${TX.base}`}>{who}</dt>
       <dd className={TX.base}>
         {call.band === null
-          ? "Didn't place it"
+          ? "Not placed"
           : `Said ${TABLE_BANDS[call.band].label}`}
         <span className={`block ${T.caption} ${TX.muted}`}>
           {placementReason(call, actualBand)}

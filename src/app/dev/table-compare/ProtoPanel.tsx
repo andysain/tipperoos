@@ -9,19 +9,23 @@
 // Preview is exactly where this prototype is meant to be reviewed.
 
 import { useState } from "react";
+import { bandIndexForRank } from "@/lib/scoring/predict-table";
 import type { ProtoPayload } from "./TableComparePrototype";
+import { headerSentence, totals, type SentenceRule } from "./view";
 
 export const OPTION_DEFAULTS = {
   you: "",
   vs: "",
   q2: "label",
   q3: "both",
-  q4: "dash",
+  q4: "text",
+  q4b: "name",
   q5: "code",
   q6: "live",
   q8: "neither",
   q9: "paper",
   q10: "biggest",
+  q11: "icons",
 };
 export type Options = Record<keyof typeof OPTION_DEFAULTS, string>;
 
@@ -50,9 +54,18 @@ const QUESTIONS: {
   {
     key: "q4",
     title: "Q4 · Late Joiner's Bold Calls cell",
+    // No dash option: DESIGN.md never uses a dash for a missing value.
     options: [
-      ["dash", "—"],
       ["text", "Not eligible"],
+      ["zero", "0 (badge explains)"],
+    ],
+  },
+  {
+    key: "q4b",
+    title: "Q4 · Late badge goes",
+    options: [
+      ["name", "By the name"],
+      ["column", "On the table column"],
     ],
   },
   {
@@ -97,6 +110,14 @@ const QUESTIONS: {
       ["none", "Numbers only"],
     ],
   },
+  {
+    key: "q11",
+    title: "Q11 · Axis labels (new: icons don't name a column on touch)",
+    options: [
+      ["icons", "Band icons"],
+      ["positions", "Positions, stacked"],
+    ],
+  },
 ];
 
 const STATUS_LABEL: Record<string, string> = {
@@ -127,6 +148,42 @@ export function ProtoPanel({
     const live = payload.scores[id]?.totalScore;
     return `${p.displayName}: read-time ${live ?? "—"} · stored ${p.storedTotal ?? "—"}${p.isLateJoiner ? " · Late" : ""}`;
   };
+
+  // P4: every staging table, wildest first, so Q1's worst case is one tap
+  // away. "Wildness" = total Band distance over placed clubs.
+  const tables = payload.players
+    .filter((p) => p.hasTable)
+    .map((p) => {
+      const bands = payload.bands[p.id] ?? {};
+      let distance = 0;
+      let unplaced = 0;
+      payload.actualOrder.forEach((teamId, index) => {
+        const predicted = bands[teamId];
+        if (predicted === undefined) unplaced++;
+        else distance += Math.abs(predicted - bandIndexForRank(index + 1));
+      });
+      return { player: p, distance, unplaced };
+    })
+    .sort((a, b) => b.distance - a.distance);
+
+  // Q7: the same pair's sentence from both sides. Level is only reachable
+  // with two tables on equal totals.
+  const q7 = (() => {
+    const a = payload.scores[youId];
+    const b = payload.scores[vsId];
+    if (!a || !b || payload.actualOrder.length !== 20) return null;
+    const aBands = new Map(Object.entries(payload.bands[youId] ?? {}));
+    const bBands = new Map(Object.entries(payload.bands[vsId] ?? {}));
+    const aT = totals(a, aBands, payload.actualOrder);
+    const bT = totals(b, bBands, payload.actualOrder);
+    const name = (id: string) =>
+      payload.players.find((p) => p.id === id)?.displayName ?? "?";
+    const rule = options.q10 as SentenceRule;
+    return [
+      `As ${name(youId)}: ${headerSentence(rule, name(vsId), aT, bT)}`,
+      `As ${name(vsId)}: ${headerSentence(rule, name(youId), bT, aT)}`,
+    ];
+  })();
 
   return (
     <div className="fixed top-2 right-2 z-40 flex max-w-[calc(100vw-1rem)] flex-col items-end gap-2 font-sans text-white">
@@ -179,6 +236,38 @@ export function ProtoPanel({
             </select>
           </label>
 
+          <div className="mb-3">
+            <p className="mb-1 font-bold text-white/70">
+              Every table (Q1), wildest first — tap to compare
+            </p>
+            <ul className="flex flex-col gap-0.5">
+              {tables.map(({ player, distance, unplaced }) => (
+                <li key={player.id}>
+                  <button
+                    type="button"
+                    disabled={player.id === youId}
+                    onClick={() => setOption("vs", player.id)}
+                    className={`flex w-full justify-between rounded px-2 py-1 text-left ${
+                      player.id === vsId
+                        ? "bg-white text-neutral-900"
+                        : "hover:bg-white/10 disabled:opacity-40"
+                    }`}
+                  >
+                    <span>
+                      {player.displayName}
+                      {player.isLateJoiner ? " · Late" : ""}
+                    </span>
+                    <span className="tabular-nums">
+                      {payload.scores[player.id]?.totalScore ?? "—"} pts ·{" "}
+                      {distance} off
+                      {unplaced > 0 ? ` · ${String(unplaced)} unplaced` : ""}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+
           {QUESTIONS.map((q) => (
             <div key={q.key} className="mb-2.5">
               <p className="mb-1 font-bold text-white/70">{q.title}</p>
@@ -221,9 +310,16 @@ export function ProtoPanel({
               {payload.players.filter((p) => p.hasTable).length}/
               {payload.players.length}
             </p>
+            {q7 ? (
+              <div className="mt-1">
+                <p className="font-bold">Q7 · this pair, both sides</p>
+                {q7.map((line) => (
+                  <p key={line}>{line}</p>
+                ))}
+              </div>
+            ) : null}
             <p className="mt-1">
-              Q1 (scale) and Q7 (ahead / level): switch players above. Record
-              each pick in issue #214&apos;s thread.
+              Record each pick in issue #214&apos;s thread.
             </p>
           </div>
         </div>
