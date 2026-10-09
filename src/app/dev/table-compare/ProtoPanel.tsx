@@ -26,6 +26,7 @@ export const OPTION_DEFAULTS = {
   q9: "shell",
   q10: "biggest",
   q11: "icons",
+  q12: "visual",
 };
 export type Options = Record<keyof typeof OPTION_DEFAULTS, string>;
 
@@ -116,6 +117,14 @@ const QUESTIONS: {
     options: [
       ["icons", "Band icons"],
       ["positions", "Positions, stacked"],
+    ],
+  },
+  {
+    key: "q12",
+    title: "Q12 · Tap card",
+    options: [
+      ["visual", "Ladder + score tiles"],
+      ["text", "Text (previous)"],
     ],
   },
 ];

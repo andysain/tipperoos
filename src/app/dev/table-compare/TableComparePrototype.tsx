@@ -37,6 +37,7 @@ import {
 import type { ProtoPlayer, ProtoTeam } from "./data";
 import {
   BOLD_CALL_LINE,
+  BOLD_CALL_SHORT,
   buildSections,
   headerSentence,
   placementReason,
@@ -257,6 +258,7 @@ export function TableComparePrototype({ payload }: { payload: ProtoPayload }) {
         <TapCard
           row={openRow}
           themName={themPlayer.displayName}
+          options={options}
           onClose={() => setOpenTeamId(null)}
         />
       ) : null}
@@ -730,10 +732,12 @@ function PointsCell({
 function TapCard({
   row,
   themName,
+  options,
   onClose,
 }: {
   row: CompareRow;
   themName: string;
+  options: Options;
   onClose: () => void;
 }) {
   const band = TABLE_BANDS[row.actualBand];
@@ -790,17 +794,164 @@ function TapCard({
             <X className="size-5" aria-hidden />
           </button>
         </div>
-        <dl
-          className={`grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 ${INSET} pt-2 pb-4 ${T.dense}`}
-        >
-          <CardLine who="You" call={row.you} actualBand={row.actualBand} />
-          <CardLine
-            who={themName}
-            call={row.them}
-            actualBand={row.actualBand}
-          />
-        </dl>
+        {options.q12 === "text" ? (
+          <dl
+            className={`grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 ${INSET} pt-2 pb-4 ${T.dense}`}
+          >
+            <CardLine who="You" call={row.you} actualBand={row.actualBand} />
+            <CardLine
+              who={themName}
+              call={row.them}
+              actualBand={row.actualBand}
+            />
+          </dl>
+        ) : (
+          <div className={`flex flex-col gap-3 ${INSET} pt-3 pb-4`}>
+            {/* Read in one glance: WHERE each call landed is the ladder,
+                HOW MUCH it scored is the tiles. The prose is for screen
+                readers only. */}
+            <p className="sr-only">
+              You said{" "}
+              {row.you.band === null
+                ? "nothing"
+                : TABLE_BANDS[row.you.band].label}
+              , {placementReason(row.you, row.actualBand)}. {themName} said{" "}
+              {row.them.band === null
+                ? "nothing"
+                : TABLE_BANDS[row.them.band].label}
+              , {placementReason(row.them, row.actualBand)}.
+            </p>
+            <Ladder row={row} options={options} />
+            <div className="grid grid-cols-2 gap-2">
+              <ScoreTile
+                name="You"
+                who="you"
+                call={row.you}
+                theirs={row.them.points}
+                options={options}
+              />
+              <ScoreTile
+                name={themName}
+                who="them"
+                call={row.them}
+                theirs={row.you.points}
+                options={options}
+              />
+            </div>
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * The tapped row, enlarged and labelled: the same marks, bars, finished
+ * column and finish line, with each Band's positions written underneath.
+ * At card width the ranges fit on one line, which the row's axis can't.
+ */
+function Ladder({ row, options }: { row: CompareRow; options: Options }) {
+  const starYou = row.you.boldCall && options.q3 !== "none";
+  const starThem = row.them.boldCall && options.q3 === "both";
+  return (
+    <div className="relative" aria-hidden>
+      <span
+        className="absolute inset-y-0 rounded-btn-sm bg-paper"
+        style={{ left: pct(row.actualBand), width: pct(1) }}
+      />
+      <span className="relative block h-12">
+        <span
+          className="absolute inset-y-1 w-px bg-ink"
+          style={{ left: centre(row.actualBand) }}
+        />
+        <Lane
+          call={row.you}
+          actualBand={row.actualBand}
+          who="you"
+          top="32%"
+          showStar={starYou}
+          unplacedLabel={options.q2 === "label"}
+        />
+        <Lane
+          call={row.them}
+          actualBand={row.actualBand}
+          who="them"
+          top="70%"
+          showStar={starThem}
+          unplacedLabel={options.q2 === "label"}
+        />
+      </span>
+      <span className="relative grid grid-cols-8 pb-1.5">
+        {TABLE_BANDS.map((band, index) => (
+          // A range stacks first-over-last ("12" over "14"): at phone width
+          // a column is ~36px, too narrow for "12-14" on one line.
+          <span
+            key={band.key}
+            className={`flex flex-col items-center leading-tight ${T.label} tabular-nums ${
+              index === row.actualBand
+                ? `font-extrabold ${TX.base}`
+                : `font-bold ${TX.muted}`
+            }`}
+          >
+            {BAND_META[band.key].positions.split("-").map((part) => (
+              <span key={part}>{part}</span>
+            ))}
+          </span>
+        ))}
+      </span>
+    </div>
+  );
+}
+
+/** One player's verdict on this club: whose, how many points, which Band. */
+function ScoreTile({
+  name,
+  who,
+  call,
+  theirs,
+  options,
+}: {
+  name: string;
+  who: "you" | "them";
+  call: SideCall;
+  theirs: number;
+  options: Options;
+}) {
+  const green = greenFor(call.points, theirs, options);
+  return (
+    // The leaderboard panel's Stat cell, scaled up: paper ground, the
+    // non-interactive radius, no shadow (DESIGN.md -> Printed Controls).
+    <div className="flex min-w-0 flex-col gap-1.5 rounded-btn-sm bg-paper px-3 py-2.5">
+      <span className="flex min-w-0 items-center gap-1.5">
+        {/* The same mark as on the ladder, so the tile names its marker. */}
+        <span
+          aria-hidden
+          className={`size-2.5 shrink-0 rounded-badge ${
+            who === "you" ? "bg-accent ring-1 ring-ink" : "border-2 border-ink"
+          }`}
+        />
+        <span className={`truncate ${MICRO_LABEL} ${TX.muted}`}>{name}</span>
+      </span>
+      <span
+        className={`${T.h2} font-extrabold leading-none tabular-nums ${
+          green ? "text-success" : call.points === 0 ? TX.muted : TX.base
+        }`}
+      >
+        {pointLabel(call.points)}
+      </span>
+      {/* Wraps rather than truncates: the Band name is the tile's whole
+          answer to "what did they say". */}
+      <span className={`${T.caption} font-bold leading-snug ${TX.base}`}>
+        {call.band === null ? "Not placed" : TABLE_BANDS[call.band].label}
+      </span>
+      {call.boldCall ? (
+        <span
+          className={`flex items-center gap-1 ${T.caption} font-bold ${TX.base}`}
+        >
+          <Star className="size-3 fill-current" aria-hidden />
+          {BOLD_CALL_SHORT}
+        </span>
+      ) : null}
     </div>
   );
 }

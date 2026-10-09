@@ -125,6 +125,9 @@ export function placementReason(call: SideCall, actualBand: number): string {
   return `${label} · ${points > 0 ? `+${String(points)}` : "0"}`;
 }
 
+/** The tap card's short Bold Call line -- the value read, never typed. */
+export const BOLD_CALL_SHORT = `+${String(BOLD_CALL_BONUS)} Bold Call`;
+
 // The row figure is Placement only (issue D10), so say where the +3 went.
 export const BOLD_CALL_LINE = `Bold Call · +${String(BOLD_CALL_BONUS)} in Bold calls`;
 
