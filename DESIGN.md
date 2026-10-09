@@ -168,7 +168,7 @@ A warm programme-paper palette: one deep teal ink, one trophy gold, and football
 
 ### Tertiary
 
-- **Pitch Green** (#3d7b3c): a correct pick, a rank rise, points gained. Works as text on paper or white, or as a fill under paper text. Never as text on ink.
+- **Pitch Green** (#3d7b3c): a correct pick, a rank rise, points gained. Works as text on paper or white, or as a fill under paper text. Never as text on ink. Never to mark "the higher of two figures" in a comparison: that figure is often a wrong call that just lost less, so weight carries it instead (issue #214).
 - **Red Card** (#c23540): a wrong pick, a rank drop. Same ground rules as Pitch Green.
 - **Yellow Card** (#ebc94c): caution: the closing-soon countdown on ink, a corrected result, a Called Off match. A called-off match is yellow, never red, because it's a non-event for everyone, not a mistake.
 - **Neutral Teal** (#3e7c86): Bot, Admin and Late Joiner badges. Neutral and non-alarming, never good or bad.
@@ -185,7 +185,7 @@ A warm programme-paper palette: one deep teal ink, one trophy gold, and football
 
 ### Named Rules
 
-**The Accent Budget Rule.** Trophy Gold has two tiers. _Emotional_ (as a fill): the 1st-place leaderboard row, a player's own predicted scoreline, and Predict the Table's Champion pick. _Functional_: the primary button, the "You" badge, the active-tab bar and the focus ring, with at most one functional accent object per viewport (the focus ring doesn't count). Gold never colours a value, a label, a status chip, metadata or a secondary link.
+**The Accent Budget Rule.** Trophy Gold has two tiers. _Emotional_ (as a fill): the 1st-place leaderboard row, a player's own predicted scoreline, Predict the Table's Champion pick, and **a player's own calls on the Predict the Table comparison** — every club's mark and bar on `/predict-table/[playerId]` (issue #214), always as a fill or bar, never as text. _Functional_: the primary button, the "You" badge, the active-tab bar and the focus ring, with at most one functional accent object per viewport (the focus ring doesn't count). Gold never colours a value, a label, a status chip, metadata or a secondary link.
 
 **The Named Roles Rule.** Text colour comes from the five named roles, never from an alpha over ink (`text-ink/60`, `text-paper/80`). An alpha inverts meaninglessly the moment ink becomes a light colour, and five of the twelve alphas once in use failed AA.
 
