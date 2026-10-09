@@ -53,8 +53,8 @@ function winnerLines(award: WrapAward): WinnerLine[] {
       return award.winners.map((w) => ({
         playerId: w.playerId,
         fact: w.onlyCall
-          ? `+${w.points} · the only one to call ${w.onlyCall.home}–${w.onlyCall.away}`
-          : `+${w.points}`,
+          ? `+${w.points}pts · the only one to call ${w.onlyCall.home}–${w.onlyCall.away}`
+          : `+${w.points}pts`,
       }));
     case "topOfTheHill":
       return award.winners.map((w) => ({
@@ -77,8 +77,8 @@ function winnerLines(award: WrapAward): WinnerLine[] {
       return award.winners.map((w) => ({
         playerId: w.playerId,
         fact: w.stillSeasonBest
-          ? `A run of ${w.endedAt} ended, still the season best`
-          : `A run of ${w.endedAt} ended`,
+          ? `A run of ${w.endedAt} ended in ${w.homeTeam} v ${w.awayTeam}, still the season best`
+          : `A run of ${w.endedAt} ended in ${w.homeTeam} v ${w.awayTeam}`,
       }));
     case "furthestOff":
       return award.winners.map((w) => ({
@@ -89,6 +89,25 @@ function winnerLines(award: WrapAward): WinnerLine[] {
         fact: `${w.homeTeam} v ${w.awayTeam}: said ${w.pick.home}–${w.pick.away}, finished ${w.result.home}–${w.result.away}`,
       }));
   }
+}
+
+/** "Mia", "Mia and Sam", "Mia, Sam and Jo". */
+function joinNames(names: readonly string[]): string {
+  return names.length <= 1
+    ? (names[0] ?? "")
+    : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+/** Tipper of the Week's "next best" line, under a single winner. */
+function nextBestLine(
+  award: WrapAward,
+  people: Readonly<Record<string, WrapPerson>>,
+): string | null {
+  if (award.kind !== "tipper" || award.nextBest === null) return null;
+  const names = award.nextBest.playerIds.map(
+    (id) => people[id]?.displayName ?? "A player",
+  );
+  return `${joinNames(names)} next best with ${award.nextBest.points}pts`;
 }
 
 /** Per player, so each member of a household on one phone gets their own
@@ -199,50 +218,61 @@ export function GameweekWrapCard({
 
       {open ? (
         <ul id={bodyId} className="divide-y divide-paper-line">
-          {wrap.shown.map((award) => (
-            <li
-              key={award.kind}
-              className={`flex flex-col gap-2 ${INSET} py-3`}
-            >
-              <span className="flex items-center gap-1.5">
-                <span className={T.body} aria-hidden>
-                  {AWARD_META[award.kind].mark}
+          {wrap.shown.map((award) => {
+            const nextBest = nextBestLine(award, people);
+            return (
+              <li
+                key={award.kind}
+                className={`flex flex-col gap-2 ${INSET} py-3`}
+              >
+                <span className="flex items-center gap-1.5">
+                  <span className={T.body} aria-hidden>
+                    {AWARD_META[award.kind].mark}
+                  </span>
+                  <span className={`${LABEL} ${TX.base}`}>
+                    {AWARD_META[award.kind].name}
+                  </span>
                 </span>
-                <span className={`${LABEL} ${TX.base}`}>
-                  {AWARD_META[award.kind].name}
-                </span>
-              </span>
-              <ul className="flex flex-col gap-2">
-                {winnerLines(award).map((line) => {
-                  const person = people[line.playerId];
-                  return (
-                    <li key={line.playerId} className="flex items-center gap-2">
-                      <EmojiChip emoji={person?.emoji ?? null} />
-                      <span className="flex min-w-0 flex-col">
-                        <span className="flex items-center gap-1.5">
-                          <span
-                            className={`truncate ${T.dense} font-bold ${TX.base}`}
-                          >
-                            {person?.displayName ?? "A player"}
+                <ul className="flex flex-col gap-2">
+                  {winnerLines(award).map((line) => {
+                    const person = people[line.playerId];
+                    return (
+                      <li
+                        key={line.playerId}
+                        className="flex items-center gap-2"
+                      >
+                        <EmojiChip emoji={person?.emoji ?? null} />
+                        <span className="flex min-w-0 flex-col">
+                          <span className="flex items-center gap-1.5">
+                            <span
+                              className={`truncate ${T.dense} font-bold ${TX.base}`}
+                            >
+                              {person?.displayName ?? "A player"}
+                            </span>
+                            {line.playerId === viewerId ? (
+                              // Ink, not gold: the list's own gold You badge
+                              // is usually on screen too (Accent Budget Rule).
+                              <YouPill tone="ink" />
+                            ) : null}
                           </span>
-                          {line.playerId === viewerId ? (
-                            // Ink, not gold: the list's own gold You badge
-                            // is usually on screen too (Accent Budget Rule).
-                            <YouPill tone="ink" />
-                          ) : null}
+                          <span
+                            className={`${T.caption} tabular-nums ${TX.muted}`}
+                          >
+                            {line.fact}
+                          </span>
                         </span>
-                        <span
-                          className={`${T.caption} tabular-nums ${TX.muted}`}
-                        >
-                          {line.fact}
-                        </span>
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </li>
-          ))}
+                      </li>
+                    );
+                  })}
+                </ul>
+                {nextBest !== null ? (
+                  <p className={`${T.caption} tabular-nums ${TX.muted}`}>
+                    {nextBest}
+                  </p>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       ) : null}
     </section>

@@ -65,6 +65,9 @@ export type WrapAward =
         /** An exact score no other human called, if the winner had one. */
         onlyCall: Scoreline | null;
       }[];
+      /** The best score below a single winner; null on a tie for top, or
+       *  when nobody else scored. */
+      nextBest: { playerIds: string[]; points: number } | null;
     }
   | {
       kind: "topOfTheHill";
@@ -90,6 +93,9 @@ export type WrapAward =
         playerId: string;
         /** The streak's value just before the match that broke it (L2). */
         endedAt: number;
+        /** The clubs of the match that broke it. */
+        homeTeam: string;
+        awayTeam: string;
         /** No human's run this season is longer. */
         stillSeasonBest: boolean;
       }[];
@@ -235,15 +241,25 @@ export function buildGameweekWrap(input: GameweekWrapInput): GameweekWrap {
 
   const topScore = Math.max(0, ...snapshot.map((row) => row.gameweekScore));
   if (topScore > 0) {
+    const top = snapshot.filter((row) => row.gameweekScore === topScore);
+    const below = snapshot.filter((row) => row.gameweekScore < topScore);
+    const nextScore = Math.max(0, ...below.map((row) => row.gameweekScore));
     fired.push({
       kind: "tipper",
-      winners: snapshot
-        .filter((row) => row.gameweekScore === topScore)
-        .map((row) => ({
-          playerId: row.playerId,
-          points: row.gameweekScore,
-          onlyCall: onlyCallFor(row.playerId),
-        })),
+      winners: top.map((row) => ({
+        playerId: row.playerId,
+        points: row.gameweekScore,
+        onlyCall: onlyCallFor(row.playerId),
+      })),
+      nextBest:
+        top.length === 1 && nextScore > 0
+          ? {
+              playerIds: below
+                .filter((row) => row.gameweekScore === nextScore)
+                .map((row) => row.playerId),
+              points: nextScore,
+            }
+          : null,
     });
   }
 
@@ -358,6 +374,8 @@ export function buildGameweekWrap(input: GameweekWrapInput): GameweekWrap {
           {
             playerId: player.id,
             endedAt: value,
+            homeTeam: m.homeTeam,
+            awayTeam: m.awayTeam,
             stillSeasonBest: value >= recordN,
           },
         ];
