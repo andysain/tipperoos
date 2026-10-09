@@ -412,6 +412,42 @@ describe("buildGameweekWrap: On Fire", () => {
   });
 });
 
+describe("buildGameweekWrap: On Fire record edge cases (L3)", () => {
+  it("doesn't fire when an already-hot streak only draws level with the record", () => {
+    // ben: right GW1-4 (8), wrong GW5 -> best 8 through GW5. ana: wrong
+    // GW1, right GW2-5 (8 through GW5), and 6 through GW4 (already >= 5).
+    // Through GW4 ana is 6 (already hot) and ben's run is 8 -- the record.
+    // Through GW5 ana is 8: level with the record, which isn't a new one,
+    // and not "reached 5" either.
+    const ms = season(5);
+    const picks = ms.flatMap((m) => [
+      m.gameweekNumber === 1 ? wrong("ana", m) : right("ana", m),
+      m.gameweekNumber === 5 ? wrong("ben", m) : right("ben", m),
+    ]);
+    const wrap = streakWrap(5, [human("ana"), human("ben")], picks);
+
+    expect(award(wrap.fired, "onFire")).toBe(undefined);
+  });
+
+  it("fires when a streak level with someone else's record passes it", () => {
+    // ben: right GW1-3 (6), wrong GW4 -> best 6. ana: wrong GW1, right
+    // from GW2: 4 through GW3, 6 through GW4 (level with ben), 8 through
+    // GW5 -> passes ben's record. Level-with-someone-else is not "holding"
+    // the record, so this is a new one.
+    const ms = season(5);
+    const picks = ms.flatMap((m) => [
+      m.gameweekNumber === 1 ? wrong("ana", m) : right("ana", m),
+      m.gameweekNumber >= 4 ? wrong("ben", m) : right("ben", m),
+    ]);
+    const wrap = streakWrap(5, [human("ana"), human("ben")], picks);
+
+    const fire = award(wrap.fired, "onFire")!;
+    expect(fire.winners[0].playerId).toBe("ana");
+    expect(fire.winners[0].streakLength).toBe(8);
+    expect(fire.winners[0].newRecord).toBe(true);
+  });
+});
+
 describe("buildGameweekWrap: Streak Snapped", () => {
   it("fires when a run of 5+ breaks, giving the length it ended at", () => {
     // 6 right through GW3; GW4: right then wrong -> ended at 7.

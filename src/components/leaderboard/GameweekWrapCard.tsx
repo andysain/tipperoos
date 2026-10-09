@@ -83,7 +83,10 @@ function winnerLines(award: WrapAward): WinnerLine[] {
     case "furthestOff":
       return award.winners.map((w) => ({
         playerId: w.playerId,
-        fact: `Said ${w.pick.home}–${w.pick.away}, finished ${w.result.home}–${w.result.away} 😅`,
+        // No 😅 here, though #218 D6's example has one: emoji are only
+        // personal or award marks (DESIGN_SYSTEM.md -> Icons), and the 😬
+        // mark already sets the tone.
+        fact: `Said ${w.pick.home}–${w.pick.away}, finished ${w.result.home}–${w.result.away}`,
       }));
   }
 }
@@ -153,6 +156,13 @@ export function GameweekWrapCard({
     >
       <button
         type="button"
+        // Names the award marks, which are aria-hidden (DESIGN_SYSTEM.md ->
+        // Icons: an award's meaning is carried in text, never the emoji).
+        aria-label={`Gameweek ${wrap.gameweekNumber} wrap, ${count} ${
+          count === 1 ? "award" : "awards"
+        }: ${wrap.shown.map((a) => AWARD_META[a.kind].name).join(", ")}${
+          isNew ? ", new" : ""
+        }`}
         aria-expanded={open}
         aria-controls={bodyId}
         onClick={toggle}
@@ -178,7 +188,8 @@ export function GameweekWrapCard({
             {count} {count === 1 ? "award" : "awards"}
           </span>
           <ChevronDown
-            className={`ml-auto size-4 shrink-0 stroke-on-ink-muted transition-transform ${
+            // No transition: the wrap has no motion (#218 Scope).
+            className={`ml-auto size-4 shrink-0 stroke-on-ink-muted ${
               open ? "rotate-180" : ""
             }`}
             aria-hidden

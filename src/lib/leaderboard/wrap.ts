@@ -3,6 +3,7 @@ import {
   compareStreakMatches,
   computeStreaks,
   countsTowardStreak,
+  isRightResult,
   STREAK_BADGE_MIN,
   type StreakMatch,
   type StreakPick,
@@ -315,10 +316,19 @@ export function buildGameweekWrap(input: GameweekWrapInput): GameweekWrap {
     const before = throughPrev.get(player.id)?.current ?? 0;
     if (now < STREAK_BADGE_MIN) return [];
     const reached = before < STREAK_BADGE_MIN;
-    // A record only when the streak PASSED one it didn't already hold --
+    // A record only when the streak PASSED one it didn't hold alone --
     // otherwise a record holder's continuing streak "breaks the record"
-    // every week, which is exactly the continuing case D4 excludes.
-    const newRecord = before < recordPrev && now > recordPrev;
+    // every week, which is exactly the continuing case D4 excludes. Level
+    // with someone else's record isn't holding it. (Level with only this
+    // player's OWN earlier run can't be told apart from holding it with
+    // computeStreaks' output; that rare tie reads as continuing.)
+    const recordSharedWithOthers = humans.some(
+      (other) =>
+        other.id !== player.id &&
+        (throughPrev.get(other.id)?.best ?? 0) === recordPrev,
+    );
+    const newRecord =
+      now > recordPrev && (before < recordPrev || recordSharedWithOthers);
     if (!reached && !newRecord) return [];
     return [{ playerId: player.id, streakLength: now, newRecord }];
   });
@@ -335,11 +345,7 @@ export function buildGameweekWrap(input: GameweekWrapInput): GameweekWrap {
     for (const m of finishedN) {
       if (new Date(m.kickoffUtcIso).getTime() < joinedAt) continue;
       const p = pickByKey.get(`${player.id}:${m.id}`);
-      const isRight =
-        p !== undefined &&
-        scoreMatch(p.home, p.away, m.result.home, m.result.away).breakdown
-          .result !== null;
-      if (!isRight) {
+      if (p === undefined || !isRightResult(p, m.result)) {
         return [
           {
             playerId: player.id,

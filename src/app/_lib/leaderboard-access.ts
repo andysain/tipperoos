@@ -209,21 +209,30 @@ export async function loadTippedMatches(
     .order("id", { ascending: true });
   if (matchesError) throw matchesError;
 
-  return (matchRows ?? []).map((row) => ({
-    id: row.id,
-    gameweekNumber: gameweekByMatchId.get(row.id) ?? 0,
-    kickoffUtcIso: row.kickoff_time,
-    providerMatchId: row.provider_match_id,
-    // A final result needs `completed` AND both scores -- a completed match
-    // whose score hasn't landed is skipped, not counted as a miss (#217 L5).
-    result:
-      row.status === "completed" &&
-      row.team_a_score !== null &&
-      row.team_b_score !== null
-        ? { home: row.team_a_score, away: row.team_b_score }
-        : null,
-    voided: isMatchVoided(slotsByMatchId.get(row.id) ?? [], row.status),
-  }));
+  // Every id was read from a gameweek slot above, so its number is always
+  // known; a row without one is skipped rather than given a stand-in that
+  // would count as "through any N".
+  return (matchRows ?? []).flatMap((row) => {
+    const gameweekNumber = gameweekByMatchId.get(row.id);
+    if (gameweekNumber === undefined) return [];
+    return [
+      {
+        id: row.id,
+        gameweekNumber,
+        kickoffUtcIso: row.kickoff_time,
+        providerMatchId: row.provider_match_id,
+        // A final result needs `completed` AND both scores -- a completed match
+        // whose score hasn't landed is skipped, not counted as a miss (#217 L5).
+        result:
+          row.status === "completed" &&
+          row.team_a_score !== null &&
+          row.team_b_score !== null
+            ? { home: row.team_a_score, away: row.team_b_score }
+            : null,
+        voided: isMatchVoided(slotsByMatchId.get(row.id) ?? [], row.status),
+      },
+    ];
+  });
 }
 
 /**

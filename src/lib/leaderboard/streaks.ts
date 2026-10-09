@@ -83,6 +83,18 @@ export function compareStreakMatches(a: StreakMatch, b: StreakMatch): number {
   return a.providerMatchId.localeCompare(b.providerMatchId);
 }
 
+/** The streak's definition of "right": the scoring engine's own result
+ *  breakdown, so a Wrong Way Round (result wrong, 1 point) never counts. */
+export function isRightResult(
+  pick: { home: number; away: number },
+  result: { home: number; away: number },
+): boolean {
+  return (
+    scoreMatch(pick.home, pick.away, result.home, result.away).breakdown
+      .result !== null
+  );
+}
+
 /** One row per human player; bots get no streak (ADR 0012 D12). */
 export function computeStreaks({
   matches,
@@ -121,10 +133,7 @@ export function computeStreaks({
         if (match.kickoff < joinedAt) continue;
         const pick = pickByKey.get(`${player.id}:${match.id}`);
         const { home, away } = match.result;
-        const right =
-          pick !== undefined &&
-          scoreMatch(pick.home, pick.away, home, away).breakdown.result !==
-            null;
+        const right = pick !== undefined && isRightResult(pick, { home, away });
         current = right ? current + 1 : 0;
         best = Math.max(best, current);
       }

@@ -3,6 +3,7 @@ import {
   chunkForRowCap,
   compareStreakMatches,
   computeStreaks,
+  isRightResult,
   type StreakMatch,
   type StreakPick,
 } from "./streaks";
@@ -320,5 +321,17 @@ describe("compareStreakMatches", () => {
     const ordered = [later, id100, id99].sort(compareStreakMatches);
 
     expect(ordered.map((m) => m.providerMatchId).join(",")).toBe("99,100,1009");
+  });
+});
+
+describe("isRightResult", () => {
+  it("is the engine's result check: a Wrong Way Round is not right", () => {
+    // Final 2-1. 3-0 has the result right; 1-2 is the reversed scoreline.
+    expect(isRightResult({ home: 3, away: 0 }, { home: 2, away: 1 })).toBe(
+      true,
+    );
+    expect(isRightResult({ home: 1, away: 2 }, { home: 2, away: 1 })).toBe(
+      false,
+    );
   });
 });
