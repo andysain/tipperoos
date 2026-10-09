@@ -27,6 +27,7 @@ export const OPTION_DEFAULTS = {
   q10: "biggest",
   q11: "icons",
   q12: "visual",
+  q13: "none",
 };
 export type Options = Record<keyof typeof OPTION_DEFAULTS, string>;
 
@@ -125,6 +126,15 @@ const QUESTIONS: {
     options: [
       ["visual", "Ladder + score tiles"],
       ["text", "Text (previous)"],
+    ],
+  },
+  {
+    key: "q13",
+    title: "Sim · make Relegated exactly right for…",
+    options: [
+      ["none", "Nobody (real data)"],
+      ["you", "You"],
+      ["them", "Them"],
     ],
   },
 ];

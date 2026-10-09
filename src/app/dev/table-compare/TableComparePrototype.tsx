@@ -14,7 +14,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { useSearchParams } from "next/navigation";
-import { ChevronLeft, Star, X } from "lucide-react";
+import { Check, ChevronLeft, Star, X } from "lucide-react";
 import {
   MAX_PREDICT_TABLE_SCORE,
   type PredictTableScoreResult,
@@ -38,10 +38,12 @@ import type { ProtoPlayer, ProtoTeam } from "./data";
 import {
   BOLD_CALL_LINE,
   BOLD_CALL_SHORT,
+  bandBonus,
   buildSections,
   headerSentence,
   placementReason,
   totals,
+  withExactBand,
   type CompareRow,
   type SentenceRule,
   type SideCall,
@@ -105,6 +107,23 @@ export function TableComparePrototype({ payload }: { payload: ProtoPayload }) {
   const themPlayer = playersById.get(vsId);
 
   const actualOrder = options.q6 === "none" ? [] : payload.actualOrder;
+
+  // Q13: the real scores, or a simulated exact Relegated Band for one side.
+  const RELEGATED = TABLE_BANDS.length - 1;
+  const { bands: bandsAll, scores: scoresAll } = useMemo(() => {
+    const target =
+      options.q13 === "you" ? youId : options.q13 === "them" ? vsId : null;
+    if (!target || payload.actualOrder.length !== 20) {
+      return { bands: payload.bands, scores: payload.scores };
+    }
+    return withExactBand(
+      payload.bands,
+      new Map(payload.players.map((p) => [p.id, p.isLateJoiner])),
+      payload.actualOrder,
+      target,
+      RELEGATED,
+    );
+  }, [options.q13, youId, vsId, payload, RELEGATED]);
   const stale =
     options.q6 === "stale" || (options.q6 === "live" && payload.standingsStale);
 
@@ -165,10 +184,10 @@ export function TableComparePrototype({ payload }: { payload: ProtoPayload }) {
     );
   }
 
-  const youScore = payload.scores[youId];
-  const themScore = payload.scores[vsId];
-  const youBands = new Map(Object.entries(payload.bands[youId] ?? {}));
-  const themBands = new Map(Object.entries(payload.bands[vsId] ?? {}));
+  const youScore = scoresAll[youId];
+  const themScore = scoresAll[vsId];
+  const youBands = new Map(Object.entries(bandsAll[youId] ?? {}));
+  const themBands = new Map(Object.entries(bandsAll[vsId] ?? {}));
   const teamsById = new Map(payload.teams.map((t) => [t.id, t]));
   const sections = buildSections(
     actualOrder,
@@ -212,26 +231,46 @@ export function TableComparePrototype({ payload }: { payload: ProtoPayload }) {
           the card instead of the page. overflow-clip rounds the corners
           without that side effect. */}
       <div className={`overflow-clip rounded-card bg-surface ${CARD_SHADOW}`}>
+        <ChartKey themName={themPlayer.displayName} />
         <AxisHeader options={options} />
         <ol className="flex flex-col">
           {sections.map((section) => {
             const band = TABLE_BANDS[section.bandIndex];
             const { Icon, positions } = BAND_META[band.key];
+            const youBonus = bandBonus(youScore, section.bandIndex);
+            const themBonus = bandBonus(themScore, section.bandIndex);
             return (
               <li
                 key={section.bandIndex}
                 className="border-t border-paper-line first:border-t-0"
               >
                 {/* The /picks in-card week heading (Label, muted), with the
-                    Band's wayfinding icon as BandSummary carries it. */}
+                    Band's wayfinding icon as BandSummary carries it. An
+                    exact-Band bonus sits on the right in its player's
+                    points column. */}
                 <div
                   className={`flex items-center gap-1.5 ${INSET} pt-2.5 pb-0.5 ${TX.muted}`}
                 >
-                  <Icon className="size-3.5" aria-hidden />
-                  <span className={LABEL}>{section.label}</span>
-                  <span className={`${T.caption} font-medium tabular-nums`}>
+                  <Icon className="size-3.5 shrink-0" aria-hidden />
+                  <span className={`truncate ${LABEL}`}>{section.label}</span>
+                  <span
+                    className={`shrink-0 ${T.caption} font-medium tabular-nums`}
+                  >
                     {positions}
                   </span>
+                  {youBonus > 0 || themBonus > 0 ? (
+                    // Only a Band with a bonus reserves the two points
+                    // columns, so every other heading keeps its full width.
+                    <span
+                      className={`ml-auto grid shrink-0 ${POINTS_COLS} gap-1.5`}
+                    >
+                      <BandBonusChip who="You" value={youBonus} />
+                      <BandBonusChip
+                        who={themPlayer.displayName}
+                        value={themBonus}
+                      />
+                    </span>
+                  ) : null}
                 </div>
                 <ul>
                   {section.rows.map((row) => (
@@ -507,6 +546,104 @@ function gridCols(options: Options): string {
     : "grid-cols-[2.75rem_1fr_2.5rem_2.5rem]";
 }
 
+/** The two points columns on their own, for the Band headings. */
+const POINTS_COLS = "grid-cols-[2.5rem_2.5rem]";
+
+/**
+ * An exact-Band bonus, on its Band's heading in the player's points column.
+ * Pitch Green as a fill under paper text (DESIGN.md -> Pitch Green): it's
+ * an award for the whole Band, so it's set apart from the rows' plain
+ * numbers. Nothing renders when the Band wasn't exact -- every heading
+ * carrying two zeros would bury the one that matters.
+ */
+function BandBonusChip({ who, value }: { who: string; value: number }) {
+  if (value <= 0) return <span aria-hidden />;
+  return (
+    <span className="flex justify-end">
+      <span
+        className={`flex items-center gap-0.5 rounded-badge bg-success py-0.5 pr-1.5 pl-1 ${MICRO_LABEL} tabular-nums ${TX.onInk}`}
+      >
+        <Check className="size-3 stroke-[3]" aria-hidden />
+        {pointLabel(value)}
+        <span className="sr-only">
+          {" "}
+          for {who}: every club in this Band exactly right
+        </span>
+      </span>
+    </span>
+  );
+}
+
+// The chart's marks, drawn once so the key and the column headers use the
+// exact shapes the lanes use -- never a glyph standing in for them.
+function YouMark({ size = "size-3" }: { size?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={`${size} shrink-0 rounded-badge bg-accent ring-1 ring-ink`}
+    />
+  );
+}
+
+function ThemMark({ size = "size-3" }: { size?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={`${size} shrink-0 rounded-badge border-2 border-ink bg-surface`}
+    />
+  );
+}
+
+/**
+ * The chart's legend, in the role /picks' PicksLegend plays for its
+ * columns: what each mark means, at the top of the card. It scrolls away
+ * with the card's start; the sticky axis keeps the You/Them marks.
+ */
+function ChartKey({ themName }: { themName: string }) {
+  const item = `flex items-center gap-1.5`;
+  return (
+    <div
+      className={`flex flex-wrap gap-x-4 gap-y-1.5 border-b border-paper-line ${INSET} py-2.5 ${T.caption} ${TX.muted}`}
+    >
+      <span className={item}>
+        <YouMark />
+        <span className={`font-bold ${TX.base}`}>You</span>
+      </span>
+      <span className={item}>
+        <ThemMark />
+        <span className={`font-bold ${TX.base}`}>{themName}</span>
+      </span>
+      <span className={item}>
+        <span aria-hidden className="h-1.5 w-5 rounded-badge bg-accent" />
+        How far off
+      </span>
+      <span className={item}>
+        {/* The finished-Band column and its finish line, in miniature. */}
+        <span
+          aria-hidden
+          className="relative flex h-4 w-3 justify-center rounded-[3px] bg-paper"
+        >
+          <span className="h-full w-px bg-ink" />
+        </span>
+        Where it finished
+      </span>
+      <span className={item}>
+        <Star className={`size-3 fill-current ${TX.base}`} aria-hidden />
+        {BOLD_CALL_SHORT}
+      </span>
+      <span className={item}>
+        <span
+          aria-hidden
+          className={`flex items-center rounded-badge bg-success px-1 py-0.5 ${TX.onInk}`}
+        >
+          <Check className="size-3 stroke-[3]" />
+        </span>
+        Band exactly right
+      </span>
+    </div>
+  );
+}
+
 function AxisHeader({ options }: { options: Options }) {
   return (
     // Sticky: once the header scrolls away nothing else names the columns.
@@ -544,8 +681,17 @@ function AxisHeader({ options }: { options: Options }) {
           );
         })}
       </div>
-      <span className={`text-right ${LABEL} ${TX.muted}`}>You</span>
-      <span className={`text-right ${LABEL} ${TX.muted}`}>Them</span>
+      {/* Each points column is headed by its player's mark, so the
+          dot-to-player mapping survives scrolling past the key. The key
+          names the marks; words don't fit these 40px columns. */}
+      <span className="flex justify-end pr-3">
+        <YouMark />
+        <span className="sr-only">You</span>
+      </span>
+      <span className="flex justify-end pr-3">
+        <ThemMark />
+        <span className="sr-only">Them</span>
+      </span>
     </div>
   );
 }

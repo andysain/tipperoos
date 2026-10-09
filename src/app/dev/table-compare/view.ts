@@ -4,6 +4,7 @@
 // value is read from src/lib/scoring, never typed (issue D9).
 
 import {
+  scorePredictTableCohort,
   BOLD_CALL_BONUS,
   PLACEMENT_POINTS_BY_DISTANCE,
   bandIndexForRank,
@@ -133,6 +134,49 @@ export function placementReason(call: SideCall, actualBand: number): string {
         ? `${String(PLACEMENT_POINTS_BY_DISTANCE.length)}+ Bands out`
         : `${String(distance)} Band${distance === 1 ? "" : "s"} out`;
   return `${label} · ${points > 0 ? `+${String(points)}` : "0"}`;
+}
+
+/** A player's exact-Band bonus for one Band (0 when not exact). */
+export function bandBonus(
+  result: PredictTableScoreResult,
+  bandIndex: number,
+): number {
+  return result.bandBonuses[TABLE_BANDS[bandIndex].label] ?? 0;
+}
+
+/**
+ * PROTOTYPE SIMULATION (issue #214, Q13): staging has no exactly-right
+ * Band, so this makes one player's call for one Band exact -- every club
+ * that finished there is moved into it, and anything else they had there
+ * moves to where it finished -- then re-scores the whole cohort so the
+ * header, rows and Band heading stay consistent. Display only.
+ */
+export function withExactBand(
+  bandsByPlayer: Readonly<Record<string, Record<string, number>>>,
+  lateById: ReadonlyMap<string, boolean>,
+  actualOrder: readonly string[],
+  targetId: string,
+  bandIndex: number,
+): {
+  bands: Record<string, Record<string, number>>;
+  scores: Record<string, PredictTableScoreResult>;
+} {
+  const target = { ...(bandsByPlayer[targetId] ?? {}) };
+  actualOrder.forEach((teamId, index) => {
+    const actual = bandIndexForRank(index + 1);
+    if (actual === bandIndex) target[teamId] = bandIndex;
+    else if (target[teamId] === bandIndex) target[teamId] = actual;
+  });
+  const bands = { ...bandsByPlayer, [targetId]: target };
+  const results = scorePredictTableCohort(
+    Object.entries(bands).map(([key, b]) => ({
+      key,
+      bands: new Map(Object.entries(b)),
+      boldCallEligible: !(lateById.get(key) ?? false),
+    })),
+    actualOrder,
+  );
+  return { bands, scores: Object.fromEntries(results) };
 }
 
 /** The tap card's short Bold Call line -- the value read, never typed. */
