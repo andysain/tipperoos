@@ -5,6 +5,9 @@
 
 import {
   scorePredictTableCohort,
+  MAX_BOLD_CALLS,
+  TABLE_BANDS as SCORING_BANDS,
+  TOTAL_TEAMS,
   BOLD_CALL_BONUS,
   PLACEMENT_POINTS_BY_DISTANCE,
   bandIndexForRank,
@@ -122,18 +125,71 @@ export function totals(
   };
 }
 
-/** "Right Band", "1 Band out", ... and the points it earns -- all derived. */
-export function placementReason(call: SideCall, actualBand: number): string {
-  if (call.band === null) return `Not placed · 0`;
+/** Each score part's maximum, derived the way the leaderboard derives it. */
+export const MAX_PLACEMENT =
+  TOTAL_TEAMS * (PLACEMENT_POINTS_BY_DISTANCE[0] ?? 0);
+export const MAX_BAND_BONUS = SCORING_BANDS.reduce((s, b) => s + b.bonus, 0);
+export const MAX_BOLD_CALLS_SCORE = MAX_BOLD_CALLS * BOLD_CALL_BONUS;
+
+/** A season's matches per club, derived: everyone plays everyone twice. */
+const SEASON_MATCHES = (TOTAL_TEAMS - 1) * 2;
+
+/**
+ * "Finished" only once the season is over; until then a club is where it
+ * is NOW. The standings are a live table for 37 of 38 gameweeks.
+ */
+export function isSeasonOver(
+  played: { min: number; max: number } | null,
+): boolean {
+  return played !== null && played.min >= SEASON_MATCHES;
+}
+
+/** "Right Band", "1 Band out", "3+ Bands out", "Not placed" -- derived. */
+export function distanceLabel(call: SideCall, actualBand: number): string {
+  if (call.band === null) return "Not placed";
   const distance = Math.abs(call.band - actualBand);
-  const points = PLACEMENT_POINTS_BY_DISTANCE[distance] ?? 0;
-  const label =
-    distance === 0
-      ? "Right Band"
-      : distance >= PLACEMENT_POINTS_BY_DISTANCE.length
-        ? `${String(PLACEMENT_POINTS_BY_DISTANCE.length)}+ Bands out`
-        : `${String(distance)} Band${distance === 1 ? "" : "s"} out`;
-  return `${label} · ${points > 0 ? `+${String(points)}` : "0"}`;
+  return distance === 0
+    ? "Right Band"
+    : distance >= PLACEMENT_POINTS_BY_DISTANCE.length
+      ? `${String(PLACEMENT_POINTS_BY_DISTANCE.length)}+ Bands out`
+      : `${String(distance)} Band${distance === 1 ? "" : "s"} out`;
+}
+
+/** "Right Band · +5" -- the distance and what it earns, all derived. */
+export function placementReason(call: SideCall, actualBand: number): string {
+  const points = call.placement;
+  return `${distanceLabel(call, actualBand)} · ${points > 0 ? `+${String(points)}` : "0"}`;
+}
+
+/**
+ * How a row's figure is made, as an equation when a Bold Call is folded in
+ * ("Right Band +5 · Bold Call +3" under a "+8") so the +3 never reads as a
+ * second addition on top.
+ */
+export function breakdown(
+  call: SideCall,
+  actualBand: number,
+): { placement: string; boldCall: string | null } {
+  const placementPart = `${distanceLabel(call, actualBand)}${
+    call.placement > 0 ? ` +${String(call.placement)}` : ""
+  }`;
+  return {
+    placement: placementPart,
+    boldCall: call.boldCall ? `Bold Call +${String(BOLD_CALL_BONUS)}` : null,
+  };
+}
+
+/** "Exactly right Bands: …" in one sentence, for either outcome. */
+export function exactBandsLine(
+  themName: string,
+  you: SideTotals,
+  them: SideTotals,
+): string {
+  if (you.exactBands.length === 0 && them.exactBands.length === 0) {
+    return "none yet for either of you.";
+  }
+  const part = (list: string[]) => (list.length ? list.join(", ") : "none yet");
+  return `you, ${part(you.exactBands)}. ${themName}, ${part(them.exactBands)}.`;
 }
 
 /** A player's exact-Band bonus for one Band (0 when not exact). */
@@ -183,7 +239,7 @@ export function withExactBand(
 export const BOLD_CALL_SHORT = `+${String(BOLD_CALL_BONUS)} Bold Call`;
 
 // The row figure is Placement only (issue D10), so say where the +3 went.
-export const BOLD_CALL_LINE = `Bold Call · +${String(BOLD_CALL_BONUS)} in Bold calls`;
+export const BOLD_CALL_LINE = `Bold Call · +${String(BOLD_CALL_BONUS)} in Bold Calls`;
 
 type Component = "bands" | "placement" | "boldCalls";
 // Tie order for the "biggest" rule (issue question 10's proposal).

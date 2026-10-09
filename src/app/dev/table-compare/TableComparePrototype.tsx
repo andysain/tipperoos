@@ -38,9 +38,15 @@ import type { ProtoPlayer, ProtoTeam } from "./data";
 import {
   BOLD_CALL_LINE,
   BOLD_CALL_SHORT,
+  MAX_BAND_BONUS,
+  MAX_BOLD_CALLS_SCORE,
+  MAX_PLACEMENT,
   bandBonus,
+  breakdown,
   buildSections,
+  exactBandsLine,
   headerSentence,
+  isSeasonOver,
   placementReason,
   totals,
   withExactBand,
@@ -83,15 +89,18 @@ export function TableComparePrototype({ payload }: { payload: ProtoPayload }) {
     readOptions(new URLSearchParams(searchParams.toString())),
   );
   const [openTeamId, setOpenTeamId] = useState<string | null>(null);
+  const [cardHeight, setCardHeight] = useState(0);
 
+  // The URL write happens outside the state updater: Next's router listens
+  // to history.replaceState, and updating it from inside a React updater
+  // re-entered rendering ("Cannot update a component (Router) while
+  // rendering").
   function setOption(key: keyof Options, value: string) {
-    setOptions((prev) => {
-      const next = { ...prev, [key]: value };
-      const params = new URLSearchParams();
-      for (const [k, v] of Object.entries(next)) if (v) params.set(k, v);
-      window.history.replaceState(null, "", `?${params.toString()}`);
-      return next;
-    });
+    const next = { ...options, [key]: value };
+    setOptions(next);
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(next)) if (v) params.set(k, v);
+    window.history.replaceState(null, "", `?${params.toString()}`);
   }
 
   const playersById = useMemo(
@@ -126,6 +135,7 @@ export function TableComparePrototype({ payload }: { payload: ProtoPayload }) {
   }, [options.q13, youId, vsId, payload, RELEGATED]);
   const stale =
     options.q6 === "stale" || (options.q6 === "live" && payload.standingsStale);
+  const seasonOver = isSeasonOver(payload.standingsPlayed);
 
   const panel = (
     <ProtoPanel
@@ -204,7 +214,12 @@ export function TableComparePrototype({ payload }: { payload: ProtoPayload }) {
     null;
 
   return (
-    <main className={`${PAGE} ${openRow ? "pb-72" : ""}`}>
+    <main
+      className={PAGE}
+      // While the docked card is open, pad by its measured height so the
+      // last rows can still scroll out from under it.
+      style={openRow ? { paddingBottom: cardHeight + 16 } : undefined}
+    >
       {top}
 
       <Header
@@ -220,9 +235,8 @@ export function TableComparePrototype({ payload }: { payload: ProtoPayload }) {
         // the table it's measured against is -- in the muted caption the
         // leaderboard uses for its explanatory lines.
         <p className={`${T.caption} ${TX.muted}`}>
-          Measured against the league table from{" "}
-          {payload.standingsUpdatedLabel ?? "a while ago"}. Scores catch up at
-          the next update.
+          Measured against the league table as of{" "}
+          {payload.standingsUpdatedLabel ?? "its last update"}.
         </p>
       ) : null}
 
@@ -231,7 +245,7 @@ export function TableComparePrototype({ payload }: { payload: ProtoPayload }) {
           the card instead of the page. overflow-clip rounds the corners
           without that side effect. */}
       <div className={`overflow-clip rounded-card bg-surface ${CARD_SHADOW}`}>
-        <ChartKey themName={themPlayer.displayName} />
+        <ChartKey themName={themPlayer.displayName} seasonOver={seasonOver} />
         <AxisHeader options={options} />
         <ol className="flex flex-col">
           {sections.map((section) => {
@@ -259,14 +273,13 @@ export function TableComparePrototype({ payload }: { payload: ProtoPayload }) {
                     {positions}
                   </span>
                   {youBonus > 0 || themBonus > 0 ? (
-                    // Only a Band with a bonus reserves the two points
-                    // columns, so every other heading keeps its full width.
-                    <span
-                      className={`ml-auto grid shrink-0 ${POINTS_COLS} gap-1.5`}
-                    >
-                      <BandBonusChip who="You" value={youBonus} />
+                    // Each chip carries its owner's mark, so it never relies
+                    // on which column it happens to sit above.
+                    <span className="ml-auto flex shrink-0 gap-1">
+                      <BandBonusChip who="you" name="You" value={youBonus} />
                       <BandBonusChip
-                        who={themPlayer.displayName}
+                        who="them"
+                        name={themPlayer.displayName}
                         value={themBonus}
                       />
                     </span>
@@ -278,6 +291,7 @@ export function TableComparePrototype({ payload }: { payload: ProtoPayload }) {
                       key={row.teamId}
                       row={row}
                       options={options}
+                      seasonOver={seasonOver}
                       open={row.teamId === openTeamId}
                       onTap={() =>
                         setOpenTeamId((id) =>
@@ -298,6 +312,8 @@ export function TableComparePrototype({ payload }: { payload: ProtoPayload }) {
           row={openRow}
           themName={themPlayer.displayName}
           options={options}
+          seasonOver={seasonOver}
+          onHeight={setCardHeight}
           onClose={() => setOpenTeamId(null)}
         />
       ) : null}
@@ -309,10 +325,22 @@ export function TableComparePrototype({ payload }: { payload: ProtoPayload }) {
 
 // ---------------------------------------------------------------------------
 
-function greenFor(mine: number, theirs: number, options: Options): boolean {
+/**
+ * Whether this figure is the one that won the comparison. Shown by weight,
+ * never Pitch Green: DESIGN.md defines green as "a correct pick", and the
+ * winning figure is often a wrong-Band call that just lost less (a +1 two
+ * Bands out). Level figures carry no emphasis (Q8).
+ */
+function leads(mine: number, theirs: number, options: Options): boolean {
   if (mine > theirs) return true;
   if (mine === theirs && mine > 0) return options.q8 === "both";
   return false;
+}
+
+/** Winner extrabold; the other figure plain; nothing scored, muted. */
+function emphasis(mine: number, theirs: number, options: Options): string {
+  if (leads(mine, theirs, options)) return `font-extrabold ${TX.base}`;
+  return mine === 0 ? `font-medium ${TX.muted}` : `font-medium ${TX.base}`;
 }
 
 function Header({
@@ -329,13 +357,11 @@ function Header({
   options: Options;
 }) {
   // Q9: "shell" is /picks/[playerId]'s ink identity band over a white body;
-  // "plain" keeps the whole card white. Pitch Green is never text on ink
-  // (DESIGN.md -> Pitch Green), so the band's totals are never green.
+  // "plain" keeps the whole card white.
   const shell = options.q9 !== "plain";
-  const green = (mine: number, theirs: number) =>
-    greenFor(mine, theirs, options) ? "text-success" : TX.base;
-  const bandGreen = (mine: number, theirs: number) =>
-    shell ? TX.onInk : green(mine, theirs);
+  const weight = (mine: number, theirs: number) =>
+    emphasis(mine, theirs, options);
+  const bandTotal = () => (shell ? TX.onInk : TX.base);
 
   const sentence = headerSentence(
     options.q10 as SentenceRule,
@@ -344,23 +370,32 @@ function Header({
     themTotals,
   );
 
-  // Component names as the Predict the Table leaderboard panel spells them.
-  const rows: { label: string; you: number; them: number; key: string }[] = [
+  // The glossary's names for the three parts, each with its maximum.
+  const rows: {
+    label: string;
+    max: number;
+    you: number;
+    them: number;
+    key: string;
+  }[] = [
     {
       key: "placement",
       label: "Placement",
+      max: MAX_PLACEMENT,
       you: youTotals.placement,
       them: themTotals.placement,
     },
     {
       key: "bands",
-      label: "Bands",
+      label: "Band Bonus",
+      max: MAX_BAND_BONUS,
       you: youTotals.bands,
       them: themTotals.bands,
     },
     {
       key: "bold",
-      label: "Bold calls",
+      label: "Bold Calls",
+      max: MAX_BOLD_CALLS_SCORE,
       you: youTotals.boldCalls,
       them: themTotals.boldCalls,
     },
@@ -382,7 +417,7 @@ function Header({
           player={you}
           label="You"
           total={youTotals.total}
-          totalClass={bandGreen(youTotals.total, themTotals.total)}
+          totalClass={bandTotal()}
           shell={shell}
           showLate={options.q4b === "name"}
         />
@@ -390,7 +425,7 @@ function Header({
           player={them}
           label={them.displayName}
           total={themTotals.total}
-          totalClass={bandGreen(themTotals.total, youTotals.total)}
+          totalClass={bandTotal()}
           shell={shell}
           alignEnd
           showLate={options.q4b === "name"}
@@ -432,15 +467,14 @@ function Header({
                   className={`py-1.5 text-left font-normal ${TX.muted}`}
                 >
                   {r.label}
+                  <span className={`ml-1 ${T.caption} tabular-nums`}>
+                    /{r.max}
+                  </span>
                 </th>
-                <td
-                  className={`py-1.5 text-right font-extrabold ${green(r.you, r.them)}`}
-                >
+                <td className={`py-1.5 text-right ${weight(r.you, r.them)}`}>
                   {r.key === "bold" ? boldCell(you, r.you) : r.you}
                 </td>
-                <td
-                  className={`py-1.5 text-right font-extrabold ${green(r.them, r.you)}`}
-                >
+                <td className={`py-1.5 text-right ${weight(r.them, r.you)}`}>
                   {r.key === "bold" ? boldCell(them, r.them) : r.them}
                 </td>
               </tr>
@@ -451,14 +485,19 @@ function Header({
                 className={`py-1.5 text-left font-bold ${TX.base}`}
               >
                 Total
+                <span
+                  className={`ml-1 ${T.caption} font-normal tabular-nums ${TX.muted}`}
+                >
+                  /{MAX_PREDICT_TABLE_SCORE}
+                </span>
               </th>
               <td
-                className={`py-1.5 text-right font-extrabold ${green(youTotals.total, themTotals.total)}`}
+                className={`py-1.5 text-right ${weight(youTotals.total, themTotals.total)}`}
               >
                 {youTotals.total}
               </td>
               <td
-                className={`py-1.5 text-right font-extrabold ${green(themTotals.total, youTotals.total)}`}
+                className={`py-1.5 text-right ${weight(themTotals.total, youTotals.total)}`}
               >
                 {themTotals.total}
               </td>
@@ -467,9 +506,8 @@ function Header({
         </table>
 
         <p className={`${T.caption} ${TX.muted}`}>
-          <span className="font-bold">Exactly right: </span>
-          you, {youTotals.exactBands.join(", ") || "none yet"}.{" "}
-          {them.displayName}, {themTotals.exactBands.join(", ") || "none yet"}.
+          <span className="font-bold">Exactly right Bands: </span>
+          {exactBandsLine(them.displayName, youTotals, themTotals)}
         </p>
       </div>
     </CardShell>
@@ -542,12 +580,9 @@ function Who({
 /** Row grid: label | 8-Band axis | You | Them. Shared by axis and rows. */
 function gridCols(options: Options): string {
   return options.q5 === "name"
-    ? "grid-cols-[5.5rem_1fr_2.5rem_2.5rem]"
-    : "grid-cols-[2.75rem_1fr_2.5rem_2.5rem]";
+    ? "grid-cols-[5.5rem_1fr_2rem_2rem]"
+    : "grid-cols-[2.75rem_1fr_2rem_2rem]";
 }
-
-/** The two points columns on their own, for the Band headings. */
-const POINTS_COLS = "grid-cols-[2.5rem_2.5rem]";
 
 /**
  * An exact-Band bonus, on its Band's heading in the player's points column.
@@ -556,19 +591,31 @@ const POINTS_COLS = "grid-cols-[2.5rem_2.5rem]";
  * numbers. Nothing renders when the Band wasn't exact -- every heading
  * carrying two zeros would bury the one that matters.
  */
-function BandBonusChip({ who, value }: { who: string; value: number }) {
-  if (value <= 0) return <span aria-hidden />;
+function BandBonusChip({
+  who,
+  name,
+  value,
+}: {
+  who: "you" | "them";
+  name: string;
+  value: number;
+}) {
+  if (value <= 0) return null;
   return (
-    <span className="flex justify-end">
-      <span
-        className={`flex items-center gap-0.5 rounded-badge bg-success py-0.5 pr-1.5 pl-1 ${MICRO_LABEL} tabular-nums ${TX.onInk}`}
-      >
-        <Check className="size-3 stroke-[3]" aria-hidden />
-        {pointLabel(value)}
-        <span className="sr-only">
-          {" "}
-          for {who}: every club in this Band exactly right
-        </span>
+    <span
+      className={`flex items-center gap-1 rounded-badge bg-success py-0.5 pr-1.5 pl-1 ${MICRO_LABEL} tabular-nums ${TX.onInk}`}
+    >
+      {/* The owner's chart mark, so the chip says whose it is. */}
+      {who === "you" ? (
+        <YouMark size="size-2.5" />
+      ) : (
+        <ThemMark size="size-2.5" />
+      )}
+      <Check className="-ml-0.5 size-3 stroke-[3]" aria-hidden />
+      {pointLabel(value)}
+      <span className="sr-only">
+        {" "}
+        for {name}: every club in this Band exactly right
       </span>
     </span>
   );
@@ -599,7 +646,13 @@ function ThemMark({ size = "size-3" }: { size?: string }) {
  * columns: what each mark means, at the top of the card. It scrolls away
  * with the card's start; the sticky axis keeps the You/Them marks.
  */
-function ChartKey({ themName }: { themName: string }) {
+function ChartKey({
+  themName,
+  seasonOver,
+}: {
+  themName: string;
+  seasonOver: boolean;
+}) {
   const item = `flex items-center gap-1.5`;
   return (
     <div
@@ -625,7 +678,7 @@ function ChartKey({ themName }: { themName: string }) {
         >
           <span className="h-full w-px bg-ink" />
         </span>
-        Where it finished
+        {seasonOver ? "Where it finished" : "Where it is now"}
       </span>
       <span className={item}>
         <Star className={`size-3 fill-current ${TX.base}`} aria-hidden />
@@ -651,45 +704,20 @@ function AxisHeader({ options }: { options: Options }) {
     <div
       className={`sticky top-0 z-10 grid ${gridCols(options)} items-end gap-1.5 border-b border-paper-line bg-surface ${INSET} py-1.5`}
     >
+      {/* No Band labels on the axis (Q11: neither option read at phone
+          width). Each section's heading and its shaded column name the
+          Band; the tick marks let distance be counted. */}
       <span aria-hidden />
-      <div className="grid grid-cols-8">
-        {/* Q11: position ranges ("12-14") don't fit eight-across on one
-            line at phone width. Either each Band's wayfinding icon
-            (BAND_META), or the range stacked over two lines. */}
-        {TABLE_BANDS.map((band) => {
-          const { Icon, positions } = BAND_META[band.key];
-          const [from, to] = positions.split("-");
-          return (
-            <span
-              key={band.key}
-              className={`flex flex-col items-center leading-none ${TX.muted}`}
-              title={`${band.label} (${positions})`}
-            >
-              {options.q11 === "positions" ? (
-                <span
-                  className={`flex flex-col items-center ${T.label} font-bold tabular-nums`}
-                  aria-hidden
-                >
-                  <span>{from}</span>
-                  {to ? <span>{to}</span> : null}
-                </span>
-              ) : (
-                <Icon className="size-3.5" aria-hidden />
-              )}
-              <span className="sr-only">{band.label}</span>
-            </span>
-          );
-        })}
-      </div>
+      <span aria-hidden />
       {/* Each points column is headed by its player's mark, so the
           dot-to-player mapping survives scrolling past the key. The key
           names the marks; words don't fit these 40px columns. */}
       <span className="flex justify-end pr-3">
-        <YouMark />
+        <YouMark size="size-2.5" />
         <span className="sr-only">You</span>
       </span>
       <span className="flex justify-end pr-3">
-        <ThemMark />
+        <ThemMark size="size-2.5" />
         <span className="sr-only">Them</span>
       </span>
     </div>
@@ -698,6 +726,22 @@ function AxisHeader({ options }: { options: Options }) {
 
 const pct = (n: number) => `${String((n * 100) / BAND_COUNT)}%`;
 const centre = (band: number) => pct(band + 0.5);
+
+/** Hairlines at every Band boundary, so a bar's length can be counted. */
+function BandTicks() {
+  return (
+    <>
+      {Array.from({ length: BAND_COUNT - 1 }, (_, i) => (
+        <span
+          key={i}
+          aria-hidden
+          className="absolute inset-y-1 w-px bg-paper-line"
+          style={{ left: pct(i + 1) }}
+        />
+      ))}
+    </>
+  );
+}
 
 function Lane({
   call,
@@ -748,9 +792,13 @@ function Lane({
       {showStar ? (
         // A lucide icon, not a ★ glyph: functional marks come from the icon
         // set (DESIGN.md -> Do's).
+        // In the last Band the star goes on the mark's left, so it never
+        // crowds the points column.
         <Star
           aria-hidden
-          className={`absolute size-3 -translate-y-1/2 translate-x-2.5 fill-current ${TX.base}`}
+          className={`absolute size-3 -translate-y-1/2 fill-current ${TX.base} ${
+            call.band === BAND_COUNT - 1 ? "-translate-x-5" : "translate-x-2.5"
+          }`}
           style={{ top, left: centre(call.band) }}
         />
       ) : null}
@@ -761,11 +809,13 @@ function Lane({
 function Row({
   row,
   options,
+  seasonOver,
   open,
   onTap,
 }: {
   row: CompareRow;
   options: Options;
+  seasonOver: boolean;
   open: boolean;
   onTap: () => void;
 }) {
@@ -796,7 +846,7 @@ function Row({
             />
           )}
           <span className="sr-only">
-            , finished {ordinal(row.position)}. You{" "}
+            , {seasonOver ? "finished" : "now"} {ordinal(row.position)}. You{" "}
             {placementReason(row.you, row.actualBand)}
             {row.you.boldCall ? ", plus a Bold Call" : ""}. Them{" "}
             {placementReason(row.them, row.actualBand)}
@@ -811,6 +861,7 @@ function Row({
             className="absolute inset-y-0 bg-paper"
             style={{ left: pct(row.actualBand), width: pct(1) }}
           />
+          <BandTicks />
           <span
             className="absolute inset-y-0 w-px bg-ink"
             style={{ left: centre(row.actualBand) }}
@@ -850,19 +901,12 @@ function PointsCell({
   options: Options;
 }) {
   const mine = call.points;
-  const green = greenFor(mine, theirs, options);
   return (
     // `+5` / `0` through the app's own pointLabel (DESIGN.md -> Do's). A
     // Bold Call is folded in (`+8★`); the star slot is always reserved so
     // digits stay in one column (DESIGN.md -> Steady Digits).
     <span
-      className={`flex items-center justify-end gap-0.5 ${T.caption} tabular-nums ${
-        green
-          ? "font-extrabold text-success"
-          : mine === 0
-            ? TX.muted
-            : `font-bold ${TX.base}`
-      }`}
+      className={`flex items-center justify-end gap-0.5 ${T.caption} tabular-nums ${emphasis(mine, theirs, options)}`}
       aria-hidden
     >
       {pointLabel(mine)}
@@ -881,11 +925,15 @@ function TapCard({
   row,
   themName,
   options,
+  seasonOver,
+  onHeight,
   onClose,
 }: {
   row: CompareRow;
   themName: string;
   options: Options;
+  seasonOver: boolean;
+  onHeight: (height: number) => void;
   onClose: () => void;
 }) {
   const band = TABLE_BANDS[row.actualBand];
@@ -896,6 +944,7 @@ function TapCard({
   // clear of it if it landed underneath.
   useEffect(() => {
     const card = cardRef.current?.getBoundingClientRect();
+    if (card) onHeight(card.height);
     const tapped = document
       .getElementById(`row-${row.teamId}`)
       ?.getBoundingClientRect();
@@ -908,7 +957,7 @@ function TapCard({
         behavior: reduce.matches ? "auto" : "smooth",
       });
     }
-  }, [row.teamId]);
+  }, [row.teamId, onHeight]);
 
   return (
     // Docked above the tab bar, no scrim, so the row stays visible above it.
@@ -930,7 +979,8 @@ function TapCard({
               {row.name}
             </p>
             <p className={`${T.caption} ${TX.muted}`}>
-              Finished {ordinal(row.position)} · {band.label}
+              {seasonOver ? "Finished" : "Now"} {ordinal(row.position)} ·{" "}
+              {band.label} Band
             </p>
           </div>
           <button
@@ -975,6 +1025,7 @@ function TapCard({
                 name="You"
                 who="you"
                 call={row.you}
+                actualBand={row.actualBand}
                 theirs={row.them.points}
                 options={options}
               />
@@ -982,6 +1033,7 @@ function TapCard({
                 name={themName}
                 who="them"
                 call={row.them}
+                actualBand={row.actualBand}
                 theirs={row.you.points}
                 options={options}
               />
@@ -1008,6 +1060,7 @@ function Ladder({ row, options }: { row: CompareRow; options: Options }) {
         style={{ left: pct(row.actualBand), width: pct(1) }}
       />
       <span className="relative block h-12">
+        <BandTicks />
         <span
           className="absolute inset-y-1 w-px bg-ink"
           style={{ left: centre(row.actualBand) }}
@@ -1031,19 +1084,22 @@ function Ladder({ row, options }: { row: CompareRow; options: Options }) {
       </span>
       <span className="relative grid grid-cols-8 pb-1.5">
         {TABLE_BANDS.map((band, index) => (
-          // A range stacks first-over-last ("12" over "14"): at phone width
-          // a column is ~36px, too narrow for "12-14" on one line.
+          // One line, with an en dash (stacked ranges read as fractions),
+          // and only for the Bands this card is about: where the club is
+          // and the two calls. The ticks already mark every other Band.
           <span
             key={band.key}
-            className={`flex flex-col items-center leading-tight ${T.label} tabular-nums ${
+            className={`whitespace-nowrap text-center ${T.label} tracking-[-0.04em] tabular-nums ${
               index === row.actualBand
                 ? `font-extrabold ${TX.base}`
                 : `font-bold ${TX.muted}`
             }`}
           >
-            {BAND_META[band.key].positions.split("-").map((part) => (
-              <span key={part}>{part}</span>
-            ))}
+            {index === row.actualBand ||
+            index === row.you.band ||
+            index === row.them.band
+              ? BAND_META[band.key].positions.replace("-", "–")
+              : null}
           </span>
         ))}
       </span>
@@ -1056,16 +1112,19 @@ function ScoreTile({
   name,
   who,
   call,
+  actualBand,
   theirs,
   options,
 }: {
   name: string;
   who: "you" | "them";
   call: SideCall;
+  actualBand: number;
   theirs: number;
   options: Options;
 }) {
-  const green = greenFor(call.points, theirs, options);
+  const parts = breakdown(call, actualBand);
+  const lead = leads(call.points, theirs, options);
   return (
     // The leaderboard panel's Stat cell, scaled up: paper ground, the
     // non-interactive radius, no shadow (DESIGN.md -> Printed Controls).
@@ -1081,25 +1140,38 @@ function ScoreTile({
         <span className={`truncate ${MICRO_LABEL} ${TX.muted}`}>{name}</span>
       </span>
       <span
-        className={`${T.h2} font-extrabold leading-none tabular-nums ${
-          green ? "text-success" : call.points === 0 ? TX.muted : TX.base
+        className={`${T.h2} leading-none tabular-nums ${
+          call.points === 0
+            ? `font-bold ${TX.muted}`
+            : lead
+              ? `font-extrabold ${TX.base}`
+              : `font-bold ${TX.base}`
         }`}
       >
         {pointLabel(call.points)}
       </span>
-      {/* Wraps rather than truncates: the Band name is the tile's whole
-          answer to "what did they say". */}
-      <span className={`${T.caption} font-bold leading-snug ${TX.base}`}>
-        {call.band === null ? "Not placed" : TABLE_BANDS[call.band].label}
+      {/* How the figure is made, as one equation: a Bold Call is inside the
+          number above, never a second addition on top of it. */}
+      <span className={`${T.caption} leading-snug ${TX.muted}`}>
+        {parts.placement}
+        {parts.boldCall ? (
+          <span className={`font-bold ${TX.base}`}>
+            {" · "}
+            <Star
+              className="mb-0.5 inline size-3 fill-current"
+              aria-hidden
+            />{" "}
+            {parts.boldCall}
+          </span>
+        ) : null}
       </span>
-      {call.boldCall ? (
-        <span
-          className={`flex items-center gap-1 ${T.caption} font-bold ${TX.base}`}
-        >
-          <Star className="size-3 fill-current" aria-hidden />
-          {BOLD_CALL_SHORT}
-        </span>
-      ) : null}
+      {/* Wraps rather than truncates: the Band name is the tile's answer
+          to "what did they say". */}
+      <span className={`${T.caption} font-bold leading-snug ${TX.base}`}>
+        {call.band === null
+          ? "Not placed"
+          : `Said ${TABLE_BANDS[call.band].label}`}
+      </span>
     </div>
   );
 }

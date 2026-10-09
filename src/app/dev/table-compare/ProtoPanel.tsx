@@ -24,8 +24,7 @@ export const OPTION_DEFAULTS = {
   q6: "live",
   q8: "neither",
   q9: "shell",
-  q10: "biggest",
-  q11: "icons",
+  q10: "none",
   q12: "visual",
   q13: "none",
 };
@@ -89,10 +88,10 @@ const QUESTIONS: {
   },
   {
     key: "q8",
-    title: "Q8 · Level row/total",
+    title: "Q8 · Level row/total (winner is bold)",
     options: [
-      ["neither", "No green"],
-      ["both", "Both green"],
+      ["neither", "Neither bold"],
+      ["both", "Both bold"],
     ],
   },
   {
@@ -110,14 +109,6 @@ const QUESTIONS: {
       ["biggest", "Biggest part"],
       ["bands", "Bands first"],
       ["none", "Numbers only"],
-    ],
-  },
-  {
-    key: "q11",
-    title: "Q11 · Axis labels (new: icons don't name a column on touch)",
-    options: [
-      ["icons", "Band icons"],
-      ["positions", "Positions, stacked"],
     ],
   },
   {
