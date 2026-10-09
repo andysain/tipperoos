@@ -24,6 +24,12 @@ interface PlayerRow {
   joined_at: string;
 }
 
+interface PredictionStateRow {
+  player_id: string;
+  submitted_at: string | null;
+  is_skipped: boolean;
+}
+
 interface ScoreRow {
   player_id: string;
   total_score: number;
@@ -39,8 +45,9 @@ export interface TableLeaderboardView {
 }
 
 /**
- * Only players who have an actual `table_prediction_scores` row are
- * included -- a player who never submitted (or hasn't been through a
+ * Only players with a submitted, non-skipped table AND a
+ * `table_prediction_scores` row are included (the first condition is issue
+ * #214 D2, below) -- a player who never submitted (or hasn't been through a
  * cohort recompute yet) has no score to show, and isn't given a
  * misrepresenting 0 (CLAUDE.md's "no pick, no points" principle, applied
  * here to Predict the Table). Bots are excluded at the source: they never
@@ -67,18 +74,39 @@ export async function loadTableLeaderboard(
   if (players.length === 0) return { rows: [], scored: false };
   const playerIds = players.map((p) => p.id);
 
-  const { data: scoreRows, error: scoresError } = await supabase
-    .from("table_prediction_scores")
-    .select(
-      "player_id, total_score, placement_score, band_bonus_score, bold_call_score",
-    )
-    .in("player_id", playerIds)
-    .order("player_id");
-  if (scoresError) throw scoresError;
+  // Both keyed only on the player ids, so they share one round trip.
+  const [scoresResult, predictionsResult] = await Promise.all([
+    supabase
+      .from("table_prediction_scores")
+      .select(
+        "player_id, total_score, placement_score, band_bonus_score, bold_call_score",
+      )
+      .in("player_id", playerIds)
+      .order("player_id"),
+    supabase
+      .from("table_predictions")
+      .select("player_id, submitted_at, is_skipped")
+      .in("player_id", playerIds)
+      .order("player_id"),
+  ]);
+  if (scoresResult.error) throw scoresResult.error;
+  if (predictionsResult.error) throw predictionsResult.error;
+
+  // Issue #214 D2: submitted tables only. A score row outlives its table --
+  // scores are only ever upserted, while skipping and every pre-deadline
+  // Band move reset `submitted_at` -- so a frozen score would otherwise sit
+  // on the board forever, and its row would link to a table the comparison
+  // page refuses to show. Filtered at read time; no score row is deleted.
+  const hasSubmittedTable = new Set(
+    ((predictionsResult.data ?? []) as PredictionStateRow[])
+      .filter((p) => p.submitted_at !== null && !p.is_skipped)
+      .map((p) => p.player_id),
+  );
 
   const playerById = new Map(players.map((p) => [p.id, p]));
 
-  const scores = ((scoreRows ?? []) as ScoreRow[])
+  const scores = ((scoresResult.data ?? []) as ScoreRow[])
+    .filter((row) => hasSubmittedTable.has(row.player_id))
     .map((row) => {
       const player = playerById.get(row.player_id);
       if (!player) return null;
