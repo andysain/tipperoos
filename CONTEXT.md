@@ -61,7 +61,7 @@ A Player's run of consecutive right-result Tipped Matches in kickoff order, acro
 _Avoid_: Hot streak, Form (the old app's analytics pages, which stay out of scope)
 
 **Gameweek wrap**:
-A few awards about the last snapshotted Gameweek, shown on the leaderboard's Season tab: Tipper of the Week, Top of the Hill, On Fire, Rocket, Streak Snapped and Furthest Off. Only awards that actually happened that week appear, never more than four, and Bots never win one. Derived on every request and stored nowhere (issue #218).
+A few awards about the last snapshotted Gameweek, shown on the leaderboard's Season tab: Tipper of the Week, Top of the Hill, On Fire, Rocket, Streak Snapped and Furthest Off. Only awards that actually happened that week appear, never more than four, and Bots never win one. Derived on every request and stored nowhere (issue #218). The Competition Admin also sees every award that fired, uncapped, on `/admin` as copyable plain text, plus an admin-only **No picks** list that is never copied (issue #219).
 _Avoid_: Recap (already means the Pick Board's own-week summary)
 
 **Award mark**:

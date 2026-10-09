@@ -90,7 +90,7 @@ Serial Supabase depth on the route is **3**: `seasonId` → current gameweek num
 
 **Corrected 2026-10-08 (issue #217).** The shape above was never what shipped, and "3" undercounted. Counted in real round trips, `loadLeaderboard` is **5** deep: wave 1 is max(`scoresForCompetition` 2, `loadScoredGameweeks` 3, `loadTippedMatches` 2) = 3, then wave 2 is max(`loadPreviousSeasonTotals` 2, the streak picks read 1) = 2. The page adds the active-player and current-season reads ahead of it. #217's streak reads sit inside the existing waves and added no depth.
 
-**Amended 2026-10-09 (issue #218).** The Season tab also carries the **Gameweek wrap**: one collapsed card above the bots caption with the last snapshotted gameweek's awards (`src/lib/leaderboard/wrap.ts`). Its ranks follow D12 (humans only, re-ranked from stored `season_total`), and its "previous gameweek" is the same numeric N‑1 as movement. `loadPreviousSeasonTotals` became `loadSnapshotTotals`, which reads N‑1 and N in one call, so the depth is still **5**.
+**Amended 2026-10-09 (issue #218).** The Season tab also carries the **Gameweek wrap**: one collapsed card above the bots caption with the last snapshotted gameweek's awards (`src/lib/leaderboard/wrap.ts`). Its ranks follow D12 (humans only, re-ranked from stored `season_total`), and its "previous gameweek" is the same numeric N‑1 as movement. `loadPreviousSeasonTotals` became `loadSnapshotTotals`, which reads N‑1 and N in one call, so the depth is still **5**. The admin panel (issue #219) reuses the same loader for its uncapped, copyable view of the wrap.
 
 ### D10 — Exact tips and correct results are shown, and cost nothing to derive
 

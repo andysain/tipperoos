@@ -55,15 +55,15 @@ opening a terminal", not "an admin panel usually has this".
 
 ## 3. Decisions this spec is built on
 
-| #   | Decision                                                                                                         | Consequence                                                                                                                                                                           |
-| --- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D1  | **One surface, one tier.** `is_admin` unlocks everything the UI offers. No Superadmin, no operator env-var gate. | Nothing in the UI is dangerous enough to need a second tier, _because_ of D2. Keeps `docs/adr/0004`'s "don't build Superadmin speculatively" intact.                                  |
-| D2  | **Match facts stay read-only.** No editing of results, kickoff times, or match status; no void/postpone action.  | `CLAUDE.md`'s rule survives unamended. The UI still _shows_ a wrong result — it just can't fix it. Corrections remain a development-team DB action.                                   |
-| D3  | **No elevated read visibility.** Admin never sees another player's pre-lock scoreline.                           | Admin sees "filed 2 of 2", never the numbers. Upheld by construction: the admin queries select counts, not scores.                                                                    |
-| D4  | **No admin audit log.**                                                                                          | No `admin_audit` table. Actions are visible in server logs only. Small trusted group; revisit if a second human admin ever exists.                                                    |
-| D5  | **Disable, i.e. a soft delete.** The standard pattern, nothing bespoke.                                          | A disabled player keeps every row — picks, scores, Median Bot contribution, Bold Call cohort membership. Only their ability to log in, and their leaderboard row, go away.            |
-| D6  | **No standalone re-run buttons for selection, bot picks, or scoring.** One button re-runs the whole sync cycle.  | The three jobs are gap-fill by construction (§7.2), so a cycle can never re-roll a selection or a pick a player has seen. Standalone re-runs of any of them individually don't exist. |
-| D7  | **No export or backup tooling.**                                                                                 | `CLAUDE.md`'s out-of-scope line stands; the weekly REST export already covers data safety.                                                                                            |
+| #   | Decision                                                                                                         | Consequence                                                                                                                                                                                                                                                                                   |
+| --- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | **One surface, one tier.** `is_admin` unlocks everything the UI offers. No Superadmin, no operator env-var gate. | Nothing in the UI is dangerous enough to need a second tier, _because_ of D2. Keeps `docs/adr/0004`'s "don't build Superadmin speculatively" intact.                                                                                                                                          |
+| D2  | **Match facts stay read-only.** No editing of results, kickoff times, or match status; no void/postpone action.  | `CLAUDE.md`'s rule survives unamended. The UI still _shows_ a wrong result — it just can't fix it. Corrections remain a development-team DB action.                                                                                                                                           |
+| D3  | **No elevated read visibility.** Admin never sees another player's pre-lock scoreline.                           | Admin sees "filed 2 of 2", never the numbers. Upheld by construction: admin queries never read a pre-lock scoreline. The one admin read of scorelines is the Gameweek wrap (§5, #219), whose picks are scoped to completed matches only, the same picks every player sees on the Pick Reveal. |
+| D4  | **No admin audit log.**                                                                                          | No `admin_audit` table. Actions are visible in server logs only. Small trusted group; revisit if a second human admin ever exists.                                                                                                                                                            |
+| D5  | **Disable, i.e. a soft delete.** The standard pattern, nothing bespoke.                                          | A disabled player keeps every row — picks, scores, Median Bot contribution, Bold Call cohort membership. Only their ability to log in, and their leaderboard row, go away.                                                                                                                    |
+| D6  | **No standalone re-run buttons for selection, bot picks, or scoring.** One button re-runs the whole sync cycle.  | The three jobs are gap-fill by construction (§7.2), so a cycle can never re-roll a selection or a pick a player has seen. Standalone re-runs of any of them individually don't exist.                                                                                                         |
+| D7  | **No export or backup tooling.**                                                                                 | `CLAUDE.md`'s out-of-scope line stands; the weekly REST export already covers data safety.                                                                                                                                                                                                    |
 
 ---
 
@@ -127,7 +127,15 @@ Table submissions (submitted / skipped / outstanding).
 > Skipped-Slot week has one tipped match, so it shows **no tips / tipped**). Same
 > count-not-scoreline rule as §6.1's roster column (D3).
 
-Nothing on this page is a button.
+**Gameweek wrap** (issue #219), below the counts row: every award that fired for the
+last scored gameweek (uncapped, unlike the Season tab's four), shown as the exact plain
+text a **Copy as text** button puts on the clipboard, for pasting into the group's own
+message. Under it, an admin-only **No picks** line: humans missing a pick on that
+gameweek's counted matches. It is never part of the copied text. The wording is shared
+with the Season tab card (`src/lib/leaderboard/wrap-copy.ts`).
+
+Nothing on this page changes data. Copy as text is the one button, and it only writes
+to the admin's own clipboard.
 
 ---
 
