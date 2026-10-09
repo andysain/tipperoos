@@ -22,6 +22,10 @@ import { rankScores } from "./rank";
 
 export interface WrapMatch extends StreakMatch {
   gameweekNumber: number;
+  /** Page-facing club names (`teams.name`), so Furthest Off can say which
+   *  match it was. */
+  homeTeam: string;
+  awayTeam: string;
 }
 
 export interface WrapSnapshotRow {
@@ -94,6 +98,8 @@ export type WrapAward =
       kind: "furthestOff";
       winners: {
         playerId: string;
+        homeTeam: string;
+        awayTeam: string;
         pick: Scoreline;
         result: Scoreline;
         /** |pick home - result home| + |pick away - result away|. */
@@ -186,6 +192,8 @@ function furthestOffIn(
       if (current === undefined || goalError > current.goalError) {
         worstByPlayer.set(p.playerId, {
           playerId: p.playerId,
+          homeTeam: m.homeTeam,
+          awayTeam: m.awayTeam,
           pick: { home: p.home, away: p.away },
           result: { home: m.result.home, away: m.result.away },
           goalError,
