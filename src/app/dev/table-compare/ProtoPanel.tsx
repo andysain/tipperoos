@@ -23,7 +23,7 @@ export const OPTION_DEFAULTS = {
   q5: "code",
   q6: "live",
   q8: "neither",
-  q9: "paper",
+  q9: "shell",
   q10: "biggest",
   q11: "icons",
 };
@@ -97,8 +97,8 @@ const QUESTIONS: {
     key: "q9",
     title: "Q9 · Header ground",
     options: [
-      ["paper", "Paper"],
-      ["ink", "Ink, no green"],
+      ["shell", "Ink name band (as /picks)"],
+      ["plain", "All white"],
     ],
   },
   {

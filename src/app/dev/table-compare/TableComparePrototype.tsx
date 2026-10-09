@@ -3,17 +3,28 @@
 // PROTOTYPE -- issue #214. G, the dumbbell view, in comparison mode, with
 // each of the issue's open questions as a switchable option. Throwaway: no
 // tests, minimal error handling, and it never ships to Production.
+//
+// Built from the app's existing grammar rather than its own (DESIGN.md):
+// the /picks/[playerId] page shape (back-link, Headline, ink identity band
+// over a white body), the leaderboard's `n/200` totals and component names,
+// BandSummary's kit-coloured club badges and Band icons, and the /picks
+// in-card week heading for the Band sections.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { useSearchParams } from "next/navigation";
-import { ChevronLeft, X } from "lucide-react";
-import type { PredictTableScoreResult } from "@/lib/scoring/predict-table";
+import { ChevronLeft, Star, X } from "lucide-react";
+import {
+  MAX_PREDICT_TABLE_SCORE,
+  type PredictTableScoreResult,
+} from "@/lib/scoring/predict-table";
 import { TABLE_BANDS } from "@/lib/table-predictions/rules";
-import { BAND_META, ordinal } from "@/app/predict-table/shared";
+import { BAND_META, ordinal, teamFill } from "@/app/predict-table/shared";
 import { EmojiChip } from "@/components/ui/PlayerChip";
 import { CardShell } from "@/components/ui/CardShell";
+import { ClubCodeBadge } from "@/components/ui/ClubCodeBadge";
+import { pointLabel } from "@/components/ui/Points";
 import {
   CARD_SHADOW,
   FOCUS,
@@ -52,6 +63,7 @@ export interface ProtoPayload {
 }
 
 const BAND_COUNT = TABLE_BANDS.length;
+const PAGE = "mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4";
 
 function readOptions(params: URLSearchParams): Options {
   const out = { ...OPTION_DEFAULTS };
@@ -105,21 +117,28 @@ export function TableComparePrototype({ payload }: { payload: ProtoPayload }) {
     />
   );
 
-  const backLink = (
-    <Link
-      href={"/leaderboard?segment=table" as Route}
-      className={`-ml-2 flex min-h-11 w-fit items-center gap-0.5 rounded-btn-sm px-2 ${T.caption} font-bold ${TX.muted} hover:bg-ink/5 ${FOCUS}`}
-    >
-      <ChevronLeft className="size-4" aria-hidden />
-      Leaderboard
-    </Link>
+  // Same back-link and Headline as /picks/[playerId] -- this is the same
+  // kind of destination, reached from the same leaderboard row panel.
+  const top = (
+    <>
+      <Link
+        href={"/leaderboard?segment=table" as Route}
+        className={`-ml-2 flex min-h-11 w-fit items-center gap-0.5 rounded-btn-sm px-2 ${T.caption} font-bold ${TX.muted} hover:bg-ink/5 ${FOCUS}`}
+      >
+        <ChevronLeft className="size-4" aria-hidden />
+        Leaderboard
+      </Link>
+      <h1 className={`${T.h1} font-extrabold leading-tight ${TX.base}`}>
+        Predict the Table
+      </h1>
+    </>
   );
 
   if (!youPlayer?.hasTable || !themPlayer?.hasTable) {
     return (
-      <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4">
-        {backLink}
-        <p className={`${T.body} ${TX.base}`}>
+      <main className={PAGE}>
+        {top}
+        <p className={`${T.caption} ${TX.muted}`}>
           {!youPlayer?.hasTable
             ? `${youPlayer?.displayName ?? "This player"} has no submitted table, so there's nothing to compare. Pick another "You" in the prototype panel.`
             : "Pick a player to compare with in the prototype panel."}
@@ -131,23 +150,15 @@ export function TableComparePrototype({ payload }: { payload: ProtoPayload }) {
 
   if (actualOrder.length !== 20) {
     return (
-      <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4">
-        {backLink}
-        <h1 className={`${T.h1} font-extrabold leading-tight ${TX.base}`}>
-          You vs {themPlayer.displayName}
-        </h1>
-        {/* Q6 proposal: before the first standings sync there is nothing
-            to score against, so say so plainly instead of drawing an empty
-            chart. */}
-        <CardShell className={`bg-surface ${INSET} py-4`}>
-          <p className={`${T.body} font-bold ${TX.base}`}>
-            No scores to compare yet
-          </p>
-          <p className={`${T.dense} ${TX.muted}`}>
-            Tables are scored against the real league table. That shows up here
-            after its first update.
-          </p>
-        </CardShell>
+      <main className={PAGE}>
+        {top}
+        {/* Q6 proposal: before the first standings sync there is nothing to
+            score against. Said in the leaderboard's own empty-state voice
+            (a muted caption), not drawn as an empty chart. */}
+        <p className={`${T.caption} ${TX.muted}`}>
+          Nothing to compare yet. Tables are scored against the real league
+          table, and that arrives with the first standings update.
+        </p>
         {panel}
       </main>
     );
@@ -173,10 +184,8 @@ export function TableComparePrototype({ payload }: { payload: ProtoPayload }) {
     null;
 
   return (
-    <main
-      className={`mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4 ${openRow ? "pb-72" : ""}`}
-    >
-      {backLink}
+    <main className={`${PAGE} ${openRow ? "pb-72" : ""}`}>
+      {top}
 
       <Header
         you={youPlayer}
@@ -187,52 +196,60 @@ export function TableComparePrototype({ payload }: { payload: ProtoPayload }) {
       />
 
       {stale ? (
-        // Q6 proposal for stale standings: keep the chart, say how old the
-        // table it's measured against is.
-        <p
-          className={`rounded-btn bg-warning/25 ${INSET} py-2 ${T.caption} font-bold ${TX.base}`}
-        >
+        // Q6 proposal for stale standings: keep the chart, and say how old
+        // the table it's measured against is -- in the muted caption the
+        // leaderboard uses for its explanatory lines.
+        <p className={`${T.caption} ${TX.muted}`}>
           Measured against the league table from{" "}
           {payload.standingsUpdatedLabel ?? "a while ago"}. Scores catch up at
           the next update.
         </p>
       ) : null}
 
-      {/* Not CardShell: its overflow-hidden makes the card a scroll
-          container, which pins the sticky axis to the card instead of the
-          page. overflow-clip rounds the corners without that side effect. */}
+      {/* A plain surface card, not CardShell: CardShell's overflow-hidden
+          makes the card a scroll container, which pins the sticky axis to
+          the card instead of the page. overflow-clip rounds the corners
+          without that side effect. */}
       <div className={`overflow-clip rounded-card bg-surface ${CARD_SHADOW}`}>
         <AxisHeader options={options} />
         <ol className="flex flex-col">
-          {sections.map((section) => (
-            <li key={section.bandIndex}>
-              <div
-                className={`flex items-baseline gap-2 border-t border-paper-line bg-paper/60 ${INSET} py-1.5`}
+          {sections.map((section) => {
+            const band = TABLE_BANDS[section.bandIndex];
+            const { Icon, positions } = BAND_META[band.key];
+            return (
+              <li
+                key={section.bandIndex}
+                className="border-t border-paper-line first:border-t-0"
               >
-                <span className={`${MICRO_LABEL} ${TX.base}`}>
-                  {section.label}
-                </span>
-                <span className={`${T.label} ${TX.muted} tabular-nums`}>
-                  {BAND_META[TABLE_BANDS[section.bandIndex].key].positions}
-                </span>
-              </div>
-              <ul>
-                {section.rows.map((row) => (
-                  <Row
-                    key={row.teamId}
-                    row={row}
-                    options={options}
-                    open={row.teamId === openTeamId}
-                    onTap={() =>
-                      setOpenTeamId((id) =>
-                        id === row.teamId ? null : row.teamId,
-                      )
-                    }
-                  />
-                ))}
-              </ul>
-            </li>
-          ))}
+                {/* The /picks in-card week heading (Label, muted), with the
+                    Band's wayfinding icon as BandSummary carries it. */}
+                <div
+                  className={`flex items-center gap-1.5 ${INSET} pt-2.5 pb-0.5 ${TX.muted}`}
+                >
+                  <Icon className="size-3.5" aria-hidden />
+                  <span className={LABEL}>{section.label}</span>
+                  <span className={`${T.caption} font-medium tabular-nums`}>
+                    {positions}
+                  </span>
+                </div>
+                <ul>
+                  {section.rows.map((row) => (
+                    <Row
+                      key={row.teamId}
+                      row={row}
+                      options={options}
+                      open={row.teamId === openTeamId}
+                      onTap={() =>
+                        setOpenTeamId((id) =>
+                          id === row.teamId ? null : row.teamId,
+                        )
+                      }
+                    />
+                  ))}
+                </ul>
+              </li>
+            );
+          })}
         </ol>
       </div>
 
@@ -270,13 +287,14 @@ function Header({
   themTotals: SideTotals;
   options: Options;
 }) {
-  const ink = options.q9 === "ink";
-  const base = ink ? TX.onInk : TX.base;
-  const muted = ink ? TX.onInkMuted : TX.muted;
-  const line = ink ? "border-paper/15" : "border-paper-line";
-  // Q9: on ink, Pitch Green is never text (DESIGN.md -> Pitch Green).
+  // Q9: "shell" is /picks/[playerId]'s ink identity band over a white body;
+  // "plain" keeps the whole card white. Pitch Green is never text on ink
+  // (DESIGN.md -> Pitch Green), so the band's totals are never green.
+  const shell = options.q9 !== "plain";
   const green = (mine: number, theirs: number) =>
-    !ink && greenFor(mine, theirs, options) ? "text-success" : base;
+    greenFor(mine, theirs, options) ? "text-success" : TX.base;
+  const bandGreen = (mine: number, theirs: number) =>
+    shell ? TX.onInk : green(mine, theirs);
 
   const sentence = headerSentence(
     options.q10 as SentenceRule,
@@ -285,6 +303,7 @@ function Header({
     themTotals,
   );
 
+  // Component names as the Predict the Table leaderboard panel spells them.
   const rows: { label: string; you: number; them: number; key: string }[] = [
     {
       key: "placement",
@@ -300,7 +319,7 @@ function Header({
     },
     {
       key: "bold",
-      label: "Bold Calls",
+      label: "Bold calls",
       you: youTotals.boldCalls,
       them: themTotals.boldCalls,
     },
@@ -314,43 +333,49 @@ function Header({
   }
 
   return (
-    <CardShell className={ink ? "bg-ink" : "bg-surface"}>
-      <div className={`flex flex-col gap-3 ${INSET} py-4`}>
-        <div className="grid grid-cols-2 gap-3">
-          <Who
-            player={you}
-            label="You"
-            total={youTotals.total}
-            totalClass={green(youTotals.total, themTotals.total)}
-            ink={ink}
-            showLate={options.q4b === "name"}
-          />
-          <Who
-            player={them}
-            label={them.displayName}
-            total={themTotals.total}
-            totalClass={green(themTotals.total, youTotals.total)}
-            ink={ink}
-            alignEnd
-            showLate={options.q4b === "name"}
-          />
-        </div>
+    <CardShell className="bg-surface">
+      <div
+        className={`grid grid-cols-2 gap-3 ${INSET} py-3.5 ${shell ? "bg-ink" : "border-b border-paper-line"}`}
+      >
+        <Who
+          player={you}
+          label="You"
+          total={youTotals.total}
+          totalClass={bandGreen(youTotals.total, themTotals.total)}
+          shell={shell}
+          showLate={options.q4b === "name"}
+        />
+        <Who
+          player={them}
+          label={them.displayName}
+          total={themTotals.total}
+          totalClass={bandGreen(themTotals.total, youTotals.total)}
+          shell={shell}
+          alignEnd
+          showLate={options.q4b === "name"}
+        />
+      </div>
 
-        <p className={`${T.body} font-bold leading-snug ${base}`}>{sentence}</p>
+      <div className={`flex flex-col gap-3 ${INSET} py-4`}>
+        <p
+          className={`max-w-[52ch] ${T.body} font-bold leading-snug ${TX.base}`}
+        >
+          {sentence}
+        </p>
 
         <table className={`w-full ${T.dense} tabular-nums`}>
           <thead>
-            <tr className={`${LABEL} ${muted}`}>
-              <th className="py-1 text-left font-bold" scope="col">
-                <span className="sr-only">Component</span>
+            <tr className={`${LABEL} ${TX.muted}`}>
+              <th className="pb-1 text-left font-bold" scope="col">
+                <span className="sr-only">Score part</span>
               </th>
-              <th className="py-1 text-right font-bold" scope="col">
+              <th className="pb-1 text-right font-bold" scope="col">
                 You
                 {options.q4b === "column" && you.isLateJoiner ? (
                   <LateChip />
                 ) : null}
               </th>
-              <th className="py-1 text-right font-bold" scope="col">
+              <th className="pb-1 text-right font-bold" scope="col">
                 {them.displayName}
                 {options.q4b === "column" && them.isLateJoiner ? (
                   <LateChip />
@@ -360,27 +385,30 @@ function Header({
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.key} className={`border-t ${line}`}>
+              <tr key={r.key} className="border-t border-paper-line">
                 <th
                   scope="row"
-                  className={`py-1.5 text-left font-normal ${muted}`}
+                  className={`py-1.5 text-left font-normal ${TX.muted}`}
                 >
                   {r.label}
                 </th>
                 <td
-                  className={`py-1.5 text-right font-bold ${green(r.you, r.them)}`}
+                  className={`py-1.5 text-right font-extrabold ${green(r.you, r.them)}`}
                 >
                   {r.key === "bold" ? boldCell(you, r.you) : r.you}
                 </td>
                 <td
-                  className={`py-1.5 text-right font-bold ${green(r.them, r.you)}`}
+                  className={`py-1.5 text-right font-extrabold ${green(r.them, r.you)}`}
                 >
                   {r.key === "bold" ? boldCell(them, r.them) : r.them}
                 </td>
               </tr>
             ))}
-            <tr className={`border-t-2 ${line}`}>
-              <th scope="row" className={`py-1.5 text-left font-bold ${base}`}>
+            <tr className="border-t border-paper-line">
+              <th
+                scope="row"
+                className={`py-1.5 text-left font-bold ${TX.base}`}
+              >
                 Total
               </th>
               <td
@@ -397,10 +425,10 @@ function Header({
           </tbody>
         </table>
 
-        <p className={`${T.caption} ${muted}`}>
-          <span className="font-bold">Exactly right — </span>
-          You: {youTotals.exactBands.join(", ") || "none yet"} ·{" "}
-          {them.displayName}: {themTotals.exactBands.join(", ") || "none yet"}
+        <p className={`${T.caption} ${TX.muted}`}>
+          <span className="font-bold">Exactly right: </span>
+          you, {youTotals.exactBands.join(", ") || "none yet"}.{" "}
+          {them.displayName}, {themTotals.exactBands.join(", ") || "none yet"}.
         </p>
       </div>
     </CardShell>
@@ -423,7 +451,7 @@ function Who({
   label,
   total,
   totalClass,
-  ink,
+  shell,
   alignEnd,
   showLate,
 }: {
@@ -431,37 +459,38 @@ function Who({
   label: string;
   total: number;
   totalClass: string;
-  ink: boolean;
+  shell: boolean;
   alignEnd?: boolean;
   showLate: boolean;
 }) {
   return (
     <div
-      className={`flex flex-col gap-1 ${alignEnd ? "items-end text-right" : ""}`}
+      className={`flex min-w-0 flex-col gap-2 ${alignEnd ? "items-end text-right" : ""}`}
     >
       <div
-        className={`flex items-center gap-2 ${alignEnd ? "flex-row-reverse" : ""}`}
+        className={`flex min-w-0 items-center gap-2 ${alignEnd ? "flex-row-reverse" : ""}`}
       >
-        <EmojiChip emoji={player.emoji} onDark={ink} />
+        <EmojiChip emoji={player.emoji} onDark={shell} />
         <span
-          className={`min-w-0 truncate ${T.body} font-bold ${ink ? TX.onInk : TX.base}`}
+          className={`min-w-0 truncate ${T.body} font-bold ${shell ? TX.onInk : TX.base}`}
         >
           {label}
         </span>
+        {player.isLateJoiner && showLate ? <LateChip /> : null}
       </div>
-      {player.isLateJoiner && showLate ? (
-        // Q4: the Late badge sits by the name in the header, in Neutral
-        // Teal's badge role (DESIGN.md -> Neutral Teal).
+      {/* The leaderboard's `n/200`, set at Display size like /picks'
+          header total. */}
+      <span className="flex items-baseline gap-0.5">
         <span
-          className={`rounded-badge px-1.5 py-0.5 ${MICRO_LABEL} bg-info ${TX.onInk}`}
+          className={`${T.score} font-extrabold leading-none tabular-nums ${totalClass}`}
         >
-          Late
+          {total}
         </span>
-      ) : null}
-      <span
-        className={`${T.score} font-extrabold leading-none tabular-nums ${totalClass}`}
-      >
-        {total}
+        <span
+          className={`${LABEL} tabular-nums ${shell ? TX.onInkMuted : TX.muted}`}
+        >
+          /{MAX_PREDICT_TABLE_SCORE}
+        </span>
       </span>
     </div>
   );
@@ -479,8 +508,9 @@ function gridCols(options: Options): string {
 function AxisHeader({ options }: { options: Options }) {
   return (
     // Sticky: once the header scrolls away nothing else names the columns.
+    // Same treatment as /picks' sticky PicksLegend.
     <div
-      className={`sticky top-0 z-[1] grid ${gridCols(options)} items-end gap-1.5 border-b border-paper-line bg-surface ${INSET} py-1.5`}
+      className={`sticky top-0 z-10 grid ${gridCols(options)} items-end gap-1.5 border-b border-paper-line bg-surface ${INSET} py-1.5`}
     >
       <span aria-hidden />
       <div className="grid grid-cols-8">
@@ -536,13 +566,14 @@ function Lane({
   showStar: boolean;
   unplacedLabel: boolean;
 }) {
+  const you = who === "you";
   if (call.band === null) {
     return unplacedLabel ? (
       <span
         className={`absolute left-0 -translate-y-1/2 ${T.label} font-bold ${TX.muted}`}
         style={{ top }}
       >
-        {who === "you" ? "You" : "Them"}: not placed
+        {you ? "You" : "Them"}: not placed
       </span>
     ) : null;
   }
@@ -551,29 +582,29 @@ function Lane({
   return (
     <>
       {span > 0 ? (
+        // Gold as a bar for your own call (DESIGN.md -> Trophy Gold, "a
+        // fill, a bar, a ring"); the peer's bar in the muted text role.
         <span
           aria-hidden
-          className={`absolute -translate-y-1/2 rounded-badge ${who === "you" ? "h-1.5 bg-accent" : "h-0.5 bg-ink/50"}`}
+          className={`absolute -translate-y-1/2 rounded-badge ${you ? "h-1.5 bg-accent" : "h-0.5 bg-text-muted"}`}
           style={{ top, left: centre(from), width: pct(span) }}
         />
       ) : null}
       <span
         aria-hidden
         className={`absolute size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-badge ${
-          who === "you"
-            ? "bg-accent ring-1 ring-ink/40"
-            : "border-2 border-ink bg-surface"
+          you ? "bg-accent ring-1 ring-ink" : "border-2 border-ink bg-surface"
         }`}
         style={{ top, left: centre(call.band) }}
       />
       {showStar ? (
-        <span
+        // A lucide icon, not a ★ glyph: functional marks come from the icon
+        // set (DESIGN.md -> Do's).
+        <Star
           aria-hidden
-          className={`absolute -translate-y-1/2 pl-2.5 ${T.label} leading-none ${TX.base}`}
+          className={`absolute size-3 -translate-y-1/2 translate-x-2.5 fill-current ${TX.base}`}
           style={{ top, left: centre(call.band) }}
-        >
-          ★
-        </span>
+        />
       ) : null}
     </>
   );
@@ -598,22 +629,10 @@ function Row({
     <li>
       <button
         type="button"
-        onClick={(event) => {
-          onTap();
-          // The design keeps the tapped row visible above the docked card,
-          // so lift it clear if it would land underneath. 17rem ~ the card
-          // plus the 4rem tab bar; good enough for a prototype.
-          const row = event.currentTarget.getBoundingClientRect();
-          const clearance = window.innerHeight - 17 * 16;
-          if (!open && row.bottom > clearance) {
-            window.scrollBy({
-              top: row.bottom - clearance + 8,
-              behavior: "smooth",
-            });
-          }
-        }}
+        id={`row-${row.teamId}`}
+        onClick={onTap}
         aria-expanded={open}
-        className={`grid min-h-11 w-full ${gridCols(options)} items-center gap-1.5 border-t border-paper-line/60 ${INSET} text-left first:border-t-0 ${open ? "bg-ink/5" : ""} ${FOCUS}`}
+        className={`grid min-h-11 w-full ${gridCols(options)} items-center gap-1.5 ${INSET} text-left ${open ? "bg-paper" : "hover:bg-paper/60"} ${FOCUS}`}
       >
         <span className="flex min-w-0 items-center">
           {options.q5 === "name" ? (
@@ -621,11 +640,12 @@ function Row({
               {row.name}
             </span>
           ) : (
-            <span
-              className={`${T.caption} font-extrabold tracking-wide ${TX.base}`}
-            >
-              {row.shortCode ?? "?"}
-            </span>
+            // BandSummary's club identity: the code on its kit colour, run
+            // through the contrast floor (DESIGN.md -> Kit Colour Rule).
+            <ClubCodeBadge
+              shortCode={row.shortCode}
+              fill={teamFill(row.shortCode)}
+            />
           )}
           <span className="sr-only">
             , finished {ordinal(row.position)}. You{" "}
@@ -635,13 +655,14 @@ function Row({
         </span>
 
         <span className="relative h-11" aria-hidden>
-          {/* The Band these clubs finished in, with its finish line. */}
+          {/* The Band these clubs finished in (paper, the app's ground), with
+              its finish line down the centre. */}
           <span
-            className="absolute inset-y-0 bg-ink/6"
+            className="absolute inset-y-0 bg-paper"
             style={{ left: pct(row.actualBand), width: pct(1) }}
           />
           <span
-            className="absolute inset-y-0 w-px bg-ink/45"
+            className="absolute inset-y-0 w-px bg-ink"
             style={{ left: centre(row.actualBand) }}
           />
           <Lane
@@ -688,6 +709,7 @@ function PointsCell({
 }) {
   const green = greenFor(mine, theirs, options);
   return (
+    // `+5` / `0` through the app's own pointLabel (DESIGN.md -> Do's).
     <span
       className={`text-right ${T.caption} tabular-nums ${
         green
@@ -698,7 +720,7 @@ function PointsCell({
       }`}
       aria-hidden
     >
-      {mine > 0 ? `+${String(mine)}` : "0"}
+      {pointLabel(mine)}
     </span>
   );
 }
@@ -715,19 +737,46 @@ function TapCard({
   onClose: () => void;
 }) {
   const band = TABLE_BANDS[row.actualBand];
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // The design keeps the tapped row visible above the docked card, so once
+  // the card has rendered (its height varies with its content) lift the row
+  // clear of it if it landed underneath.
+  useEffect(() => {
+    const card = cardRef.current?.getBoundingClientRect();
+    const tapped = document
+      .getElementById(`row-${row.teamId}`)
+      ?.getBoundingClientRect();
+    if (!card || !tapped) return;
+    const overlap = tapped.bottom - (card.top - 8);
+    if (overlap > 0) {
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+      window.scrollBy({
+        top: overlap,
+        behavior: reduce.matches ? "auto" : "smooth",
+      });
+    }
+  }, [row.teamId]);
+
   return (
     // Docked above the tab bar, no scrim, so the row stays visible above it.
+    // A raised sheet: Matchday Lift, no border (DESIGN.md -> Elevation).
     <div
-      className={`fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 mx-auto w-full max-w-4xl px-3`}
+      ref={cardRef}
+      className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 mx-auto w-full max-w-4xl px-4"
       role="dialog"
       aria-label={`${row.name} details`}
     >
-      <div
-        className={`rounded-card bg-surface ${CARD_SHADOW} ring-1 ring-paper-line`}
-      >
+      <div className={`rounded-card bg-surface ${CARD_SHADOW}`}>
         <div className={`flex items-start gap-2 ${INSET} pt-3`}>
-          <div className="flex-1">
-            <p className={`${T.body} font-extrabold ${TX.base}`}>{row.name}</p>
+          <ClubCodeBadge
+            shortCode={row.shortCode}
+            fill={teamFill(row.shortCode)}
+          />
+          <div className="min-w-0 flex-1">
+            <p className={`${T.body} font-bold leading-snug ${TX.base}`}>
+              {row.name}
+            </p>
             <p className={`${T.caption} ${TX.muted}`}>
               Finished {ordinal(row.position)} · {band.label}
             </p>
@@ -736,13 +785,13 @@ function TapCard({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className={`-mr-2 grid size-11 place-items-center rounded-btn-sm ${TX.muted} hover:bg-ink/5 ${FOCUS}`}
+            className={`-mt-1.5 -mr-2 grid size-11 place-items-center rounded-btn-sm ${TX.muted} hover:bg-ink/5 ${FOCUS}`}
           >
             <X className="size-5" aria-hidden />
           </button>
         </div>
         <dl
-          className={`grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 ${INSET} pb-4 pt-2 ${T.dense}`}
+          className={`grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 ${INSET} pt-2 pb-4 ${T.dense}`}
         >
           <CardLine who="You" call={row.you} actualBand={row.actualBand} />
           <CardLine
@@ -774,8 +823,15 @@ function CardLine({
           : `Said ${TABLE_BANDS[call.band].label}`}
         <span className={`block ${T.caption} ${TX.muted}`}>
           {placementReason(call, actualBand)}
-          {call.boldCall ? ` · ${BOLD_CALL_LINE}` : ""}
         </span>
+        {call.boldCall ? (
+          <span
+            className={`flex items-center gap-1 ${T.caption} font-bold ${TX.base}`}
+          >
+            <Star className="size-3 fill-current" aria-hidden />
+            {BOLD_CALL_LINE}
+          </span>
+        ) : null}
       </dd>
     </>
   );

@@ -125,7 +125,8 @@ export function placementReason(call: SideCall, actualBand: number): string {
   return `${label} · ${points > 0 ? `+${String(points)}` : "0"}`;
 }
 
-export const BOLD_CALL_LINE = `Bold Call · +${String(BOLD_CALL_BONUS)}, counted in Bold Calls`;
+// The row figure is Placement only (issue D10), so say where the +3 went.
+export const BOLD_CALL_LINE = `Bold Call · +${String(BOLD_CALL_BONUS)} in Bold calls`;
 
 type Component = "bands" | "placement" | "boldCalls";
 // Tie order for the "biggest" rule (issue question 10's proposal).
