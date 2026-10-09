@@ -36,6 +36,9 @@ export default async function CompareTablePage({
 }) {
   const { playerId: targetId } = await params;
   const { playerId: viewerId, competitionId } = await loadActivePlayer();
+  // Your own id goes to your own table before anything is read (D6): it
+  // never waits on, or fails with, the comparison's reads.
+  if (targetId === viewerId) redirect("/predict-table");
   const supabase = createServerSupabaseClient();
 
   const { decision, cohort, teams, now } = await loadTableComparison(

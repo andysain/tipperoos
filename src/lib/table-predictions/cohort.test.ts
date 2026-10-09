@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fakeSupabase, type Row } from "../../../vitest/fake-supabase";
-import { loadScoredCohort } from "./cohort";
+import { isSubmittedTable, loadScoredCohort } from "./cohort";
 import { TABLE_BANDS as RULE_BANDS } from "./rules";
 
 // Golden values for issue #214 D1's shared cohort read: the same cohort as
@@ -177,5 +177,56 @@ describe("loadScoredCohort", () => {
     expect(cohort.results.size).toBe(0);
     // The cohort's members are still known -- only the scoring waits.
     expect(cohort.players.size).toBe(3);
+  });
+});
+
+describe("loadScoredCohort -- one current season, chosen deterministically", () => {
+  it("uses the newest current season's standings and kickoff, as the recompute always did", async () => {
+    const data = seed();
+    // A stray older season still flagged current (staging once had one),
+    // with the table upside down and an earlier kickoff.
+    data.seasons.push({ id: "s0", is_current: true, start_date: "2025-08-01" });
+    data.matches.push({
+      season_id: "s0",
+      kickoff_time: "2025-08-16T00:00:00Z",
+    });
+    data.team_standings.push(
+      ...TEAM_IDS.map((teamId, index) => ({
+        team_id: teamId,
+        season_id: "s0",
+        position: 20 - index,
+        played: 38,
+        updated_at: "2026-05-25T00:00:00Z",
+      })),
+    );
+    const { client } = fakeSupabase(data);
+    const cohort = await loadScoredCohort(client, COMPETITION_ID);
+
+    expect(cohort.actualOrder[0]).toBe("t1");
+    expect(cohort.minPlayed).toBe(7);
+    expect(cohort.gameweekOneKickoff?.toISOString()).toBe(
+      "2026-08-15T00:00:00.000Z",
+    );
+    expect(cohort.results.get("p1")?.totalScore).toBe(191);
+  });
+});
+
+describe("isSubmittedTable", () => {
+  it("counts only a submitted, non-skipped table", () => {
+    expect(
+      isSubmittedTable({
+        submitted_at: "2026-08-01T00:00:00Z",
+        is_skipped: false,
+      }),
+    ).toBe(true);
+    expect(isSubmittedTable({ submitted_at: null, is_skipped: false })).toBe(
+      false,
+    );
+    expect(
+      isSubmittedTable({
+        submitted_at: "2026-08-01T00:00:00Z",
+        is_skipped: true,
+      }),
+    ).toBe(false);
   });
 });

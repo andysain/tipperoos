@@ -382,22 +382,30 @@ function Who({
 
 // --- Marks, key and sticky header -------------------------------------------
 
-// The chart's marks, drawn once so the key, the sticky header and the chips
-// use the exact shapes the lanes use -- never a glyph standing in for them.
-function YouMark({ size = "size-3" }: { size?: string }) {
+// The chart's marks, drawn once so the lanes, the key, the sticky header,
+// the chips and the tiles all use the exact same shapes -- never a glyph
+// standing in for them. Your mark is Trophy Gold (DESIGN.md -> Accent
+// Budget Rule, issue #214); theirs is outline ink, never Neutral Teal.
+function Mark({
+  who,
+  size = "size-3",
+  className = "",
+  style,
+}: {
+  who: "you" | "them";
+  size?: string;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
   return (
     <span
       aria-hidden
-      className={`${size} shrink-0 rounded-badge bg-accent ring-1 ring-ink`}
-    />
-  );
-}
-
-function ThemMark({ size = "size-3" }: { size?: string }) {
-  return (
-    <span
-      aria-hidden
-      className={`${size} shrink-0 rounded-badge border-2 border-ink bg-surface`}
+      className={`${size} shrink-0 rounded-badge ${
+        who === "you"
+          ? "bg-accent ring-1 ring-ink"
+          : "border-2 border-ink bg-surface"
+      } ${className}`}
+      style={style}
     />
   );
 }
@@ -416,11 +424,11 @@ function ChartKey({
       className={`flex flex-wrap gap-x-4 gap-y-1.5 border-b border-paper-line ${INSET} py-2.5 ${T.caption} ${TX.muted}`}
     >
       <span className={item}>
-        <YouMark />
+        <Mark who="you" />
         <span className={`font-bold ${TX.base}`}>You</span>
       </span>
       <span className={item}>
-        <ThemMark />
+        <Mark who="them" />
         <span className={`font-bold ${TX.base}`}>{themName}</span>
       </span>
       <span className={item}>
@@ -431,7 +439,7 @@ function ChartKey({
         {/* The current-Band column and its finish line, in miniature. */}
         <span
           aria-hidden
-          className="relative flex h-4 w-3 justify-center rounded-[3px] bg-paper"
+          className="relative flex h-4 w-3 justify-center bg-paper"
         >
           <span className="h-full w-px bg-ink" />
         </span>
@@ -470,11 +478,11 @@ function StickyMarks() {
       <span aria-hidden />
       <span aria-hidden />
       <span className="flex justify-end pr-3">
-        <YouMark size="size-2.5" />
+        <Mark who="you" size="size-2.5" />
         <span className="sr-only">You</span>
       </span>
       <span className="flex justify-end pr-3">
-        <ThemMark size="size-2.5" />
+        <Mark who="them" size="size-2.5" />
         <span className="sr-only">Them</span>
       </span>
     </div>
@@ -499,11 +507,7 @@ function BandBonusChip({
     <span
       className={`flex items-center gap-1 rounded-badge bg-success py-0.5 pr-1.5 pl-1 ${MICRO_LABEL} tabular-nums ${TX.onInk}`}
     >
-      {who === "you" ? (
-        <YouMark size="size-2.5" />
-      ) : (
-        <ThemMark size="size-2.5" />
-      )}
+      <Mark who={who} size="size-2.5" />
       <Check className="-ml-0.5 size-3 stroke-[3]" aria-hidden />
       {pointLabel(value)}
       <span className="sr-only">
@@ -567,11 +571,10 @@ function Lane({
           style={{ top, left: centre(from), width: pct(span) }}
         />
       ) : null}
-      <span
-        aria-hidden
-        className={`absolute size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-badge ${
-          you ? "bg-accent ring-1 ring-ink" : "border-2 border-ink bg-surface"
-        }`}
+      <Mark
+        who={who}
+        size="size-3.5"
+        className="absolute -translate-x-1/2 -translate-y-1/2"
         style={{ top, left: centre(call.band) }}
       />
       {call.boldCall ? (
@@ -590,8 +593,7 @@ function Lane({
 }
 
 function rowSpeech(call: SideCall, actualBand: number): string {
-  const points = call.placement > 0 ? `+${String(call.placement)}` : "0";
-  return `${distanceLabel(call, actualBand)}, ${points}${call.boldCall ? ", plus a Bold Call" : ""}`;
+  return `${distanceLabel(call, actualBand)}, ${pointLabel(call.placement)}${call.boldCall ? ", plus a Bold Call" : ""}`;
 }
 
 function Row({
@@ -842,28 +844,18 @@ function ScoreTile({
   theirs: number;
 }) {
   const placementPart = `${distanceLabel(call, actualBand)}${
-    call.placement > 0 ? ` +${String(call.placement)}` : ""
+    call.placement > 0 ? ` ${pointLabel(call.placement)}` : ""
   }`;
   return (
     // The leaderboard panel's Stat cell, scaled up: paper ground, the
     // non-interactive radius, no shadow (DESIGN.md -> Printed Controls).
     <div className="flex min-w-0 flex-col gap-1.5 rounded-btn-sm bg-paper px-3 py-2.5">
       <span className="flex min-w-0 items-center gap-1.5">
-        {who === "you" ? (
-          <YouMark size="size-2.5" />
-        ) : (
-          <ThemMark size="size-2.5" />
-        )}
+        <Mark who={who} size="size-2.5" />
         <span className={`truncate ${MICRO_LABEL} ${TX.muted}`}>{name}</span>
       </span>
       <span
-        className={`${T.h2} leading-none tabular-nums ${
-          call.points === 0
-            ? `font-bold ${TX.muted}`
-            : leads(call.points, theirs)
-              ? `font-extrabold ${TX.base}`
-              : `font-bold ${TX.base}`
-        }`}
+        className={`${T.h2} leading-none tabular-nums ${emphasis(call.points, theirs)}`}
       >
         {pointLabel(call.points)}
       </span>

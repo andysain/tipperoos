@@ -16,15 +16,12 @@ import { BAND_KEYS, isBandKey, isLateJoiner } from "./rules";
 // non-skipped table, Late Joiners outside the Bold Call process -- so the
 // page's totals match the leaderboard's stored ones (issue D3).
 //
-// One round trip: three independent reads in one wave, each a single
+// One round trip: two independent reads in one wave, each a single
 // PostgREST query thanks to embedded resources -- predictions carry their
-// player and ranks, standings and Gameweek 1's kickoff carry their season.
-// The recompute's previous shape was six serial reads.
-//
-// Season scoping assumes one current season. If two were ever flagged
-// current (staging once had that, see the is_current-default migration),
-// standings would come back with more than 20 rows and scoring no-ops
-// rather than mixing seasons.
+// player and ranks; the current season carries its standings and its
+// earliest match (Gameweek 1's kickoff). The recompute's previous shape was
+// six serial reads. The season is the newest flagged current, as before, so
+// a stray second current season (staging once had one) can't mix seasons.
 
 export interface CohortPlayer {
   id: string;
@@ -63,11 +60,30 @@ interface PredictionRow {
   table_prediction_ranks: { team_id: string; band: string }[] | null;
 }
 
-interface StandingRow {
-  team_id: string;
-  position: number;
-  played: number;
-  updated_at: string;
+interface SeasonRow {
+  id: string;
+  team_standings:
+    | {
+        team_id: string;
+        position: number;
+        played: number;
+        updated_at: string;
+      }[]
+    | null;
+  matches: { kickoff_time: string }[] | null;
+}
+
+/**
+ * A table counts -- for scoring, for the leaderboard, for being visible --
+ * only once it is submitted and not skipped. Every Band move before the
+ * deadline resets `submitted_at`, and skipping sets `is_skipped`, so a
+ * stored score can outlive the table it was earned by (issue #214 D2).
+ */
+export function isSubmittedTable(row: {
+  submitted_at: string | null;
+  is_skipped: boolean;
+}): boolean {
+  return row.submitted_at !== null && !row.is_skipped;
 }
 
 const bandIndexByKey = new Map(BAND_KEYS.map((key, index) => [key, index]));
@@ -76,49 +92,51 @@ export async function loadScoredCohort(
   supabase: SupabaseClient,
   competitionId: string,
 ): Promise<ScoredCohort> {
-  const [predictionsResult, standingsResult, kickoffResult] = await Promise.all(
-    [
-      supabase
-        .from("table_predictions")
-        .select(
-          "id, player_id, submitted_at, is_skipped, players!inner(id, display_name, emoji, joined_at, competition_id, is_bot), table_prediction_ranks(team_id, band)",
-        )
-        .eq("players.competition_id", competitionId)
-        .eq("players.is_bot", false)
-        .order("id"),
-      supabase
-        .from("team_standings")
-        .select(
-          "team_id, position, played, updated_at, seasons!inner(is_current)",
-        )
-        .eq("seasons.is_current", true)
-        .order("position", { ascending: true }),
-      supabase
-        .from("matches")
-        .select("kickoff_time, seasons!inner(is_current)")
-        .eq("seasons.is_current", true)
-        .order("kickoff_time", { ascending: true })
-        .limit(1)
-        .maybeSingle(),
-    ],
-  );
+  const [predictionsResult, seasonResult] = await Promise.all([
+    supabase
+      .from("table_predictions")
+      .select(
+        "id, player_id, submitted_at, is_skipped, players!inner(id, display_name, emoji, joined_at, competition_id, is_bot), table_prediction_ranks(team_id, band)",
+      )
+      .eq("players.competition_id", competitionId)
+      .eq("players.is_bot", false)
+      .order("id"),
+    // The current season -- the newest one, deterministically, exactly as
+    // the recompute always chose it -- carrying its standings in table
+    // order and its earliest match (Gameweek 1's kickoff), in one query.
+    supabase
+      .from("seasons")
+      .select(
+        "id, team_standings(team_id, position, played, updated_at), matches(kickoff_time)",
+      )
+      .eq("is_current", true)
+      .order("start_date", { ascending: false })
+      .order("position", {
+        ascending: true,
+        referencedTable: "team_standings",
+      })
+      .order("kickoff_time", { ascending: true, referencedTable: "matches" })
+      .limit(1, { referencedTable: "matches" })
+      .limit(1)
+      .maybeSingle(),
+  ]);
   if (predictionsResult.error) throw predictionsResult.error;
-  if (standingsResult.error) throw standingsResult.error;
-  if (kickoffResult.error) throw kickoffResult.error;
+  if (seasonResult.error) throw seasonResult.error;
 
-  const kickoff = kickoffResult.data as { kickoff_time: string } | null;
-  const gameweekOneKickoff = kickoff ? new Date(kickoff.kickoff_time) : null;
+  const season = seasonResult.data as unknown as SeasonRow | null;
+  const firstMatch = season?.matches?.[0];
+  const gameweekOneKickoff = firstMatch
+    ? new Date(firstMatch.kickoff_time)
+    : null;
 
   const players = new Map<string, CohortPlayer>();
   const bands = new Map<string, Map<TeamId, number>>();
-  const joinedAt = new Map<string, Date>();
   // supabase-js types a `!inner` embed as an array; PostgREST returns the
   // single parent row for this many-to-one relation.
   for (const row of (predictionsResult.data ??
     []) as unknown as PredictionRow[]) {
-    if (row.submitted_at === null || row.is_skipped || !row.players) continue;
+    if (!isSubmittedTable(row) || !row.players) continue;
     const joined = new Date(row.players.joined_at);
-    joinedAt.set(row.player_id, joined);
     players.set(row.player_id, {
       id: row.player_id,
       displayName: row.players.display_name,
@@ -134,7 +152,7 @@ export async function loadScoredCohort(
     bands.set(row.player_id, bandMap);
   }
 
-  const standings = (standingsResult.data ?? []) as unknown as StandingRow[];
+  const standings = season?.team_standings ?? [];
   const actualOrder =
     standings.length === TOTAL_TEAMS ? standings.map((s) => s.team_id) : [];
   const minPlayed =

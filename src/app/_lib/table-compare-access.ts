@@ -20,32 +20,24 @@ import { getDatabaseTime } from "./table-prediction-access";
 
 export type TableCompareDecision = "own-table" | "not-found" | "allow";
 
-export interface TableCompareTarget {
-  competitionId: string;
-  hasSubmittedTable: boolean;
-}
-
 /**
  * Precedence, in order: your own id always goes to your own table (D6);
  * no DB time refuses (fail closed); a peer refuses before the deadline;
- * then a target outside your competition, or with no submitted table,
- * refuses (D4). `target` is null when the id matches no such player.
+ * then a target with no visible table refuses. `targetHasVisibleTable` is
+ * membership of the viewer's competition-scoped cohort (D4): false for a
+ * player in another competition, a skipped or un-submitted table, a bot,
+ * or an id that matches nobody.
  */
 export function decideTableCompareAccess(params: {
   viewerId: string;
-  viewerCompetitionId: string;
   targetId: string;
-  target: TableCompareTarget | null;
+  targetHasVisibleTable: boolean;
   now: Date | null;
 }): TableCompareDecision {
-  const { viewerId, viewerCompetitionId, targetId, target, now } = params;
+  const { viewerId, targetId, targetHasVisibleTable, now } = params;
   if (targetId === viewerId) return "own-table";
   if (now === null || !arePeerTablesVisible(now)) return "not-found";
-  if (!target || target.competitionId !== viewerCompetitionId) {
-    return "not-found";
-  }
-  if (!target.hasSubmittedTable) return "not-found";
-  return "allow";
+  return targetHasVisibleTable ? "allow" : "not-found";
 }
 
 export interface TableCompareData {
@@ -58,7 +50,7 @@ export interface TableCompareData {
 
 /**
  * One wave after the session: the competition's scored cohort (itself a
- * single wave of three embedded-select queries), the teams, and DB time.
+ * single wave of two embedded-select queries), the teams, and DB time.
  * Serial depth from the page is 2 -- `loadActivePlayer`, then this.
  *
  * The target's competition scope comes from the cohort itself (D4): the
@@ -84,11 +76,8 @@ export async function loadTableComparison(
 
   const decision = decideTableCompareAccess({
     viewerId: viewer.id,
-    viewerCompetitionId: viewer.competitionId,
     targetId,
-    target: cohort.players.has(targetId)
-      ? { competitionId: viewer.competitionId, hasSubmittedTable: true }
-      : null,
+    targetHasVisibleTable: cohort.players.has(targetId),
     now,
   });
 

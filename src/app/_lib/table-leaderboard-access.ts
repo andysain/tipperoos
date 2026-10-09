@@ -5,6 +5,7 @@ import {
   type TableLeaderboardRow,
 } from "@/lib/leaderboard/table-board";
 import { isLateJoiner } from "@/lib/table-predictions/rules";
+import { isSubmittedTable } from "@/lib/table-predictions/cohort";
 import { getGameweekOneKickoff } from "./table-prediction-access";
 
 // DB-fetching glue for the leaderboard's Predict the Table segment (issue
@@ -99,7 +100,7 @@ export async function loadTableLeaderboard(
   // page refuses to show. Filtered at read time; no score row is deleted.
   const hasSubmittedTable = new Set(
     ((predictionsResult.data ?? []) as PredictionStateRow[])
-      .filter((p) => p.submitted_at !== null && !p.is_skipped)
+      .filter(isSubmittedTable)
       .map((p) => p.player_id),
   );
 
