@@ -60,6 +60,10 @@ _Avoid_: Reversed, Flipped (both read as an admin action on a result, not a Play
 A Player's run of consecutive right-result Tipped Matches in kickoff order, across Gameweeks. A Wrong Way Round or a missing Pick ends it; a Voided Match is skipped. Carried as **current** and the season's **best**, for humans only. A current Streak of 5 or more shows a 🔥 badge on the leaderboard (issue #217, `docs/adr/0012-leaderboard-view.md` D10).
 _Avoid_: Hot streak, Form (the old app's analytics pages, which stay out of scope)
 
+**Gameweek wrap**:
+A few awards about the last snapshotted Gameweek, shown on the leaderboard's Season tab: Tipper of the Week, Top of the Hill, On Fire, Rocket, Streak Snapped and Furthest Off. Only awards that actually happened that week appear, never more than four, and Bots never win one. Derived on every request and stored nowhere (issue #218).
+_Avoid_: Recap (already means the Pick Board's own-week summary)
+
 **Award mark**:
 An emoji that celebrates something a Player achieved, such as the Streak's 🔥 or a Gameweek wrap award. The third emoji tier, alongside the Player's own emoji and 🤖 for Bots. Never chrome or state (`docs/DESIGN_SYSTEM.md` → _Icons_).
 
