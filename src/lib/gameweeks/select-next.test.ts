@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { selectNextGameweekSlots } from "./select-next";
+import {
+  LIVE_STANDINGS_STALE_MS,
+  selectNextGameweekSlots,
+} from "./select-next";
 
 // Golden values hand-derived per issue #92's decision log. Proven
 // end-to-end (gameweeks/matches/team_standings/teams reads -> rule
@@ -307,5 +310,13 @@ describe("selectNextGameweekSlots", () => {
     const gw2 = tables.gameweeks.find((g) => g.number === 2);
     // m3 averages 2.5 (positions 3 and 2) against m4's 10 (5 and 15).
     expect(gw2?.match_1_id).toBe("m3");
+  });
+});
+
+describe("LIVE_STANDINGS_STALE_MS", () => {
+  // Standings older than 48 hours are stale (issue #92 D4). Pinned as a
+  // literal because a second reader now shares it (issue #214).
+  it("is 48 hours", () => {
+    expect(LIVE_STANDINGS_STALE_MS).toBe(172800000);
   });
 });

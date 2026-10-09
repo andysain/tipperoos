@@ -11,13 +11,23 @@
 
 import {
   BOLD_CALL_BONUS,
+  MAX_BOLD_CALLS,
   PLACEMENT_POINTS_BY_DISTANCE,
+  TABLE_BANDS as SCORING_BANDS,
   TOTAL_TEAMS,
   bandIndexForRank,
   type PredictTableScoreResult,
   type TeamId,
 } from "@/lib/scoring/predict-table";
 import { TABLE_BANDS, TABLE_PREDICTION_DEADLINE } from "./rules";
+
+/** Each score part's maximum, derived the way the leaderboard derives it. */
+export const MAX_PLACEMENT = TOTAL_TEAMS * PLACEMENT_POINTS_BY_DISTANCE[0];
+export const MAX_BAND_BONUS = SCORING_BANDS.reduce(
+  (sum, band) => sum + band.bonus,
+  0,
+);
+export const MAX_BOLD_CALLS_SCORE = MAX_BOLD_CALLS * BOLD_CALL_BONUS;
 
 export interface ComparisonTeam {
   id: TeamId;

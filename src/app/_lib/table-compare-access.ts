@@ -52,6 +52,8 @@ export interface TableCompareData {
   decision: TableCompareDecision;
   cohort: ScoredCohort;
   teams: Map<string, ComparisonTeam>;
+  /** DB time for this request; null if it couldn't be read. */
+  now: Date | null;
 }
 
 /**
@@ -100,5 +102,5 @@ export async function loadTableComparison(
     ).map((t) => [t.id, { id: t.id, name: t.name, shortCode: t.short_code }]),
   );
 
-  return { decision, cohort, teams };
+  return { decision, cohort, teams, now };
 }

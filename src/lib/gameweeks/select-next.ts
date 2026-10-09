@@ -34,7 +34,9 @@ import { isGameweekScoringComplete, toScoringSlot } from "./completion";
  * football-data.org's `matchday` field -- not a second provider call.
  */
 
-const LIVE_STANDINGS_STALE_MS = 48 * 60 * 60 * 1000; // D4
+// D4. Exported so every reader of team_standings judges "stale" the same
+// way (issue #214: the Predict the Table comparison's stale-standings note).
+export const LIVE_STANDINGS_STALE_MS = 48 * 60 * 60 * 1000;
 
 interface GameweekRow {
   id: string;

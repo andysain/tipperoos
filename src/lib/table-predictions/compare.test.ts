@@ -5,6 +5,9 @@ import {
 } from "@/lib/scoring/predict-table";
 import { TABLE_PREDICTION_DEADLINE } from "./rules";
 import {
+  MAX_BAND_BONUS,
+  MAX_BOLD_CALLS_SCORE,
+  MAX_PLACEMENT,
   arePeerTablesVisible,
   buildTableComparison,
   distanceLabel,
@@ -240,5 +243,14 @@ describe("arePeerTablesVisible -- the peer-visibility rule", () => {
     expect(arePeerTablesVisible(new Date(deadline - 1))).toBe(false);
     expect(arePeerTablesVisible(new Date(deadline))).toBe(true);
     expect(arePeerTablesVisible(new Date(deadline + 1))).toBe(true);
+  });
+});
+
+describe("score-part maximums", () => {
+  it("are 100 / 85 / 15, summing to the 200 ceiling (CLAUDE.md)", () => {
+    expect(MAX_PLACEMENT).toBe(100);
+    expect(MAX_BAND_BONUS).toBe(85);
+    expect(MAX_BOLD_CALLS_SCORE).toBe(15);
+    expect(MAX_PLACEMENT + MAX_BAND_BONUS + MAX_BOLD_CALLS_SCORE).toBe(200);
   });
 });
