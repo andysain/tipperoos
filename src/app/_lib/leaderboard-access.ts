@@ -16,6 +16,7 @@ import {
 import { isMatchVoided } from "@/lib/matches/voided";
 import {
   buildGameweekWrap,
+  findNoPicks,
   type GameweekWrap,
   type WrapMatch,
   type WrapSnapshotRow,
@@ -302,6 +303,10 @@ export interface LeaderboardView {
   rows: LeaderboardRow[];
   /** The last snapshotted gameweek's awards (#218); null before any. */
   wrap: GameweekWrap | null;
+  /** Humans missing a pick on the wrap's gameweek, for the admin panel's
+   *  No picks line (#219 L4); null when `wrap` is. Already public on the
+   *  Pick Reveal -- but never handed to the Season tab's card. */
+  noPicks: string[] | null;
   /** False before the competition's first scored match -- ADR 0012 D8. */
   scored: boolean;
 }
@@ -385,6 +390,15 @@ export async function loadLeaderboard(
       }),
       viewerId,
     }),
+    noPicks:
+      lastScoredNumber !== null
+        ? findNoPicks({
+            gameweekNumber: lastScoredNumber,
+            players,
+            matches: tippedMatches,
+            picks: streakPicks,
+          })
+        : null,
     wrap:
       lastScoredNumber !== null
         ? buildGameweekWrap({

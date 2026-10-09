@@ -6,12 +6,14 @@ import { ChevronRight } from "lucide-react";
 import { requireAdmin } from "@/app/_lib/admin-access";
 import { loadAdminHealth } from "@/app/_lib/admin-health-access";
 import { loadAdminIndexCounts } from "@/app/_lib/admin-index-access";
+import { loadAdminWrap, type AdminWrap } from "@/app/_lib/admin-wrap-access";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
   DEFAULT_TIME_ZONE,
   TIMEZONE_COOKIE_NAME,
 } from "@/components/nav/timezone-cookie";
 import { HealthStrip } from "@/components/admin/HealthStrip";
+import { WrapPanel } from "@/components/admin/WrapPanel";
 import { CARD_SHADOW, FOCUS, LABEL, T, TX } from "@/components/ui/tokens";
 
 // Gated behind requireAdmin(): a non-admin session and a logged-out visitor
@@ -69,15 +71,30 @@ export default async function AdminIndexPage() {
   // then run in one wave). The two loaders are sequential because the
   // second genuinely needs the first's output
   // (docs/standards/PERFORMANCE_TESTING_STANDARD.md §7).
-  const counts = await loadAdminIndexCounts(supabase, admin.competitionId);
-  const health = await loadAdminHealth(
-    supabase,
-    admin.competitionId,
-    counts.seasonId,
-    counts.currentGameweek,
-    new Date(),
-    timeZone,
-  );
+  //
+  // The Gameweek wrap (#219) runs alongside that chain: both are 6 round
+  // trips deep, so the page stays at 6. A wrap failure is caught here so
+  // the page's real job -- "is anything wrong?" -- still renders.
+  const [{ counts, health }, wrap] = await Promise.all([
+    (async () => {
+      const counts = await loadAdminIndexCounts(supabase, admin.competitionId);
+      const health = await loadAdminHealth(
+        supabase,
+        admin.competitionId,
+        counts.seasonId,
+        counts.currentGameweek,
+        new Date(),
+        timeZone,
+      );
+      return { counts, health };
+    })(),
+    loadAdminWrap(supabase, admin.competitionId, admin.playerId).catch(
+      (error: unknown): AdminWrap | "error" => {
+        console.error("admin wrap failed to load", error);
+        return "error";
+      },
+    ),
+  ]);
 
   const { submitted, skipped, outstanding } = counts.tablePredictions;
   const picks = counts.currentGameweekPicks;
@@ -124,6 +141,20 @@ export default async function AdminIndexPage() {
           {outstanding} outstanding
         </p>
       </section>
+
+      {wrap === "error" ? (
+        <WrapPanel state="error" />
+      ) : wrap.kind === "none" ? (
+        <WrapPanel state="none" />
+      ) : (
+        <WrapPanel
+          state="ready"
+          gameweekNumber={wrap.gameweekNumber}
+          text={wrap.text}
+          awardCount={wrap.awardCount}
+          noPicks={wrap.noPicks}
+        />
+      )}
 
       <Link
         href={{ pathname: "/admin/players" }}
