@@ -66,7 +66,7 @@ A tiny, curated weekly surface for one family-and-friends group, not a sports pl
 
 - A live production app with real players in the 2026–27 season. Old-app screenshots are in `docs/screenshots/`. UI findings from production are in `docs/production-ui-findings.md`.
 - Production UI defects found since launch, and where each was filed, are tracked in `docs/production-ui-findings.md`.
-- **Decided (issue #214):** how players compare Predict the Table entries now that they're locked is "G", the dumbbell view on `/predict-table/[playerId]`: the real table as the spine, both players' calls as marks with bars showing how far off each was, points per club and per exactly-right Band. Settled in an in-app prototype; issue #214 carries the design and its decision log. Your own scoring view on `/predict-table` (G without a second player) is still to come.
+- **Decided (issue #214):** how players compare Predict the Table entries now that they're locked is "G", the dumbbell view on `/predict-table/[playerId]`: the real table as the spine, both players' calls as marks with bars showing how far off each was, points per club and per exactly-right Band. Settled in an in-app prototype; issue #214 carries the design and its decision log. G for one player is built too (issue #226): your own scored table on `/predict-table`, and another player's table on its own when you have none to compare.
 - There are no testimonials, usage metrics or engagement data on record. Don't invent any.
 
 ## Product Principles
