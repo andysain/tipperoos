@@ -5,7 +5,7 @@ import { MoreHorizontal } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import { TAB_BAR_HEIGHT_CLASS } from "./shell-metrics";
-import { TABS } from "./tabs";
+import { TABS, tabForPath } from "./tabs";
 import { MoreMenuItems } from "./MoreMenu";
 import { FOCUS, T, TX } from "@/components/ui/tokens";
 
@@ -59,12 +59,17 @@ export function TabBar({ isAdmin = false }: { isAdmin?: boolean }) {
       >
         <ul className={`flex ${TAB_BAR_HEIGHT_CLASS}`}>
           {TABS.map((tab) => {
+            // `active` is the tab's own page: it alone gets aria-current and
+            // the tap-to-top behaviour. `highlighted` also covers the detail
+            // pages reached from that tab, so the bar still says where you
+            // are -- tapping it there navigates back to the tab's page.
             const active = pathname === tab.href;
+            const highlighted = tabForPath(pathname) === tab.href;
             const Icon = tab.icon;
             // Active label in ink, not accent: accent text at 0.7rem on
             // paper measured ~2:1. The accent moves to a bar above the
             // tab, where it marks the state without carrying the words.
-            const toneClass = active
+            const toneClass = highlighted
               ? `${TX.base} stroke-text`
               : `${TX.muted} stroke-text-muted`;
             return (
@@ -112,7 +117,7 @@ export function TabBar({ isAdmin = false }: { isAdmin?: boolean }) {
                       New
                     </span>
                   ) : null}
-                  {active ? (
+                  {highlighted ? (
                     <span
                       aria-hidden
                       className="absolute inset-x-6 top-0 h-[3px] rounded-b-full bg-accent"
