@@ -11,10 +11,13 @@ import { T, TX } from "@/components/ui/tokens";
 export function SubmittedMoment({
   assignments,
   teamsById,
+  isLateJoiner,
   onDismiss,
 }: {
   assignments: Record<string, BandKey>;
   teamsById: Map<string, Team>;
+  /** A Late Joiner has no deadline (CLAUDE.md), so no date to promise. */
+  isLateJoiner: boolean;
   onDismiss: () => void;
 }) {
   const [shown, setShown] = useState(false);
@@ -61,10 +64,14 @@ export function SubmittedMoment({
           You&apos;re locked in!
         </p>
         <p className={`mt-1 max-w-[26ch] ${T.dense} ${TX.muted}`}>
-          Submitted -- you can keep editing until 31 August.
+          {isLateJoiner
+            ? "Submitted -- you can change it any time."
+            : "Submitted -- you can keep editing until 31 August."}
         </p>
         {champion ? (
-          <div className={`mt-3 inline-flex items-center gap-2 rounded-btn bg-accent/10 px-3 py-2 ${T.dense} font-bold ${TX.base}`}>
+          <div
+            className={`mt-3 inline-flex items-center gap-2 rounded-btn bg-accent/10 px-3 py-2 ${T.dense} font-bold ${TX.base}`}
+          >
             <Trophy className="size-4 shrink-0 text-accent" aria-hidden />
             <TeamIdentity team={champion} /> to win it all
           </div>

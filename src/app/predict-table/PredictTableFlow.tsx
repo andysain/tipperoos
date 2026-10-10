@@ -568,7 +568,9 @@ export function PredictTableFlow({
           className={`-mt-2 flex items-center gap-1.5 ${T.dense} text-success`}
         >
           <CircleCheck className="size-4 shrink-0" aria-hidden />
-          Submitted &mdash; you can keep editing until 31 August.
+          {isLateJoiner
+            ? "Submitted \u2014 you can change it any time."
+            : "Submitted \u2014 you can keep editing until 31 August."}
         </p>
       ) : null}
 
@@ -709,6 +711,7 @@ export function PredictTableFlow({
         <SubmittedMoment
           assignments={assignments}
           teamsById={teamsById}
+          isLateJoiner={isLateJoiner}
           onDismiss={() => {
             setJustSubmitted(false);
             // A Late Joiner who (re-)submits goes back to their scored
