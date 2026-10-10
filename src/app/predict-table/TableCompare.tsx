@@ -22,7 +22,6 @@ import {
   MAX_BAND_BONUS,
   MAX_BOLD_CALLS_SCORE,
   MAX_PLACEMENT,
-  SCORING_REACH,
   distanceLabel,
   gapSentence,
   leads,
@@ -53,7 +52,7 @@ export interface ComparePlayer {
 }
 
 const BAND_COUNT = TABLE_BANDS.length;
-const BOLD_CALL_KEY = `+${String(BOLD_CALL_BONUS)} Bold Call`;
+const BOLD_CALL_KEY = `Bold Call +${String(BOLD_CALL_BONUS)}`;
 
 const pct = (n: number) => `${String((n * 100) / BAND_COUNT)}%`;
 const centre = (band: number) => pct(band + 0.5);
@@ -105,7 +104,15 @@ export function TableCompare({
           the card instead of the page. overflow-clip rounds the corners
           without that side effect. */}
       <div className={`overflow-clip rounded-card bg-surface ${CARD_SHADOW}`}>
-        <ChartKey themName={them.displayName} seasonOver={seasonOver} />
+        <ChartKey
+          themName={them.displayName}
+          showBoldCall={comparison.sections.some((section) =>
+            section.rows.some((row) => row.you.boldCall || row.them.boldCall),
+          )}
+          showExactBand={comparison.sections.some(
+            (section) => section.youBandBonus > 0 || section.themBandBonus > 0,
+          )}
+        />
         <StickyMarks />
         <ol className="flex flex-col">
           {comparison.sections.map((section) => {
@@ -423,66 +430,87 @@ function Mark({
   );
 }
 
-/** What each mark means, in the role /picks' PicksLegend plays. */
+/**
+ * What each mark means, in the role /picks' PicksLegend plays. Two tiers:
+ * who (the two marks), then how to read the chart -- one quiet row of
+ * same-sized samples with short labels. Entries for things that aren't on
+ * this chart (no Bold Call, no exact Band) are left out.
+ */
 function ChartKey({
   themName,
-  seasonOver,
+  showBoldCall,
+  showExactBand,
 }: {
   themName: string;
-  seasonOver: boolean;
+  showBoldCall: boolean;
+  showExactBand: boolean;
 }) {
   const item = "flex items-center gap-1.5";
+  // Every sample sits in the same box, so the labels line up.
+  const sample = "flex h-4 w-6 shrink-0 items-center justify-center";
   return (
     <div
-      className={`flex flex-wrap gap-x-4 gap-y-1.5 border-b border-paper-line ${INSET} py-2.5 ${T.caption} ${TX.muted}`}
+      className={`flex flex-col gap-1.5 border-b border-paper-line ${INSET} py-2.5`}
     >
-      <span className={item}>
-        <Mark who="you" />
-        <span className={`font-bold ${TX.base}`}>You</span>
-      </span>
-      <span className={item}>
-        <Mark who="them" />
-        <span className={`font-bold ${TX.base}`}>{themName}</span>
-      </span>
-      <span className={item}>
-        <span aria-hidden className="h-1.5 w-5 rounded-badge bg-accent" />
-        How far off: shorter scores more
-      </span>
-      <span className={item}>
-        <Mark who="you" hit size="size-4" />
-        Right Band
-      </span>
-      <span className={item}>
-        {/* A no-points call in miniature: faded bar, lightly faded mark. */}
-        <span aria-hidden className="flex items-center">
-          <span className="h-1.5 w-4 rounded-badge bg-accent opacity-35" />
-          <Mark who="you" className="-ml-1 opacity-60" />
+      <div
+        className={`flex flex-wrap gap-x-4 ${T.caption} font-bold ${TX.base}`}
+      >
+        <span className={item}>
+          <Mark who="you" />
+          You
         </span>
-        {`No points: ${String(SCORING_REACH + 1)}+ Bands out`}
-      </span>
-      <span className={item}>
-        {/* The current-Band column and its finish line, in miniature. */}
-        <span
-          aria-hidden
-          className="relative flex h-4 w-3 justify-center bg-paper"
-        >
-          <span className="h-full w-px bg-ink" />
+        <span className={`${item} min-w-0`}>
+          <Mark who="them" />
+          <span className="truncate">{themName}</span>
         </span>
-        {seasonOver ? "Where it finished" : "Where it is now"}
-      </span>
-      <span className={item}>
-        <Star className={`size-3 fill-current ${TX.base}`} aria-hidden />
-        {BOLD_CALL_KEY}
-      </span>
-      <span className={item}>
-        <span
-          aria-hidden
-          className={`flex items-center rounded-badge bg-success px-1 py-0.5 ${TX.onInk}`}
-        >
-          <Check className="size-3 stroke-[3]" />
+      </div>
+      <div
+        className={`flex flex-wrap gap-x-3.5 gap-y-1 ${T.caption} ${TX.muted}`}
+      >
+        <span className={item}>
+          {/* The finish line with a bar running out from it: the line is
+              where the club is, the bar how far off a call was. */}
+          <span aria-hidden className={`${sample} justify-start`}>
+            <span className="h-4 w-px bg-ink" />
+            <span className="h-1.5 w-4 rounded-badge bg-accent" />
+          </span>
+          Shorter scores more
         </span>
-        Band exactly right
-      </span>
+        <span className={item}>
+          <span aria-hidden className={sample}>
+            <Mark who="you" hit size="size-4" />
+          </span>
+          Right Band
+        </span>
+        <span className={item}>
+          {/* A no-points call in miniature: faded bar, lightly faded mark. */}
+          <span aria-hidden className={sample}>
+            <span className="h-1.5 w-3 rounded-badge bg-accent opacity-35" />
+            <Mark who="you" className="-ml-1 opacity-60" />
+          </span>
+          No points
+        </span>
+        {showBoldCall ? (
+          <span className={item}>
+            <span aria-hidden className={sample}>
+              <Star className={`size-3 fill-current ${TX.base}`} />
+            </span>
+            {BOLD_CALL_KEY}
+          </span>
+        ) : null}
+        {showExactBand ? (
+          <span className={item}>
+            <span aria-hidden className={sample}>
+              <span
+                className={`flex items-center rounded-badge bg-success px-1 py-0.5 ${TX.onInk}`}
+              >
+                <Check className="size-3 stroke-[3]" />
+              </span>
+            </span>
+            Exact Band
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }
