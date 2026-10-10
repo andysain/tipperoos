@@ -27,7 +27,7 @@ import {
 import { T, TX } from "@/components/ui/tokens";
 import { PredictTableFlow } from "./PredictTableFlow";
 import { BandSummary } from "./BandSummary";
-import { TableSingle } from "./TableSingle";
+import { EditTableLink, TableSingle } from "./TableSingle";
 import type { Team } from "./shared";
 
 // Reads the session + DB fresh on every request -- this is a personalized,
@@ -75,7 +75,9 @@ export default async function PredictTablePage({
       .order("name", { ascending: true }),
     getDatabaseTime(supabase),
     getTablePredictionRecord(supabase, playerId),
-    loadScoredCohort(supabase, competitionId),
+    // Caught into the page's own "Try refreshing" branch below: unlike
+    // the kickoff lookup it replaced, the cohort read throws on failure.
+    loadScoredCohort(supabase, competitionId).catch(() => null),
   ]);
 
   if (!player) {
@@ -108,6 +110,16 @@ export default async function PredictTablePage({
     );
   }
 
+  if (!cohort) {
+    return (
+      <main className="flex min-h-full flex-1 items-center justify-center bg-paper p-4">
+        <p className="text-danger">
+          Couldn&apos;t load Predict the Table. Try refreshing.
+        </p>
+      </main>
+    );
+  }
+
   const editability = getTablePredictionEditability({
     joinedAt: player.joinedAt,
     now: databaseTime,
@@ -117,7 +129,6 @@ export default async function PredictTablePage({
   const view = decidePredictTableView({
     locked: editability.locked,
     isLateJoiner: editability.isLateJoiner,
-    isSkipped: prediction?.skipped ?? false,
     hasSubmittedTable: cohort.players.has(playerId),
     standingsComplete: cohort.actualOrder.length > 0,
     editRequested: edit === "1",
@@ -164,6 +175,7 @@ export default async function PredictTablePage({
           assignments={assignments}
           teamsById={new Map(teamList.map((team) => [team.id, team]))}
         />
+        {editability.isLateJoiner ? <EditTableLink /> : null}
       </>,
     );
   }

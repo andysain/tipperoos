@@ -89,8 +89,8 @@ export default async function CompareTablePage({
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4">
         {top}
         <p className={`${T.caption} ${TX.muted}`}>
-          Nothing to compare yet. Tables are scored against the real league
-          table, and that arrives with the first standings update.
+          Nothing scored yet. Tables are scored against the real league table,
+          and that arrives with the first standings update.
         </p>
       </main>
     );

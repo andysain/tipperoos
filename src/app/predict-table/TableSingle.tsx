@@ -328,17 +328,7 @@ function Header({
             : "none yet."}
         </p>
 
-        {editHref ? (
-          // A Late Joiner can always edit (CLAUDE.md); the secondary button
-          // -- ink, not the accent, which the gold marks already spend
-          // (DESIGN.md -> Buttons).
-          <Link
-            href={editHref}
-            className={`flex min-h-11 items-center justify-center rounded-btn bg-ink px-5 ${T.dense} font-bold ${TX.onInk} ${FOCUS}`}
-          >
-            Edit my table
-          </Link>
-        ) : null}
+        {editHref ? <EditTableLink href={editHref} /> : null}
       </div>
     </CardShell>
   );
@@ -394,5 +384,25 @@ function Row({
         <PointsCell call={row.call} className={pointsClass(row.call.points)} />
       </button>
     </li>
+  );
+}
+
+/**
+ * A Late Joiner's way back to the capture board (#226 S3): they can always
+ * edit (CLAUDE.md). The small secondary button -- ink, not the accent,
+ * which the gold marks already spend (DESIGN.md -> Buttons).
+ */
+export function EditTableLink({
+  href = "/predict-table?edit=1" as Route,
+}: {
+  href?: Route;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`flex min-h-11 items-center justify-center rounded-btn bg-ink px-3.5 py-2 ${T.dense} font-bold ${TX.onInk} ${FOCUS}`}
+    >
+      Edit my table
+    </Link>
   );
 }

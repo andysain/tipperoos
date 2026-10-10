@@ -413,7 +413,9 @@ export function scorePartExplainers(
   const boldCall = `A right Band that no more than roughly one in ten players also called is a Bold Call, worth ${pointLabel(BOLD_CALL_BONUS)}. ${you ? "Your" : "The"} best ${String(MAX_BOLD_CALLS)} count.`;
   return {
     placement: `Each club scores for how close ${you ? "you put it" : "it was put"}: ${PLACEMENT_STEPS}, and any further scores 0.`,
-    bandBonus: `Get every club in a Band right, in any order, for a bonus: ${BAND_BONUS_AMOUNTS}.`,
+    bandBonus: you
+      ? `Get every club in a Band right, in any order, for a bonus: ${BAND_BONUS_AMOUNTS}.`
+      : `A Band with every club right, in any order, earns a bonus: ${BAND_BONUS_AMOUNTS}.`,
     boldCall: anyLateJoiner
       ? `${boldCall} Late Joiners can't earn Bold Calls.`
       : boldCall,

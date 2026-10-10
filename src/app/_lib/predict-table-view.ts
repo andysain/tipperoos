@@ -17,7 +17,6 @@ export function decidePredictTableView(params: {
   /** On-time and past the deadline. A Late Joiner is never locked. */
   locked: boolean;
   isLateJoiner: boolean;
-  isSkipped: boolean;
   /** A member of the scored cohort: submitted and not skipped. */
   hasSubmittedTable: boolean;
   /** All 20 standings exist, so tables can be scored. */
@@ -28,21 +27,18 @@ export function decidePredictTableView(params: {
   const {
     locked,
     isLateJoiner,
-    isSkipped,
     hasSubmittedTable,
     standingsComplete,
     editRequested,
   } = params;
 
-  // S3: a Late Joiner can always edit. They see their scored table when
-  // they have one, and the capture board (or skipped screen) otherwise.
+  // S3: a Late Joiner can always edit. A submitted table shows scored (or
+  // waiting for standings, S4); asking to edit, an un-submitted table and
+  // a skip all keep the capture board or skipped screen. A skipped table
+  // is never "submitted" -- the cohort leaves it out.
   if (isLateJoiner) {
-    return hasSubmittedTable &&
-      standingsComplete &&
-      !editRequested &&
-      !isSkipped
-      ? "single"
-      : "flow";
+    if (!hasSubmittedTable || editRequested) return "flow";
+    return standingsComplete ? "single" : "awaiting-standings";
   }
 
   // On time, before the deadline: still filling it in.

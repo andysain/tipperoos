@@ -7,7 +7,6 @@ import { decidePredictTableView } from "./predict-table-view";
 const base = {
   locked: false,
   isLateJoiner: false,
-  isSkipped: false,
   hasSubmittedTable: false,
   standingsComplete: true,
   editRequested: false,
@@ -83,17 +82,19 @@ describe("decidePredictTableView -- Late Joiners (never locked)", () => {
     expect(decidePredictTableView(late)).toBe("flow");
   });
 
-  it("keeps the skipped screen for a Late Joiner who skipped", () => {
-    expect(decidePredictTableView({ ...late, isSkipped: true })).toBe("flow");
+  it("keeps the skipped screen for a Late Joiner who skipped -- a skipped table is never submitted", () => {
+    expect(decidePredictTableView({ ...late, hasSubmittedTable: false })).toBe(
+      "flow",
+    );
   });
 
-  it("keeps the capture board until standings exist", () => {
+  it("waits for standings with a submitted table, like everyone else (S4)", () => {
     expect(
       decidePredictTableView({
         ...late,
         hasSubmittedTable: true,
         standingsComplete: false,
       }),
-    ).toBe("flow");
+    ).toBe("awaiting-standings");
   });
 });

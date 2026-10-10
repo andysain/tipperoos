@@ -15,7 +15,14 @@ describe("staleStandingsNote", () => {
     expect(staleStandingsNote(later, updated, "Australia/Sydney")).toBe(
       "Mon 24 Aug",
     );
-    expect(staleStandingsNote(later, updated, "America/Los_Angeles")).toBe(
+    // 20:00 UTC is already Tuesday in Sydney but still Monday in LA: the
+    // date must follow the viewer's zone, not the server's.
+    const evening = new Date("2026-08-24T20:00:00Z");
+    const after = new Date(evening.getTime() + LIVE_STANDINGS_STALE_MS + 1);
+    expect(staleStandingsNote(after, evening, "Australia/Sydney")).toBe(
+      "Tue 25 Aug",
+    );
+    expect(staleStandingsNote(after, evening, "America/Los_Angeles")).toBe(
       "Mon 24 Aug",
     );
   });

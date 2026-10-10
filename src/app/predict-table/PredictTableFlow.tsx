@@ -47,6 +47,8 @@ import { BandSummary } from "./BandSummary";
 import { BandsBoard, type UndoState } from "./BandsBoard";
 import { ChampionCelebration } from "./ChampionCelebration";
 import { SubmittedMoment } from "./SubmittedMoment";
+import { useRouter } from "next/navigation";
+import type { Route } from "next";
 import { BAND_LABEL, type Team } from "./shared";
 import { FOCUS, T, TX } from "@/components/ui/tokens";
 
@@ -169,6 +171,7 @@ export function PredictTableFlow({
 
   const [isSkipped, setIsSkipped] = useState(initialIsSkipped);
   const [submittedAt, setSubmittedAt] = useState(initialSubmittedAt);
+  const router = useRouter();
   const [saveError, setSaveError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -477,9 +480,7 @@ export function PredictTableFlow({
 
   return (
     <main className="relative mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4">
-      <h1 className={`${T.h1} font-extrabold ${TX.base}`}>
-        Predict the Table
-      </h1>
+      <h1 className={`${T.h1} font-extrabold ${TX.base}`}>Predict the Table</h1>
       {/* The instruction line is for someone who hasn't done this before.
           Once a table has been submitted it is five lines of nothing,
           pushing the player's actual table below the fold on a phone -- so
@@ -495,7 +496,9 @@ export function PredictTableFlow({
       <ScoringSummary kind="table" />
 
       <div className="-mt-2 flex items-center justify-between gap-2">
-        <p className={`flex items-center gap-1.5 ${T.label} font-bold ${TX.muted}`}>
+        <p
+          className={`flex items-center gap-1.5 ${T.label} font-bold ${TX.muted}`}
+        >
           <span>
             {placedCount} of {teams.length} placed
           </span>
@@ -520,7 +523,9 @@ export function PredictTableFlow({
 
         {placedCount > 0 ? (
           confirmingStartAgain ? (
-            <span className={`flex shrink-0 items-center gap-2 ${T.label} font-bold`}>
+            <span
+              className={`flex shrink-0 items-center gap-2 ${T.label} font-bold`}
+            >
               <span className={TX.muted}>Start again?</span>
               <button
                 type="button"
@@ -559,7 +564,9 @@ export function PredictTableFlow({
       ) : null}
 
       {submittedAt ? (
-        <p className={`-mt-2 flex items-center gap-1.5 ${T.dense} text-success`}>
+        <p
+          className={`-mt-2 flex items-center gap-1.5 ${T.dense} text-success`}
+        >
           <CircleCheck className="size-4 shrink-0" aria-hidden />
           Submitted &mdash; you can keep editing until 31 August.
         </p>
@@ -639,9 +646,13 @@ export function PredictTableFlow({
                     <span className={`font-extrabold ${TX.base}`}>
                       {BAND_LABEL[mismatch.band]}
                     </span>
-                    <span className={`text-right font-bold ${TX.muted} tabular-nums`}>
+                    <span
+                      className={`text-right font-bold ${TX.muted} tabular-nums`}
+                    >
                       {mismatch.actual} of {mismatch.expected} teams
-                      <span className={`block ${T.caption} font-semibold text-warning`}>
+                      <span
+                        className={`block ${T.caption} font-semibold text-warning`}
+                      >
                         {difference > 0
                           ? `${difference} too many`
                           : `${Math.abs(difference)} more needed`}
@@ -698,7 +709,16 @@ export function PredictTableFlow({
         <SubmittedMoment
           assignments={assignments}
           teamsById={teamsById}
-          onDismiss={() => setJustSubmitted(false)}
+          onDismiss={() => {
+            setJustSubmitted(false);
+            // A Late Joiner who (re-)submits goes back to their scored
+            // table (issue #226 S3): drop any ?edit=1 and let the page
+            // decide again, now that the table is submitted.
+            if (isLateJoiner) {
+              router.replace("/predict-table" as Route);
+              router.refresh();
+            }
+          }}
         />
       ) : null}
 
