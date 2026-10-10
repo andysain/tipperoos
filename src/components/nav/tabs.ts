@@ -26,3 +26,26 @@ export const TABS: Tab[] = [
   { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
   { href: "/predict-table", label: "Predict the Table", icon: ListOrdered },
 ];
+
+/**
+ * Which tab a page belongs to, for the tab bar's highlight. A tab's own
+ * route is its page; a detail page belongs to the tab it's reached from, so
+ * the bar still says where you are. Pages outside the three tabs (How it
+ * works, admin, login) highlight none.
+ *
+ *   /gameweek/[n]            -> Pick Board (reached from a settled slot)
+ *   /picks/[playerId]        -> Leaderboard (reached from a leaderboard row)
+ *   /predict-table/[playerId]-> Leaderboard (the comparison, from a row)
+ */
+export function tabForPath(pathname: string): Tab["href"] | null {
+  if (pathname === "/" || pathname.startsWith("/gameweek/")) return "/";
+  if (
+    pathname === "/leaderboard" ||
+    pathname.startsWith("/picks/") ||
+    pathname.startsWith("/predict-table/")
+  ) {
+    return "/leaderboard";
+  }
+  if (pathname === "/predict-table") return "/predict-table";
+  return null;
+}
