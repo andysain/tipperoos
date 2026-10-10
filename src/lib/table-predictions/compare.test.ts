@@ -11,6 +11,7 @@ import {
   MAX_PLACEMENT,
   arePeerTablesVisible,
   buildTableComparison,
+  buildTableSingle,
   distanceLabel,
   gapSentence,
   isSeasonOver,
@@ -259,5 +260,67 @@ describe("score-part maximums", () => {
 describe("SCORING_REACH", () => {
   it("is 2: a call one or two Bands out still scores, three or more scores 0 (CLAUDE.md)", () => {
     expect(SCORING_REACH).toBe(2);
+  });
+});
+
+// --- One player (issue #226 S6) ---------------------------------------------
+// The same hand-derived scenario as above, seen from "you" alone: the
+// comparison's figures for that side must come out of the one-player builder
+// unchanged -- Placement 94, Band Bonus 65, one Bold Call +3, total 162.
+
+const single = buildTableSingle({
+  actualOrder: TEAMS,
+  teams,
+  side: { bands: youBands, result: results.get("you")! },
+});
+
+const singleRow = (teamId: string) =>
+  single.sections.flatMap((s) => s.rows).find((r) => r.teamId === teamId)!;
+
+describe("buildTableSingle -- one player against the real table", () => {
+  it("carries that player's totals and parts", () => {
+    expect(single.totals.placement).toBe(94);
+    expect(single.totals.bandBonus).toBe(65);
+    expect(single.totals.boldCalls).toBe(3);
+    expect(single.totals.total).toBe(162);
+    expect(single.totals.exactBands).toHaveLength(6);
+  });
+
+  it("scores each row as Placement plus any Bold Call", () => {
+    expect(singleRow("t1").call.band).toBe(1);
+    expect(singleRow("t1").call.points).toBe(2);
+    expect(singleRow("t20").call.placement).toBe(5);
+    expect(singleRow("t20").call.points).toBe(8);
+    expect(singleRow("t20").call.boldCall).toBe(true);
+    expect(singleRow("t10").call.points).toBe(5);
+  });
+
+  it("puts each exact Band's bonus on its own section", () => {
+    expect(single.sections).toHaveLength(8);
+    expect(single.sections[0].bandBonus).toBe(0);
+    expect(single.sections[1].bandBonus).toBe(0);
+    expect(single.sections[2].bandBonus).toBe(10);
+    expect(single.sections[7].bandBonus).toBe(15);
+    expect(single.sections[7].rows.map((r) => r.position)).toEqual([
+      18, 19, 20,
+    ]);
+  });
+
+  it("agrees with the comparison's side, row for row", () => {
+    const compared = comparison.sections.flatMap((s) => s.rows);
+    for (const r of single.sections.flatMap((s) => s.rows)) {
+      const twin = compared.find((c) => c.teamId === r.teamId)!;
+      expect(r.call).toEqual(twin.you);
+    }
+    expect(single.totals).toEqual(comparison.you);
+  });
+
+  it("rows sum to Placement + Bold Calls, and adding the section bonuses gives the total", () => {
+    const rowSum = single.sections
+      .flatMap((s) => s.rows)
+      .reduce((sum, r) => sum + r.call.points, 0);
+    const bonusSum = single.sections.reduce((sum, s) => sum + s.bandBonus, 0);
+    expect(rowSum).toBe(97);
+    expect(rowSum + bonusSum).toBe(single.totals.total);
   });
 });

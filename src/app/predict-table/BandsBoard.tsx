@@ -19,6 +19,7 @@ import {
   FILL_GROUND,
   HEADER_BACKGROUND,
   PLACED_TEAM_GRID_COLS,
+  ordinal,
   teamFill,
   type Team,
 } from "./shared";
@@ -45,7 +46,9 @@ export type UndoState = MoveUndo;
  * to the thing it's talking about. */
 function UndoRow({ undo, onUndo }: { undo: UndoState; onUndo: () => void }) {
   return (
-    <div className={`mb-2 flex items-center justify-between gap-2 rounded-btn-sm bg-ink/[0.06] px-3 py-2 ${T.label} ${TX.muted}`}>
+    <div
+      className={`mb-2 flex items-center justify-between gap-2 rounded-btn-sm bg-ink/[0.06] px-3 py-2 ${T.label} ${TX.muted}`}
+    >
       <span className="truncate">{undo.label}</span>
       <button
         type="button"
@@ -125,7 +128,10 @@ function PlacedTeamCard({
           defensible at all -- now lives entirely in the plain-English line
           above the roster, which names the club. This card keeps only the
           warm tint, so that sentence has something to point at. */}
-      <X aria-hidden className={`size-4 shrink-0 self-center ${TX.decorative}`} />
+      <X
+        aria-hidden
+        className={`size-4 shrink-0 self-center ${TX.decorative}`}
+      />
     </button>
   );
 }
@@ -162,12 +168,14 @@ function RosterChip({
       onClick={onTap}
       disabled={disabled || busy}
       title={
-        position ? `${team.name} \u2014 finished ${position}th` : team.name
+        position
+          ? `${team.name} \u2014 finished ${ordinal(position)}`
+          : team.name
       }
       aria-label={
         band
           ? `Move ${team.name} out of ${BAND_LABEL[band]}`
-          : `Place ${team.name}${position ? `, finished ${position}th` : ", promoted"}`
+          : `Place ${team.name}${position ? `, finished ${ordinal(position)}` : ", promoted"}`
       }
       className={`flex items-center gap-1.5 overflow-hidden rounded-btn-sm border py-1.5 pr-2 pl-1.5 text-left transition disabled:cursor-not-allowed disabled:opacity-40 ${FOCUS} ${
         band
@@ -232,7 +240,9 @@ function MemberName({ team }: { team: Team }) {
         className="h-3.5 w-[3px] shrink-0 rounded-full"
         style={{ background: teamFill(team.shortCode) }}
       />
-      <span className={`min-w-0 truncate ${T.caption} leading-snug font-bold ${TX.muted}`}>
+      <span
+        className={`min-w-0 truncate ${T.caption} leading-snug font-bold ${TX.muted}`}
+      >
         {team.displayName}
       </span>
     </span>
@@ -375,7 +385,9 @@ function CollapsedBandRow({
           ))}
         </span>
       ) : (
-        <span className={`w-full ${T.caption} leading-snug font-semibold ${TX.decorative}`}>
+        <span
+          className={`w-full ${T.caption} leading-snug font-semibold ${TX.decorative}`}
+        >
           Nobody yet
         </span>
       )}
@@ -491,16 +503,22 @@ export function BandsBoard({
                   className={`-my-1 flex w-full items-center justify-between gap-2 py-1 text-left ${FOCUS}`}
                 >
                   <span className="flex min-w-0 items-center gap-2">
-                    <span className={`inline-flex shrink-0 items-center justify-center rounded-badge bg-paper/15 px-2 py-1 ${T.label} font-extrabold text-paper tabular-nums`}>
+                    <span
+                      className={`inline-flex shrink-0 items-center justify-center rounded-badge bg-paper/15 px-2 py-1 ${T.label} font-extrabold text-paper tabular-nums`}
+                    >
                       {meta.positions}
                     </span>
-                    <h2 className={`inline-flex min-w-0 items-center gap-1.5 truncate ${T.caption} font-bold tracking-[0.04em] text-paper uppercase`}>
+                    <h2
+                      className={`inline-flex min-w-0 items-center gap-1.5 truncate ${T.caption} font-bold tracking-[0.04em] text-paper uppercase`}
+                    >
                       <meta.Icon className="size-4 shrink-0" aria-hidden />
                       {band.label}
                     </h2>
                   </span>
                   <span className="flex shrink-0 items-center gap-1.5">
-                    <span className={`${T.label} font-bold tabular-nums text-paper/85`}>
+                    <span
+                      className={`${T.label} font-bold tabular-nums text-paper/85`}
+                    >
                       {countRead(inBand.length, band.target)}
                     </span>
                     <ChevronUp className="size-4 text-paper/70" aria-hidden />
@@ -517,7 +535,9 @@ export function BandsBoard({
                     eight collapsed rows would be noise; burying it in the
                     scoring accordion (where it also lives) is too late. */}
                 {band.target > 1 ? (
-                  <p className={`mb-2 px-0.5 ${T.label} font-semibold ${TX.muted}`}>
+                  <p
+                    className={`mb-2 px-0.5 ${T.label} font-semibold ${TX.muted}`}
+                  >
                     Any order &mdash; only who&apos;s in the Band counts.
                   </p>
                 ) : null}
@@ -587,7 +607,9 @@ export function BandsBoard({
                 ) : null}
 
                 <>
-                  <p className={`mt-3 mb-2 px-0.5 ${T.label} font-bold tracking-[0.12em] ${TX.muted} uppercase`}>
+                  <p
+                    className={`mt-3 mb-2 px-0.5 ${T.label} font-bold tracking-[0.12em] ${TX.muted} uppercase`}
+                  >
                     Still to place
                   </p>
                   {/* The eviction rule, stated where the tap that triggers
@@ -595,7 +617,9 @@ export function BandsBoard({
                         full, so it reads as a live consequence rather than
                         a standing instruction. */}
                   {nextOutTeamId ? (
-                    <p className={`-mt-1 mb-2 px-0.5 ${T.caption} font-semibold ${TX.muted}`}>
+                    <p
+                      className={`-mt-1 mb-2 px-0.5 ${T.caption} font-semibold ${TX.muted}`}
+                    >
                       {band.label} is full. Tapping another club swaps it in for{" "}
                       <span className={`font-extrabold ${TX.base}`}>
                         {teams.find((t) => t.id === nextOutTeamId)
@@ -626,7 +650,9 @@ export function BandsBoard({
                       tidying itself, not as the list losing their place. */}
                   {demotedFrom < teams.length ? (
                     <>
-                      <p className={`mt-3 mb-1.5 px-0.5 ${T.label} font-bold tracking-[0.1em] ${TX.decorative} uppercase`}>
+                      <p
+                        className={`mt-3 mb-1.5 px-0.5 ${T.label} font-bold tracking-[0.1em] ${TX.decorative} uppercase`}
+                      >
                         Already placed &middot; {teams.length - demotedFrom}
                         <span className="ml-1.5 font-semibold tracking-normal normal-case">
                           &mdash; tap one to move it here

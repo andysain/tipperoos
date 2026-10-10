@@ -94,6 +94,55 @@ export interface TableComparison {
   them: SideTotals;
 }
 
+/** One club's row in the one-player view (issue #226). */
+export interface SingleRow {
+  teamId: TeamId;
+  name: string;
+  shortCode: string | null;
+  position: number;
+  actualBand: number;
+  call: SideCall;
+}
+
+export interface SingleSection {
+  bandIndex: number;
+  label: string;
+  rows: SingleRow[];
+  /** This Band's exact-membership bonus for the player; 0 if not exact. */
+  bandBonus: number;
+}
+
+export interface TableSingle {
+  sections: SingleSection[];
+  totals: SideTotals;
+}
+
+/** A club's place in the current standings, as both builders lay it out. */
+interface Standing {
+  teamId: TeamId;
+  name: string;
+  shortCode: string | null;
+  position: number;
+  actualBand: number;
+}
+
+function standings(
+  actualOrder: readonly TeamId[],
+  teams: ReadonlyMap<TeamId, ComparisonTeam>,
+): Standing[] {
+  return actualOrder.map((teamId, index) => {
+    const position = index + 1;
+    const team = teams.get(teamId);
+    return {
+      teamId,
+      name: team?.name ?? teamId,
+      shortCode: team?.shortCode ?? null,
+      position,
+      actualBand: bandIndexForRank(position),
+    };
+  });
+}
+
 function sideCall(side: ComparedSide, teamId: TeamId): SideCall {
   const placement = side.result.teamScores[teamId] ?? 0;
   const boldCall = side.result.boldCalls.includes(teamId);
@@ -141,26 +190,47 @@ export function buildTableComparison(params: {
     themBandBonus: bandBonus(them.result, bandIndex),
   }));
 
-  actualOrder.forEach((teamId, index) => {
-    const position = index + 1;
-    const actualBand = bandIndexForRank(position);
-    const team = teams.get(teamId);
-    sections[actualBand].rows.push({
-      teamId,
-      name: team?.name ?? teamId,
-      shortCode: team?.shortCode ?? null,
-      position,
-      actualBand,
-      you: sideCall(you, teamId),
-      them: sideCall(them, teamId),
+  for (const standing of standings(actualOrder, teams)) {
+    sections[standing.actualBand].rows.push({
+      ...standing,
+      you: sideCall(you, standing.teamId),
+      them: sideCall(them, standing.teamId),
     });
-  });
+  }
 
   return {
     sections,
     you: sideTotals(you.result),
     them: sideTotals(them.result),
   };
+}
+
+/**
+ * One player's table against the real one (issue #226): the comparison's
+ * arithmetic for a single side, so the two views can never disagree about
+ * a club, a Band or a total.
+ */
+export function buildTableSingle(params: {
+  actualOrder: readonly TeamId[];
+  teams: ReadonlyMap<TeamId, ComparisonTeam>;
+  side: ComparedSide;
+}): TableSingle {
+  const { actualOrder, teams, side } = params;
+  const sections: SingleSection[] = TABLE_BANDS.map((band, bandIndex) => ({
+    bandIndex,
+    label: band.label,
+    rows: [],
+    bandBonus: bandBonus(side.result, bandIndex),
+  }));
+
+  for (const standing of standings(actualOrder, teams)) {
+    sections[standing.actualBand].rows.push({
+      ...standing,
+      call: sideCall(side, standing.teamId),
+    });
+  }
+
+  return { sections, totals: sideTotals(side.result) };
 }
 
 /** "Right Band", "1 Band out", "3+ Bands out", or "Not placed". */
