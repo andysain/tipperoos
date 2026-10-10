@@ -11,11 +11,16 @@
 // ink identity band over a white body, the leaderboard's `n/200` totals,
 // BandSummary's kit-coloured club badges and Band icons.
 
-import { useEffect, useRef, useState } from "react";
-import { Check, Star, X } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
+import Link from "next/link";
+import type { Route } from "next";
+import { Check, Info, Star, X } from "lucide-react";
 import {
   BOLD_CALL_BONUS,
+  MAX_BOLD_CALLS,
   MAX_PREDICT_TABLE_SCORE,
+  PLACEMENT_POINTS_BY_DISTANCE,
+  TABLE_BANDS as SCORING_BANDS,
 } from "@/lib/scoring/predict-table";
 import { TABLE_BANDS } from "@/lib/table-predictions/rules";
 import {
@@ -199,12 +204,16 @@ function Header({
 }) {
   const youT = comparison.you;
   const themT = comparison.them;
+  const [openPart, setOpenPart] = useState<string | null>(null);
+  const anyLateJoiner = you.isLateJoiner || them.isLateJoiner;
   const parts: {
     key: string;
     label: string;
     max: number;
     you: number;
     them: number;
+    explainer: string;
+    total?: boolean;
   }[] = [
     {
       key: "placement",
@@ -212,6 +221,7 @@ function Header({
       max: MAX_PLACEMENT,
       you: youT.placement,
       them: themT.placement,
+      explainer: PLACEMENT_EXPLAINER,
     },
     {
       key: "bands",
@@ -219,6 +229,7 @@ function Header({
       max: MAX_BAND_BONUS,
       you: youT.bandBonus,
       them: themT.bandBonus,
+      explainer: BAND_BONUS_EXPLAINER,
     },
     {
       key: "bold",
@@ -226,6 +237,18 @@ function Header({
       max: MAX_BOLD_CALLS_SCORE,
       you: youT.boldCalls,
       them: themT.boldCalls,
+      explainer: anyLateJoiner
+        ? `${BOLD_CALL_EXPLAINER} Late Joiners can't earn Bold Calls.`
+        : BOLD_CALL_EXPLAINER,
+    },
+    {
+      key: "total",
+      label: "Total",
+      max: MAX_PREDICT_TABLE_SCORE,
+      you: youT.total,
+      them: themT.total,
+      explainer: TOTAL_EXPLAINER,
+      total: true,
     },
   ];
 
@@ -270,51 +293,28 @@ function Header({
           </thead>
           <tbody>
             {parts.map((part) => (
-              <tr key={part.key} className="border-t border-paper-line">
-                <th
-                  scope="row"
-                  className={`py-1.5 text-left font-normal ${TX.muted}`}
-                >
-                  {part.label}
-                  <span className={`ml-1 ${T.caption} tabular-nums`}>
-                    /{part.max}
-                  </span>
-                </th>
-                <td
-                  className={`py-1.5 text-right ${emphasis(part.you, part.them)}`}
-                >
-                  {part.key === "bold" ? boldCell(you, part.you) : part.you}
-                </td>
-                <td
-                  className={`py-1.5 text-right ${emphasis(part.them, part.you)}`}
-                >
-                  {part.key === "bold" ? boldCell(them, part.them) : part.them}
-                </td>
-              </tr>
+              <ScorePartRows
+                key={part.key}
+                label={part.label}
+                max={part.max}
+                total={part.total ?? false}
+                explainer={part.explainer}
+                open={openPart === part.key}
+                onToggle={() =>
+                  setOpenPart((current) =>
+                    current === part.key ? null : part.key,
+                  )
+                }
+                youCell={
+                  part.key === "bold" ? boldCell(you, part.you) : part.you
+                }
+                themCell={
+                  part.key === "bold" ? boldCell(them, part.them) : part.them
+                }
+                youClass={emphasis(part.you, part.them)}
+                themClass={emphasis(part.them, part.you)}
+              />
             ))}
-            <tr className="border-t border-paper-line">
-              <th
-                scope="row"
-                className={`py-1.5 text-left font-bold ${TX.base}`}
-              >
-                Total
-                <span
-                  className={`ml-1 ${T.caption} font-normal tabular-nums ${TX.muted}`}
-                >
-                  /{MAX_PREDICT_TABLE_SCORE}
-                </span>
-              </th>
-              <td
-                className={`py-1.5 text-right ${emphasis(youT.total, themT.total)}`}
-              >
-                {youT.total}
-              </td>
-              <td
-                className={`py-1.5 text-right ${emphasis(themT.total, youT.total)}`}
-              >
-                {themT.total}
-              </td>
-            </tr>
           </tbody>
         </table>
 
@@ -324,6 +324,119 @@ function Header({
         </p>
       </div>
     </CardShell>
+  );
+}
+
+// How each score part works, in /how-it-works' own words, with every number
+// read from src/lib/scoring -- never typed (PRODUCT.md).
+const PLACEMENT_EXPLAINER = `Each club scores for how close you put it: ${PLACEMENT_POINTS_BY_DISTANCE.map(
+  (points, distance) =>
+    distance === 0
+      ? `right Band ${pointLabel(points)}`
+      : `${String(distance)} Band${distance === 1 ? "" : "s"} away ${pointLabel(points)}`,
+).join(", ")}, and any further scores 0.`;
+
+const BAND_BONUS_EXPLAINER = (() => {
+  // Bands grouped by bonus; the biggest group reads as "every other Band".
+  const groups = [...new Set(SCORING_BANDS.map((band) => band.bonus))]
+    .map((bonus) => ({
+      bonus,
+      names: SCORING_BANDS.filter((band) => band.bonus === bonus).map(
+        (band) => band.name,
+      ),
+    }))
+    .sort((a, b) => a.names.length - b.names.length);
+  const amounts = groups.map((group, index) =>
+    index === groups.length - 1
+      ? `every other Band ${pointLabel(group.bonus)}`
+      : `${group.names.join(", ")} ${pointLabel(group.bonus)}`,
+  );
+  return `Get every club in a Band right, in any order, for a bonus: ${amounts.join(", ")}.`;
+})();
+
+const BOLD_CALL_EXPLAINER = `A right Band that no more than roughly one in ten players also called is a Bold Call, worth ${pointLabel(BOLD_CALL_BONUS)}. Your best ${String(MAX_BOLD_CALLS)} count.`;
+
+const TOTAL_EXPLAINER =
+  "Placement, Band Bonus and Bold Calls added up. These points stay separate from your weekly points.";
+
+/**
+ * One score part's row, with an info button that opens how it works in a
+ * row beneath -- a tap, not a hover tooltip, for touch screens. One open at
+ * a time (the caller holds which).
+ */
+function ScorePartRows({
+  label,
+  max,
+  total,
+  explainer,
+  open,
+  onToggle,
+  youCell,
+  themCell,
+  youClass,
+  themClass,
+}: {
+  label: string;
+  max: number;
+  total: boolean;
+  explainer: string;
+  open: boolean;
+  onToggle: () => void;
+  youCell: React.ReactNode;
+  themCell: React.ReactNode;
+  youClass: string;
+  themClass: string;
+}) {
+  const panelId = useId();
+  return (
+    <>
+      <tr className="border-t border-paper-line">
+        <th
+          scope="row"
+          className={`py-1.5 text-left ${total ? `font-bold ${TX.base}` : `font-normal ${TX.muted}`}`}
+        >
+          <span className="inline-flex items-center">
+            {label}
+            <span
+              className={`ml-1 ${T.caption} font-normal tabular-nums ${TX.muted}`}
+            >
+              /{max}
+            </span>
+            {/* A full 44px target, pulled into the row's height so the
+                table doesn't grow (DESIGN.md -> 44px tap targets). */}
+            <button
+              type="button"
+              onClick={onToggle}
+              aria-expanded={open}
+              aria-controls={panelId}
+              aria-label={`How ${label} works`}
+              className={`-my-3 grid size-11 place-items-center rounded-btn-sm ${open ? TX.base : TX.muted} hover:bg-ink/5 ${FOCUS}`}
+            >
+              <Info className="size-3.5" aria-hidden />
+            </button>
+          </span>
+        </th>
+        <td className={`py-1.5 text-right ${youClass}`}>{youCell}</td>
+        <td className={`py-1.5 text-right ${themClass}`}>{themCell}</td>
+      </tr>
+      {open ? (
+        <tr id={panelId}>
+          <td colSpan={3} className="pb-2">
+            <p
+              className={`rounded-btn-sm bg-paper px-3 py-2 ${T.caption} leading-snug ${TX.base}`}
+            >
+              {explainer}{" "}
+              <Link
+                href={"/how-it-works#predict-the-table" as Route}
+                className={`font-bold underline underline-offset-2 ${FOCUS}`}
+              >
+                More in How it works
+              </Link>
+            </p>
+          </td>
+        </tr>
+      ) : null}
+    </>
   );
 }
 
