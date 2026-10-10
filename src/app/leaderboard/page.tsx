@@ -2,6 +2,8 @@ import { loadActivePlayer } from "@/app/_lib/session-player";
 import { getCurrentSeasonId } from "@/app/_lib/gameweek-access";
 import { loadLeaderboard } from "@/app/_lib/leaderboard-access";
 import { loadTableLeaderboard } from "@/app/_lib/table-leaderboard-access";
+import { getDatabaseTime } from "@/app/_lib/table-prediction-access";
+import { arePeerTablesVisible } from "@/lib/table-predictions/compare";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { LeaderboardList } from "@/components/leaderboard/LeaderboardList";
 import { GameweekWrapCard } from "@/components/leaderboard/GameweekWrapCard";
@@ -114,9 +116,11 @@ function SeasonSegment({
 function TableSegment({
   rows,
   scored,
+  tablesVisible,
 }: {
   rows: readonly TableLeaderboardRow[];
   scored: boolean;
+  tablesVisible: boolean;
 }) {
   if (rows.length === 0) {
     return (
@@ -137,7 +141,11 @@ function TableSegment({
         </p>
       ) : null}
 
-      <TableLeaderboardList rows={rows} scored={scored} />
+      <TableLeaderboardList
+        rows={rows}
+        scored={scored}
+        tablesVisible={tablesVisible}
+      />
 
       <p className={`${T.caption} ${TX.muted}`}>
         Tap a player to see how their score breaks down.
@@ -161,13 +169,25 @@ export default async function LeaderboardPage({
   const isTableSegment = segment === "table";
 
   if (isTableSegment) {
-    const view = await loadTableLeaderboard(supabase, competitionId, playerId);
+    // DB time rides in the same wave as the board -- the two are
+    // independent, so the deadline check costs no extra round trip. No DB
+    // time means no peer links: fail closed (issue #214 D5).
+    const [view, databaseTime] = await Promise.all([
+      loadTableLeaderboard(supabase, competitionId, playerId),
+      getDatabaseTime(supabase),
+    ]);
+    const tablesVisible =
+      databaseTime !== null && arePeerTablesVisible(databaseTime);
 
     return (
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4">
         <h1 className={`${T.h1} font-extrabold text-text`}>Leaderboard</h1>
         <LeaderboardSegmentedControl active="table" />
-        <TableSegment rows={view.rows} scored={view.scored} />
+        <TableSegment
+          rows={view.rows}
+          scored={view.scored}
+          tablesVisible={tablesVisible}
+        />
       </main>
     );
   }
