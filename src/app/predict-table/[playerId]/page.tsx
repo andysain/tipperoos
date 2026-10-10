@@ -8,15 +8,17 @@ import { loadTableComparison } from "@/app/_lib/table-compare-access";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
   buildTableComparison,
+  buildTableSingle,
   isSeasonOver,
 } from "@/lib/table-predictions/compare";
-import { LIVE_STANDINGS_STALE_MS } from "@/lib/gameweeks/select-next";
+import { staleStandingsNote } from "@/app/_lib/standings-note";
 import { T, TX, FOCUS } from "@/components/ui/tokens";
 import {
   DEFAULT_TIME_ZONE,
   TIMEZONE_COOKIE_NAME,
 } from "@/components/nav/timezone-cookie";
 import { TableCompare } from "../TableCompare";
+import { TableSingle } from "../TableSingle";
 
 // Compare your Predict the Table entry with another player's, against the
 // real table (issue #214). Reached from a row on the leaderboard's Predict
@@ -71,18 +73,53 @@ export default async function CompareTablePage({
 
   const youResult = cohort.results.get(viewerId);
   const themResult = cohort.results.get(targetId);
+  const timeZone =
+    (await cookies()).get(TIMEZONE_COOKIE_NAME)?.value ?? DEFAULT_TIME_ZONE;
+  const standingsNote = staleStandingsNote(
+    now,
+    cohort.standingsUpdatedAt,
+    timeZone,
+  );
+  const seasonOver = isSeasonOver(cohort.minPlayed);
 
-  // Two states the comparison can't draw, each said in the leaderboard's
-  // muted-caption voice rather than as an empty chart.
-  if (!you || !youResult || !themResult) {
+  // Nothing scored yet -- checked first (#226 S5), whoever is viewing: said
+  // in the leaderboard's muted-caption voice, not drawn as an empty chart.
+  if (!themResult) {
     return (
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4">
         {top}
         <p className={`${T.caption} ${TX.muted}`}>
-          {!you
-            ? `You didn't submit a table, so there's nothing to compare with ${them.displayName}'s.`
-            : "Nothing to compare yet. Tables are scored against the real league table, and that arrives with the first standings update."}
+          Nothing to compare yet. Tables are scored against the real league
+          table, and that arrives with the first standings update.
         </p>
+      </main>
+    );
+  }
+
+  // You have no submitted table: their table on its own (owner decision,
+  // #226) -- their outline mark and neutral wording, never "you" (S5).
+  if (!you || !youResult) {
+    return (
+      <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4">
+        {top}
+        <TableSingle
+          view={buildTableSingle({
+            actualOrder: cohort.actualOrder,
+            teams,
+            side: {
+              bands: cohort.bands.get(targetId) ?? new Map(),
+              result: themResult,
+            },
+          })}
+          player={{
+            displayName: them.displayName,
+            emoji: them.emoji,
+            isLateJoiner: them.isLateJoiner,
+          }}
+          own={false}
+          seasonOver={seasonOver}
+          standingsNote={standingsNote}
+        />
       </main>
     );
   }
@@ -96,26 +133,6 @@ export default async function CompareTablePage({
       result: themResult,
     },
   });
-
-  // Stale on the same 48h rule match selection uses. Formatted here, once,
-  // in the viewer's tz cookie -- a client-side date format hydrates in a
-  // different locale from the server render.
-  const stale =
-    now !== null &&
-    cohort.standingsUpdatedAt !== null &&
-    now.getTime() - cohort.standingsUpdatedAt.getTime() >
-      LIVE_STANDINGS_STALE_MS;
-  const timeZone =
-    (await cookies()).get(TIMEZONE_COOKIE_NAME)?.value ?? DEFAULT_TIME_ZONE;
-  const standingsNote =
-    stale && cohort.standingsUpdatedAt
-      ? new Intl.DateTimeFormat("en-GB", {
-          weekday: "short",
-          day: "numeric",
-          month: "short",
-          timeZone,
-        }).format(cohort.standingsUpdatedAt)
-      : null;
 
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4">
@@ -132,7 +149,7 @@ export default async function CompareTablePage({
           emoji: them.emoji,
           isLateJoiner: them.isLateJoiner,
         }}
-        seasonOver={isSeasonOver(cohort.minPlayed)}
+        seasonOver={seasonOver}
         standingsNote={standingsNote}
       />
     </main>
