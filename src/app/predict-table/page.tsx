@@ -1,39 +1,71 @@
+import { cookies } from "next/headers";
+import type { Route } from "next";
 import { loadActivePlayer } from "@/app/_lib/session-player";
 import {
-  getGameweekOneKickoff,
   getDatabaseTime,
   getPlayerForTablePrediction,
   getTablePredictionRecord,
 } from "@/app/_lib/table-prediction-access";
+import { decidePredictTableView } from "@/app/_lib/predict-table-view";
+import { staleStandingsNote } from "@/app/_lib/standings-note";
 import {
+  BAND_KEYS,
   type BandKey,
+  TABLE_PREDICTION_DEADLINE,
   getTablePredictionEditability,
 } from "@/lib/table-predictions/rules";
+import { loadScoredCohort } from "@/lib/table-predictions/cohort";
+import {
+  buildTableSingle,
+  isSeasonOver,
+} from "@/lib/table-predictions/compare";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import {
+  DEFAULT_TIME_ZONE,
+  TIMEZONE_COOKIE_NAME,
+} from "@/components/nav/timezone-cookie";
+import { T, TX } from "@/components/ui/tokens";
 import { PredictTableFlow } from "./PredictTableFlow";
+import { BandSummary } from "./BandSummary";
+import { TableSingle } from "./TableSingle";
+import type { Team } from "./shared";
 
 // Reads the session + DB fresh on every request -- this is a personalized,
 // lock-time-sensitive page, not something that can be statically cached.
 export const dynamic = "force-dynamic";
 
-export default async function PredictTablePage() {
+// The deadline is the END of its day in Australia/Sydney (rules.ts), so the
+// instant itself reads as the next morning; the moment before it names the
+// day players know ("31 August"). Derived, never typed.
+const DEADLINE_DAY = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "long",
+  timeZone: "Australia/Sydney",
+}).format(new Date(TABLE_PREDICTION_DEADLINE.getTime() - 1));
+
+export default async function PredictTablePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ edit?: string }>;
+}) {
   // Forced-reset gate first (issue #36).
-  const { playerId } = await loadActivePlayer();
+  const { playerId, competitionId } = await loadActivePlayer();
+  const { edit } = await searchParams;
 
   const supabase = createServerSupabaseClient();
 
-  // None of these five reads depends on another's result -- player,
-  // prediction and databaseTime are keyed only on playerId/DB clock,
-  // gameweekOneKickoff and the teams list are global -- so all five run in
-  // one wave instead of player/teams+gameweekOneKickoff+databaseTime/
-  // prediction as three serial stages.
-  // See docs/standards/PERFORMANCE_TESTING_STANDARD.md §4.4.
+  // One wave: none of these reads depends on another's result. The scored
+  // cohort (issue #226 S8) carries Gameweek 1's kickoff, so it replaces the
+  // separate two-deep kickoff lookup, and it carries a member's own Bands,
+  // so the single view needs no ranks read of its own. Serial depth: the
+  // session (1), this wave (2), and -- for the capture board only -- the
+  // ranks tail (3). See docs/standards/PERFORMANCE_TESTING_STANDARD.md §7.
   const [
     player,
     { data: teams, error: teamsError },
-    gameweekOneKickoff,
     databaseTime,
     prediction,
+    cohort,
   ] = await Promise.all([
     getPlayerForTablePrediction(supabase, playerId),
     supabase
@@ -41,9 +73,9 @@ export default async function PredictTablePage() {
       .select("id, name, display_name, short_code, previous_season_position")
       .eq("active", true)
       .order("name", { ascending: true }),
-    getGameweekOneKickoff(supabase),
     getDatabaseTime(supabase),
     getTablePredictionRecord(supabase, playerId),
+    loadScoredCohort(supabase, competitionId),
   ]);
 
   if (!player) {
@@ -79,9 +111,103 @@ export default async function PredictTablePage() {
   const editability = getTablePredictionEditability({
     joinedAt: player.joinedAt,
     now: databaseTime,
-    gameweekOneKickoff,
+    gameweekOneKickoff: cohort.gameweekOneKickoff,
   });
 
+  const view = decidePredictTableView({
+    locked: editability.locked,
+    isLateJoiner: editability.isLateJoiner,
+    isSkipped: prediction?.skipped ?? false,
+    hasSubmittedTable: cohort.players.has(playerId),
+    standingsComplete: cohort.actualOrder.length > 0,
+    editRequested: edit === "1",
+  });
+
+  const teamList: Team[] = teams.map((team) => ({
+    id: team.id,
+    name: team.name,
+    displayName: team.display_name,
+    shortCode: team.short_code,
+    previousSeasonPosition: team.previous_season_position,
+  }));
+
+  const page = (children: React.ReactNode) => (
+    <main className="mx-auto flex w-full max-w-4xl flex-col gap-4 bg-paper p-4">
+      <h1 className={`${T.h1} font-extrabold ${TX.base}`}>Predict the Table</h1>
+      {children}
+    </main>
+  );
+
+  // S2: on time, never submitted before the deadline -- no table to show.
+  if (view === "not-submitted") {
+    return page(
+      <p className={`${T.body} ${TX.base}`}>
+        Your table wasn&apos;t submitted before the deadline ({DEADLINE_DAY}),
+        so it isn&apos;t scored this season.
+      </p>,
+    );
+  }
+
+  const ownBands = cohort.bands.get(playerId) ?? new Map<string, number>();
+
+  // S4: submitted and locked, but nothing to score against yet.
+  if (view === "awaiting-standings") {
+    const assignments = Object.fromEntries(
+      [...ownBands].map(([teamId, index]) => [teamId, BAND_KEYS[index]]),
+    ) as Record<string, BandKey>;
+    return page(
+      <>
+        <p className={`${T.caption} ${TX.muted}`}>
+          Scores show up after the first standings update.
+        </p>
+        <BandSummary
+          assignments={assignments}
+          teamsById={new Map(teamList.map((team) => [team.id, team]))}
+        />
+      </>,
+    );
+  }
+
+  // S1, S3: your table scored against the real one.
+  const ownResult = cohort.results.get(playerId);
+  if (view === "single" && ownResult) {
+    const timeZone =
+      (await cookies()).get(TIMEZONE_COOKIE_NAME)?.value ?? DEFAULT_TIME_ZONE;
+    return page(
+      <TableSingle
+        view={buildTableSingle({
+          actualOrder: cohort.actualOrder,
+          teams: new Map(
+            teamList.map((team) => [
+              team.id,
+              { id: team.id, name: team.name, shortCode: team.shortCode },
+            ]),
+          ),
+          side: { bands: ownBands, result: ownResult },
+        })}
+        player={{
+          displayName: player.displayName,
+          emoji: player.emoji,
+          isLateJoiner: editability.isLateJoiner,
+        }}
+        own
+        seasonOver={isSeasonOver(cohort.minPlayed)}
+        standingsNote={staleStandingsNote(
+          databaseTime,
+          cohort.standingsUpdatedAt,
+          timeZone,
+        )}
+        // S3: a Late Joiner can always edit; an on-time table is locked.
+        editHref={
+          editability.isLateJoiner
+            ? ("/predict-table?edit=1" as Route)
+            : undefined
+        }
+      />,
+    );
+  }
+
+  // The capture board (or a Late Joiner's skipped screen), as before.
   let assignments: Record<string, BandKey> = {};
   if (prediction) {
     const { data: ranks } = await supabase
@@ -95,13 +221,7 @@ export default async function PredictTablePage() {
 
   return (
     <PredictTableFlow
-      teams={teams.map((team) => ({
-        id: team.id,
-        name: team.name,
-        displayName: team.display_name,
-        shortCode: team.short_code,
-        previousSeasonPosition: team.previous_season_position,
-      }))}
+      teams={teamList}
       initialAssignments={assignments}
       isLateJoiner={editability.isLateJoiner}
       locked={editability.locked}
